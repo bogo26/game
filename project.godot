@@ -40,6 +40,11 @@ window/stretch/scale_mode="integer"
 window/dpi/allow_hidpi=true
 window/vsync/vsync_mode=1
 
+[gui]
+
+theme/custom="res://assets/ui/theme.tres"
+theme/default_font_antialiasing=0
+
 [input_devices]
 
 pointing/emulate_touch_from_mouse=false

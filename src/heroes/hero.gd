@@ -27,6 +27,9 @@ var input: PlayerInput
 var world: World
 
 var state: State = State.ALIVE
+var stats := Stats.new()
+## Upgrade id -> times taken this run.
+var upgrade_stacks: Dictionary = {}
 var max_hp := 100.0
 var hp := 100.0
 var armor := 0.0
@@ -42,11 +45,15 @@ var pickup_range := 28.0
 ## Ignores all damage (stress test, debug).
 var god_mode := false
 
-# Combat multipliers (upgrades adjust these in milestone 5).
+# Derived from `stats` by _refresh_stats().
 var damage_mult := 1.0
 var attack_speed_mult := 1.0
 var crit_chance := 0.05
 var crit_mult := 1.75
+var regen := 0.0
+var ult_charge_mult := 1.0
+var life_on_kill := 0.0
+var revive_speed := 1.0
 
 ## [attack, special, movement, ultimate], duplicated from the HeroData.
 var abilities: Array[Ability] = []
@@ -67,16 +74,33 @@ func setup(p_slot: int, p_hero_id: StringName, p_world: World) -> void:
 	input = InputRouter.get_player(slot)
 	color = GameState.player_color(slot)
 	data = load(HERO_DATA_PATH % hero_id) as HeroData
-	max_hp = data.max_hp
-	hp = max_hp
-	armor = data.armor
-	move_speed = data.move_speed
+	stats.set_base(Stats.MAX_HP, data.max_hp)
+	stats.set_base(Stats.ARMOR, data.armor)
+	stats.set_base(Stats.MOVE_SPEED, data.move_speed)
+	stats.set_base(Stats.DAMAGE, 1.0)
+	stats.set_base(Stats.ATTACK_SPEED, 1.0)
+	stats.set_base(Stats.CRIT_CHANCE, 0.05)
+	stats.set_base(Stats.CRIT_DAMAGE, 1.75)
+	stats.set_base(Stats.PICKUP_RANGE, 28.0)
+	stats.set_base(Stats.REGEN, 0.0)
+	stats.set_base(Stats.ULT_CHARGE, 1.0)
+	stats.set_base(Stats.LIFE_ON_KILL, 0.0)
+	stats.set_base(Stats.REVIVE_SPEED, 1.0)
 	abilities.clear()
 	var templates := data.abilities()
 	for i in templates.size():
 		var ability := templates[i].duplicate(true) as Ability
 		ability.bind(self, i as Ability.Slot)
 		abilities.append(ability)
+	_refresh_stats()
+	hp = max_hp
+	# Re-apply upgrades taken earlier in the run (levels rebuild heroes).
+	var library := UpgradePool.shared_library()
+	for id in GameState.slots[slot].upgrades:
+		var upgrade := library.find(id)
+		if upgrade:
+			apply_upgrade(upgrade, false)
+	hp = max_hp
 	_rng.seed = hash(slot * 7919 + Time.get_ticks_usec())
 
 
@@ -104,6 +128,36 @@ func ultimate() -> Ability:
 
 func is_downed() -> bool:
 	return state == State.DOWNED
+
+
+## Applies an upgrade card; `record` stores it in the run so later levels
+## re-apply it.
+func apply_upgrade(upgrade: UpgradeData, record: bool = true) -> void:
+	if not UpgradePool.apply_effects(upgrade, stats, abilities):
+		return
+	upgrade_stacks[upgrade.id] = int(upgrade_stacks.get(upgrade.id, 0)) + 1
+	_refresh_stats()
+	if record:
+		GameState.slots[slot].upgrades.append(upgrade.id)
+
+
+func _refresh_stats() -> void:
+	var old_max := max_hp
+	max_hp = maxf(1.0, stats.get_value(Stats.MAX_HP))
+	if max_hp > old_max and state == State.ALIVE:
+		hp += max_hp - old_max
+	hp = minf(hp, max_hp)
+	armor = stats.get_value(Stats.ARMOR)
+	move_speed = stats.get_value(Stats.MOVE_SPEED)
+	damage_mult = stats.get_value(Stats.DAMAGE)
+	attack_speed_mult = maxf(0.1, stats.get_value(Stats.ATTACK_SPEED))
+	crit_chance = clampf(stats.get_value(Stats.CRIT_CHANCE), 0.0, 1.0)
+	crit_mult = stats.get_value(Stats.CRIT_DAMAGE)
+	pickup_range = stats.get_value(Stats.PICKUP_RANGE)
+	regen = stats.get_value(Stats.REGEN)
+	ult_charge_mult = stats.get_value(Stats.ULT_CHARGE)
+	life_on_kill = stats.get_value(Stats.LIFE_ON_KILL)
+	revive_speed = stats.get_value(Stats.REVIVE_SPEED)
 
 
 func is_dashing() -> bool:
@@ -158,7 +212,9 @@ func tick(delta: float) -> void:
 	if input.just_pressed(PlayerInput.Action.MOVEMENT) and not is_dashing():
 		movement().try_activate(aim_dir)
 
-	ult_charge = minf(1.0, ult_charge + ULT_PASSIVE_PER_SECOND * delta)
+	ult_charge = minf(1.0, ult_charge + ULT_PASSIVE_PER_SECOND * ult_charge_mult * delta)
+	if regen > 0.0:
+		heal(regen * delta)
 	_update_visuals(delta)
 
 
@@ -204,14 +260,20 @@ func roll_damage(base: float) -> float:
 	return dmg
 
 
-## Hook for on-hit effects (lifesteal etc. come with upgrades).
+## Hook for on-hit effects of melee/area abilities.
 func on_hits(_count: int) -> void:
 	pass
 
 
+## Called by the World when an enemy this hero damaged last dies.
+func on_kill() -> void:
+	if life_on_kill > 0.0:
+		heal(life_on_kill)
+
+
 func add_ult_charge(damage_dealt: float) -> void:
 	if state == State.ALIVE and damage_dealt > 0.0:
-		ult_charge = minf(1.0, ult_charge + damage_dealt / maxf(data.ult_cost, 1.0))
+		ult_charge = minf(1.0, ult_charge + damage_dealt * ult_charge_mult / maxf(data.ult_cost, 1.0))
 
 
 ## Applies a hit; returns true if damage was taken.

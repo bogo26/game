@@ -76,10 +76,15 @@ func cancel() -> void:
 func _tick_active(delta: float) -> void:
 	if not _active:
 		return
+	var w := world()
 	if not hero.is_dashing():
 		_active = false
+		var burst := mod(&"end_burst")
+		if burst > 0.0:
+			hero.on_hits(w.damage_enemies_in_circle(hero.position, 30.0, scaled_damage(burst), 150.0, hero.slot, 0.3))
+			w.fx.ring(hero.position, 30.0, color, 0.3)
+			w.shake(2.0)
 		return
-	var w := world()
 	w.fx.disc(hero.position + Vector2(0, -6), 4.0, Color(color, 0.35), 0.15)
 	if damage > 0.0 or knockback > 0.0 or stun_time > 0.0 or slow_time > 0.0 or mark_time > 0.0:
 		var horde := w.horde
@@ -100,14 +105,15 @@ func _tick_active(delta: float) -> void:
 				horde.apply_slow(j, slow_time)
 			if mark_time > 0.0:
 				horde.apply_mark(j, mark_time)
-	if heal_allies > 0.0:
+	var heal_amount := heal_allies + mod(&"heal_allies")
+	if heal_amount > 0.0:
 		for ally in w.heroes:
 			if ally != hero and not _healed.has(ally.slot) and ally.position.distance_to(hero.position) < 18.0:
 				_healed[ally.slot] = true
 				if ally.is_downed():
 					ally.add_revive_progress(Hero.REVIVE_TIME * 0.5)
 				else:
-					ally.heal(heal_allies)
+					ally.heal(heal_amount)
 				w.fx.disc(ally.position + Vector2(0, -6), 10.0, Color(1, 0.95, 0.5, 0.6), 0.3)
 	if trail_damage > 0.0:
 		_trail_timer -= delta

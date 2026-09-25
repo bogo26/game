@@ -121,8 +121,13 @@ func _run_file(path: String, filter: String) -> void:
 		instance.call(method_name)
 		var elapsed_ms := float(Time.get_ticks_usec() - start) / 1000.0
 		var failures: PackedStringArray = instance.get("failures")
-		for i in range(errors_before, _logger.errors):
-			failures.append("error: " + _logger.messages[i])
+		var expected := int(instance.get("expected_errors"))
+		var logged := _logger.errors - errors_before
+		if logged != expected:
+			for i in range(errors_before, _logger.errors):
+				failures.append("error: " + _logger.messages[i])
+			if logged < expected:
+				failures.append("expected %d engine error(s), got %d" % [expected, logged])
 		if failures.is_empty() and int(instance.get("assert_count")) == 0:
 			failures.append("no assertions ran")
 		if failures.is_empty():

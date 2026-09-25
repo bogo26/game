@@ -40,11 +40,9 @@ godot --headless --path . -s res://tests/run_tests.gd
 
 ## Status
 
-Milestone 4 (combat) is done.
+Milestone 5 (progression) is done.
 - `./tools/dev.sh run` opens the test room. Press **Enter** (keyboard) or **A** (gamepad) to join, up to 4 players.
-- P1–P4 get Knight, Ranger, Mage and Cleric (the character select arrives in milestone 6).
-- Every hero has its attack, special, movement ability and ultimate.
-- Downed heroes are revived by standing next to them.
-- `./tools/dev.sh run -- --bots=3` adds bot players that use their abilities.
+- Enemies drop XP gems that fill the shared team XP bar.
+- Every team level-up pauses the game so each player picks 1 of 3 upgrade cards.
 
 See the milestone table in [docs/DESIGN.md](docs/DESIGN.md#milestones).

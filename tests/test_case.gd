@@ -5,6 +5,8 @@ extends RefCounted
 
 var failures: PackedStringArray = []
 var assert_count := 0
+## Tests that deliberately trigger engine errors (push_error) declare how many.
+var expected_errors := 0
 
 
 func assert_true(condition: bool, message: String = "") -> void:

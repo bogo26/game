@@ -15,6 +15,8 @@ class PlayerSlot:
 	var slot: int
 	var hero_id: StringName = &""
 	var ready := false
+	## Upgrade ids taken this run, in order (re-applied on every level).
+	var upgrades: Array[StringName] = []
 
 	func _init(p_slot: int) -> void:
 		slot = p_slot
@@ -65,6 +67,8 @@ func reset_run() -> void:
 	level_index = 0
 	pending_level_ups = 0
 	run_active = true
+	for s in slots:
+		s.upgrades.clear()
 	Events.xp_changed.emit(xp, xp_to_next(), team_level)
 
 
@@ -84,3 +88,4 @@ func clear_players() -> void:
 	for s in slots:
 		s.hero_id = &""
 		s.ready = false
+		s.upgrades.clear()

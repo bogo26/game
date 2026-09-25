@@ -31,6 +31,7 @@ func _run(world: World, seconds: float) -> void:
 func _teardown(world: World) -> void:
 	world.get_parent().remove_child(world)
 	world.free()
+	(Engine.get_main_loop() as SceneTree).paused = false
 	InputRouter.unassign_all()
 	GameState.clear_players()
 
@@ -87,3 +88,45 @@ func test_each_ability_activates_without_errors() -> void:
 		_run(world, 1.5)
 	assert_true(world.horde.kill_pos.size() >= 0)
 	_teardown(world)
+
+
+func test_level_up_round_with_bots() -> void:
+	var world := _make_world([&"knight", &"mage"])
+	world.spawner.enabled = false
+	GameState.pending_level_ups = 2
+	GameState.team_level = 3
+	world._process(DT)
+	assert_true(world.level_up.is_open(), "screen opens for pending level-ups")
+	assert_true((Engine.get_main_loop() as SceneTree).paused, "game paused while picking")
+	for frame in 240:
+		InputRouter._process(DT)
+		world.level_up._process(DT)
+		if not world.level_up.is_open():
+			break
+	assert_false(world.level_up.is_open(), "closes after all rounds")
+	assert_eq(GameState.pending_level_ups, 0)
+	assert_false((Engine.get_main_loop() as SceneTree).paused, "unpaused")
+	for hero in world.heroes:
+		assert_eq(GameState.slots[hero.slot].upgrades.size(), 2, "%s picked twice" % hero.hero_id)
+	_teardown(world)
+
+
+func test_upgrades_persist_into_next_level() -> void:
+	var world := _make_world([&"knight"])
+	var vitality := UpgradePool.shared_library().find(&"vitality")
+	var hero := world.heroes[0]
+	var base_hp := hero.max_hp
+	hero.apply_upgrade(vitality)
+	hero.apply_upgrade(vitality)
+	assert_near(hero.max_hp, base_hp + 40.0, 0.01)
+	world.get_parent().remove_child(world)
+	world.free()
+	# Next level: same run state, fresh World and Hero.
+	var next: World = (load(WORLD_SCENE) as PackedScene).instantiate()
+	next.allow_drop_in = false
+	(Engine.get_main_loop() as SceneTree).root.add_child(next)
+	var reborn := next.heroes[0]
+	assert_near(reborn.max_hp, base_hp + 40.0, 0.01, "upgrades re-applied")
+	assert_near(reborn.hp, reborn.max_hp, 0.01, "starts the level at full HP")
+	assert_eq(int(reborn.upgrade_stacks.get(&"vitality", 0)), 2)
+	_teardown(next)

@@ -29,7 +29,8 @@ func _activate(aim: Vector2) -> void:
 	zone.radius = radius * (1.0 + mod(&"area_pct"))
 	zone.duration = duration + mod(&"duration")
 	zone.interval = interval
-	zone.damage = scaled_damage(damage) if damage > 0.0 else mod(&"zone_damage")
+	var base_damage := damage + mod(&"zone_damage")
+	zone.damage = scaled_damage(base_damage) if base_damage > 0.0 else 0.0
 	zone.heal = heal * (1.0 + mod(&"heal_pct"))
 	zone.slow_time = slow_time
 	zone.stun_time = stun_time

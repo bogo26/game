@@ -36,6 +36,8 @@ const TEST_ROOM_WIPE_RESET := 3.0
 @export var spawn_enemies := true
 ## Test rooms revive a wiped team automatically instead of ending the run.
 @export var auto_revive_on_wipe := true
+## Off for the stress test (the pick screen pauses the game).
+@export var level_ups_enabled := true
 
 var grid: LevelGrid
 var heroes: Array[Hero] = []
@@ -46,6 +48,7 @@ var horde := HordeSim.new()
 var projectiles := ProjectileSim.new()
 var pickups := PickupSim.new()
 var spawner := SpawnDirector.new()
+var upgrade_pool := UpgradePool.new()
 
 ## Per-frame hero snapshots handed to the sims. `hero_positions` has every
 ## hero (camera, leash); `target_positions` only those enemies should chase.
@@ -67,9 +70,13 @@ var _wipe_timer := 0.0
 @onready var pickup_layer: InstanceLayer = $PickupLayer
 @onready var horde_layer: InstanceLayer = $HordeLayer
 @onready var projectile_layer: InstanceLayer = $ProjectileLayer
+@onready var level_up: LevelUpScreen = $LevelUp
 
 
 func _ready() -> void:
+	if not GameState.run_active:
+		GameState.reset_run()
+	level_up.closed.connect(_on_level_up_closed)
 	level.build(level_data)
 	grid = level.grid
 	camera.setup(grid.size_px())
@@ -106,6 +113,7 @@ func _ready() -> void:
 	Events.player_device_restored.connect(_on_device_changed)
 	_snapshot_heroes()
 	flow.compute_now(target_positions)
+	GameState.pending_level_ups += _cmdline_int("--debug-levelups=", 0)
 
 
 func _exit_tree() -> void:
@@ -164,6 +172,9 @@ func _process(delta: float) -> void:
 	_apply_pickups()
 	_check_wipe(dt)
 	camera.follow(hero_positions, dt)
+	if level_ups_enabled and GameState.pending_level_ups > 0 and not level_up.is_open() and not heroes.is_empty():
+		level_up.open(heroes, upgrade_pool)
+		get_tree().paused = true
 	var t_sim_end := Time.get_ticks_usec()
 
 	horde.render(horde_layer)
@@ -278,14 +289,13 @@ func _update_revives(dt: float) -> void:
 	for hero in heroes:
 		if not hero.is_downed():
 			continue
-		var helped := false
+		var speed := 0.0
 		for other in heroes:
 			if other != hero and not other.is_downed() \
 					and other.position.distance_to(hero.position) <= Hero.REVIVE_RADIUS:
-				helped = true
-				break
-		if helped:
-			hero.add_revive_progress(dt)
+				speed = maxf(speed, other.revive_speed)
+		if speed > 0.0:
+			hero.add_revive_progress(dt * speed)
 		else:
 			hero.revive_progress = maxf(0.0, hero.revive_progress - dt * REVIVE_DECAY)
 
@@ -371,6 +381,10 @@ func _process_kills() -> void:
 		var p := horde.kill_pos[k]
 		var t := horde.kill_type[k]
 		var killer := horde.kill_slot[k]
+		if killer >= 0:
+			var hero := hero_for_slot(killer)
+			if hero:
+				hero.on_kill()
 		if killer != HordeSim.SELF_KILL:
 			pickups.spawn(p, PickupSim.Kind.XP, horde.t_xp[t])
 			if _rng.randf() < HEART_DROP_CHANCE:
@@ -411,6 +425,10 @@ func _on_join_requested(device: int) -> void:
 
 ## Pause while any player's controller is unplugged; resume once all are back.
 func _on_device_changed(_slot: int) -> void:
+	get_tree().paused = InputRouter.has_disconnected_player() or level_up.is_open()
+
+
+func _on_level_up_closed() -> void:
 	get_tree().paused = InputRouter.has_disconnected_player()
 
 

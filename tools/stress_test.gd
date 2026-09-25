@@ -59,6 +59,7 @@ func _ready() -> void:
 	_world = (load(WORLD_SCENE) as PackedScene).instantiate()
 	_world.bot_count = 4
 	_world.allow_drop_in = false
+	_world.level_ups_enabled = false
 	add_child(_world)
 	_world.bots.fire_rate = 250.0
 	_world.bots.projectile_cap = _projectiles
