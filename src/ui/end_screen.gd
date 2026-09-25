@@ -7,6 +7,7 @@ const MAIN_MENU := "res://src/ui/main_menu.tscn"
 
 func _ready() -> void:
 	get_tree().paused = false
+	Audio.play_music(&"menu")
 	var victory := GameState.last_run_victory
 	%Title.text = "VICTORY!" if victory else "DEFEAT"
 	%Title.add_theme_color_override("font_color", Color("ffe07a") if victory else Color("e8504a"))

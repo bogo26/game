@@ -54,3 +54,7 @@ func _tick_active(delta: float) -> void:
 	if _tick_left <= 0.0:
 		_tick_left = interval
 		hero.on_hits(w.damage_enemies_in_circle(hero.position, r, scaled_damage(damage), knockback, hero.slot))
+
+
+func sound() -> StringName:
+	return &"slash"

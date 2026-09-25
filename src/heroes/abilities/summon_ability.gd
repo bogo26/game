@@ -51,3 +51,7 @@ func _activate(aim: Vector2) -> void:
 		w.add_minion(minion)
 		_active.append(minion)
 		w.fx.ring(minion.position, 10.0, hero.color, 0.35)
+
+
+func sound() -> StringName:
+	return &"summon"

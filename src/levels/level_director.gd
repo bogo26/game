@@ -144,6 +144,7 @@ func _activate(room: Room, leader: Hero) -> void:
 			hero.position = spot
 			world.fx.ring(spot, 12.0, hero.color, 0.4)
 	level.set_doors_locked(room.id, true)
+	Audio.play(&"door")
 	for door in room.doors:
 		world.fx.disc(LevelGrid.cell_center(door), 10.0, Color(0.9, 0.7, 0.4, 0.6), 0.3)
 	world.shake(3.0)
@@ -178,12 +179,14 @@ func _clear(room: Room) -> void:
 	room.state = RoomState.CLEARED
 	active_room = null
 	level.set_doors_locked(room.id, false)
+	Audio.play(&"clear")
 	world.spawner.mode = SpawnDirector.Mode.CORRIDOR if data.corridor_spawn_rate > 0.0 else SpawnDirector.Mode.OFF
 	world.spawner.spawn_rate = data.corridor_spawn_rate
 	world.pickups.spawn(room.center, PickupSim.Kind.HEART, 1)
 	world.fx.ring(room.center, 60.0, Color(1, 0.95, 0.6), 0.6)
 	if arenas_cleared() == rooms.size() and not data.is_boss_level:
 		exit_open = true
+		Audio.play(&"portal")
 	_update_objective()
 
 
@@ -196,6 +199,7 @@ func _spawn_boss(at: Vector2) -> void:
 	world.boss = boss
 	boss.defeated.connect(_on_boss_defeated)
 	world.fx.ring(at, 60.0, Color(1, 0.3, 0.2), 0.8)
+	Audio.play(&"roar")
 
 
 func _on_boss_defeated() -> void:

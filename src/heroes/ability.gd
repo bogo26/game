@@ -44,7 +44,15 @@ func try_activate(aim: Vector2) -> bool:
 		return false
 	_activate(aim)
 	cooldown_left = effective_cooldown()
+	Audio.play(sound())
+	if slot == Slot.ULTIMATE:
+		Audio.play(&"ult")
 	return true
+
+
+## Sound played on activation (subclasses pick one that fits).
+func sound() -> StringName:
+	return &"cast"
 
 
 func effective_cooldown() -> float:

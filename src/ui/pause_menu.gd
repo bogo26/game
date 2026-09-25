@@ -17,6 +17,14 @@ func _ready() -> void:
 	visible = false
 	%ResumeButton.pressed.connect(close)
 	%QuitButton.pressed.connect(func() -> void: quit_requested.emit())
+	%MusicSlider.value = Audio.get_bus_volume(&"Music")
+	%SoundSlider.value = Audio.get_bus_volume(&"SFX")
+	%MusicSlider.value_changed.connect(func(v: float) -> void: Audio.set_bus_volume(&"Music", v))
+	%SoundSlider.value_changed.connect(func(v: float) -> void:
+		Audio.set_bus_volume(&"SFX", v)
+		Audio.play(&"ui_move"))
+	%FullscreenButton.toggled.connect(func(on: bool) -> void:
+		get_window().mode = Window.MODE_FULLSCREEN if on else Window.MODE_WINDOWED)
 
 
 func is_open() -> bool:
@@ -33,6 +41,7 @@ func toggle() -> void:
 func open() -> void:
 	visible = true
 	_opened_this_frame = true
+	%FullscreenButton.set_pressed_no_signal(get_window().mode == Window.MODE_FULLSCREEN)
 	get_tree().paused = true
 	resume_button.grab_focus.call_deferred()
 

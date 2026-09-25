@@ -60,6 +60,7 @@ func _load_level() -> void:
 	world.team_wiped.connect(_on_team_wiped)
 	world.boss_defeated.connect(_on_boss_defeated)
 	world.quit_requested.connect(_quit_to_menu)
+	Audio.play_music(&"boss" if data.is_boss_level else &"dungeon")
 	var title := "FINAL LEVEL" if data.is_boss_level else "LEVEL %d" % (GameState.level_index + 1)
 	_show_banner(title, data.display_name)
 
@@ -83,6 +84,7 @@ func _on_level_completed() -> void:
 	_bank_level_stats()
 	GameState.levels_cleared += 1
 	_show_banner("LEVEL CLEAR!", "")
+	Audio.play(&"clear")
 	world.set_process(false)
 	await get_tree().create_timer(1.6).timeout
 	GameState.level_index += 1
@@ -98,6 +100,8 @@ func _on_team_wiped() -> void:
 	_ending = true
 	_bank_level_stats()
 	_show_banner("DEFEAT", "Your party has fallen")
+	Audio.stop_music()
+	Audio.play(&"down")
 	_banner_time = END_DELAY
 	await get_tree().create_timer(END_DELAY).timeout
 	_end(false)
@@ -110,6 +114,8 @@ func _on_boss_defeated() -> void:
 	_bank_level_stats()
 	GameState.levels_cleared += 1
 	_show_banner("VICTORY!", "The Demon Lord is slain")
+	Audio.stop_music()
+	Audio.play(&"clear")
 	_banner_time = END_DELAY
 	await get_tree().create_timer(END_DELAY).timeout
 	_end(true)

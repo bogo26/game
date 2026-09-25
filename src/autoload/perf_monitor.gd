@@ -1,5 +1,6 @@
 extends CanvasLayer
-## Frame-time statistics + F3 debug overlay.
+## Frame-time statistics + F3 debug overlay (and the global F11 / Alt+Enter
+## fullscreen hotkey).
 ## Systems report their CPU cost with `record(&"name", usec)` and counts with
 ## `set_counter(&"name", value)`. The stress test uses begin/end_capture()
 ## to get average and p99 frame times over a run.
@@ -49,8 +50,15 @@ func _ready() -> void:
 
 func _input(event: InputEvent) -> void:
 	var key := event as InputEventKey
-	if key and key.pressed and not key.echo and key.physical_keycode == KEY_F3:
+	if key == null or not key.pressed or key.echo:
+		return
+	if key.physical_keycode == KEY_F3:
 		visible = not visible
+		get_viewport().set_input_as_handled()
+	elif key.physical_keycode == KEY_F11 or (key.physical_keycode == KEY_ENTER and key.alt_pressed):
+		# Global fullscreen toggle (F11 / Alt+Enter).
+		var window := get_window()
+		window.mode = Window.MODE_WINDOWED if window.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
 		get_viewport().set_input_as_handled()
 
 

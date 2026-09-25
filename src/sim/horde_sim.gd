@@ -74,6 +74,12 @@ var kill_type := PackedInt32Array()
 var kill_slot := PackedInt32Array()
 ## Damage dealt per player slot since the last drain (ultimate charge).
 var damage_by_slot := PackedFloat32Array([0, 0, 0, 0])
+## Hits since the last drain (position, damage) for sparks and numbers.
+var hit_pos := PackedVector2Array()
+var hit_amount := PackedFloat32Array()
+var hit_type := PackedInt32Array()
+## Enemy shots fired since the World last checked (for sound).
+var shots_fired := 0
 ## Exploder blasts since the last drain (World damages heroes + draws FX).
 var blast_pos := PackedVector2Array()
 var blast_radius := PackedFloat32Array()
@@ -202,6 +208,10 @@ func damage(i: int, amount: float, knockback: Vector2, source_slot: int) -> bool
 	var remaining := h - amount
 	hp[i] = remaining
 	flash[i] = FLASH_TIME
+	if hit_pos.size() < 256:
+		hit_pos.append(pos[i])
+		hit_amount.append(amount)
+		hit_type.append(type[i])
 	if knockback != Vector2.ZERO:
 		vel[i] += knockback * t_knockback[type[i]]
 	if source_slot >= 0 and source_slot < damage_by_slot.size():
@@ -248,6 +258,12 @@ func clear_blasts() -> void:
 func relocate(i: int, p: Vector2) -> void:
 	pos[i] = p
 	vel[i] = Vector2.ZERO
+
+
+func clear_hit_log() -> void:
+	hit_pos.clear()
+	hit_amount.clear()
+	hit_type.clear()
 
 
 func clear_kill_log() -> void:
@@ -363,6 +379,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 							projectiles.spawn(p + Vector2(0, -8), aim * shot_speed_t[t], shot_damage_t[t], 3.0,
 								attack_range * 1.6 / shot_speed_t[t], ProjectileSim.Team.ENEMY, -1,
 								ProjectileSim.Look.SPIT)
+							shots_fired += 1
 					ACT[i] = cd
 			elif behavior == EnemyData.Behavior.EXPLODER and best < INF:
 				if STATE[i] == 0 and best < blast_radius_t[t] * blast_radius_t[t] * 0.4:

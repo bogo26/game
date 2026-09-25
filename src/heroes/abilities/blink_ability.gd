@@ -20,3 +20,7 @@ func _activate(aim: Vector2) -> void:
 	var dmg := arrival_damage + mod(&"arrival_damage")
 	if dmg > 0.0:
 		hero.on_hits(w.damage_enemies_in_circle(to, arrival_radius, scaled_damage(dmg), 80.0, hero.slot))
+
+
+func sound() -> StringName:
+	return &"blink"

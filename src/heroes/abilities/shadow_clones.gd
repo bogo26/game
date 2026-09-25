@@ -77,3 +77,7 @@ func _clear_ghosts() -> void:
 		if is_instance_valid(ghost):
 			ghost.queue_free()
 	_ghosts.clear()
+
+
+func sound() -> StringName:
+	return &"summon"

@@ -31,3 +31,7 @@ func _activate(aim: Vector2) -> void:
 	hero.on_hits(hits)
 	world().fx.slash(center + aim * 3.0, reach_now * 0.8, aim.angle(), arc,
 		color if not heavy else Color(1, 0.8, 0.4))
+
+
+func sound() -> StringName:
+	return &"slash"

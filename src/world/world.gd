@@ -29,6 +29,14 @@ const FX_ATLAS := preload("res://assets/sprites/fx/fx_atlas.png")
 const MAX_DELTA := 1.0 / 30.0
 const SPAWN_OFFSETS: Array[Vector2] = [Vector2(-12, -8), Vector2(12, -8), Vector2(-12, 8), Vector2(12, 8)]
 const HEART_DROP_CHANCE := 0.004
+## Particle colour per enemy id (death puffs, hit sparks).
+const ENEMY_COLORS := {
+	&"swarmer": Color(0.42, 0.75, 0.3), &"brute": Color(0.6, 0.45, 0.68), &"spitter": Color(0.68, 0.35, 0.85),
+	&"exploder": Color(1.0, 0.55, 0.2), &"boss_demon": Color(0.9, 0.25, 0.2),
+}
+const MAX_SPARKS_PER_FRAME := 40
+const MAX_PUFFS_PER_FRAME := 30
+const NUMBER_THRESHOLD := 12.0
 const REVIVE_DECAY := 0.5
 ## Test rooms: seconds after a team wipe before everyone gets back up.
 const TEST_ROOM_WIPE_RESET := 3.0
@@ -57,6 +65,7 @@ var horde := HordeSim.new()
 var projectiles := ProjectileSim.new()
 var pickups := PickupSim.new()
 var spawner := SpawnDirector.new()
+var particles := FxSim.new()
 var upgrade_pool := UpgradePool.new()
 var director := LevelDirector.new()
 var boss: BossDemon
@@ -89,6 +98,8 @@ const MAX_CORPSES := 96
 @onready var pickup_layer: InstanceLayer = $PickupLayer
 @onready var horde_layer: InstanceLayer = $HordeLayer
 @onready var projectile_layer: InstanceLayer = $ProjectileLayer
+@onready var particle_layer: InstanceLayer = $ParticleLayer
+@onready var numbers: DamageNumbers = $DamageNumbers
 @onready var level_up: LevelUpScreen = $LevelUp
 @onready var hud: Hud = $Hud
 @onready var pause_menu: PauseMenu = $PauseMenu
@@ -119,6 +130,13 @@ func _ready() -> void:
 	horde_layer.setup(HORDE_ATLAS, Vector2i(32, 32), Vector2(16, 24), HordeSim.CAPACITY)
 	projectile_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 8), ProjectileSim.CAPACITY)
 	pickup_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 11), PickupSim.CAPACITY)
+	particle_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 8), FxSim.CAPACITY, true)
+	Events.team_level_up.connect(_on_team_level_up)
+	Events.hero_damaged.connect(_on_hero_damaged)
+	Events.hero_downed.connect(func(_s: int) -> void: Audio.play(&"down"))
+	Events.hero_revived.connect(func(_s: int) -> void: Audio.play(&"revive"))
+	if not run_mode:
+		Audio.play_music(&"dungeon")
 
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--heroes="):  # debug: pick heroes for bots / drop-ins
@@ -206,6 +224,7 @@ func _process(delta: float) -> void:
 	_update_zones(dt)
 	var t_projectiles := Time.get_ticks_usec()
 
+	_emit_hit_effects()
 	_process_kills()
 	_apply_ult_charge()
 	pickups.update(dt, hero_positions, _hero_ranges, _hero_active)
@@ -226,6 +245,12 @@ func _process(delta: float) -> void:
 	projectiles.render(projectile_layer)
 	pickups.render(pickup_layer)
 	var t_fx := Time.get_ticks_usec()
+	for hero in heroes:
+		if hero.is_dashing() and randf() < 0.6:
+			particles.burst(hero.position, 1, Color(0.8, 0.8, 0.85, 0.7), 20.0, 0.3, 1)
+	particles.update(dt)
+	particles.render(particle_layer)
+	numbers.tick(dt)
 	ground_fx.tick(dt)
 	fx.tick(dt)
 	var t_end := Time.get_ticks_usec()
@@ -417,7 +442,9 @@ func _apply_blasts() -> void:
 				hero.take_hit(horde.blast_damage[k])
 		fx.disc(p, r, Color(1.0, 0.55, 0.2, 0.7), 0.25)
 		fx.ring(p, r * 1.15, Color(1.0, 0.9, 0.5), 0.3)
+		particles.burst(p, 18, Color(1.0, 0.6, 0.2), 140.0, 0.5, 4, Vector2.ZERO, TAU, 0.0, 3.0)
 		shake(2.5)
+		Audio.play(&"explosion")
 	horde.clear_blasts()
 
 
@@ -453,11 +480,51 @@ func _update_zones(dt: float) -> void:
 			i += 1
 
 
+func _enemy_color(type_index: int) -> Color:
+	return ENEMY_COLORS.get(horde.types[type_index].id, Color(0.8, 0.8, 0.8))
+
+
+func _emit_hit_effects() -> void:
+	var n := horde.hit_pos.size()
+	if n > 0:
+		Audio.play(&"hit")
+	if horde.shots_fired > 0:
+		Audio.play(&"spit")
+		horde.shots_fired = 0
+	for k in n:
+		var p := horde.hit_pos[k] + Vector2(0, -6)
+		var amount := horde.hit_amount[k]
+		if k < MAX_SPARKS_PER_FRAME:
+			particles.burst(p, 2, Color(1, 0.95, 0.8), 70.0, 0.18, 1)
+		if amount >= NUMBER_THRESHOLD:
+			var big := amount >= 40.0
+			numbers.add(p, amount, Color(1, 0.85, 0.3) if big else Color(1, 1, 1), big)
+	horde.clear_hit_log()
+
+
+func _on_hero_damaged(slot: int, amount: float) -> void:
+	Audio.play(&"hurt")
+	var hero := hero_for_slot(slot)
+	if hero:
+		particles.burst(hero.position + Vector2(0, -6), 6, Color(1, 0.25, 0.2), 70.0, 0.35, 2)
+		numbers.add(hero.position + Vector2(0, -8), amount, Color(1, 0.35, 0.3))
+
+
+func _on_team_level_up(_level: int) -> void:
+	Audio.play(&"level_up")
+	for hero in heroes:
+		particles.burst(hero.position + Vector2(0, -6), 24, Color(1, 0.88, 0.45), 90.0, 0.8, 3, Vector2.UP, PI, -40.0, 2.0)
+
+
 func _process_kills() -> void:
 	var n := horde.kill_pos.size()
+	if n > 0:
+		Audio.play(&"kill")
 	for k in n:
 		var p := horde.kill_pos[k]
 		var t := horde.kill_type[k]
+		if k < MAX_PUFFS_PER_FRAME:
+			particles.burst(p + Vector2(0, -5), 6, _enemy_color(t), 60.0, 0.45, 3, Vector2.ZERO, TAU, 30.0)
 		var killer := horde.kill_slot[k]
 		kills += 1
 		_corpse_pos.append(p)
@@ -496,8 +563,12 @@ func _apply_pickups() -> void:
 			if hero_index < heroes.size():
 				var hero := heroes[hero_index]
 				hero.heal(hero.max_hp * 0.25)
+				Audio.play(&"heal")
 		else:
 			GameState.add_xp(c[k + 2])
+			if hero_index < heroes.size() and k < 30:
+				particles.burst(heroes[hero_index].position + Vector2(0, -6), 2, Color(0.45, 0.75, 1.0), 40.0, 0.25, 1)
+			Audio.play(&"pickup", 0.0, 1.0 + minf(0.5, c[k + 2] * 0.02))
 
 
 func _on_join_requested(device: int) -> void:

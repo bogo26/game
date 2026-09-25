@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://src/world/world.gd" id="1_world"]
 [ext_resource type="Resource" path="res://src/levels/data/test_room.tres" id="2_level"]
@@ -9,6 +9,7 @@
 [ext_resource type="Script" path="res://src/ui/hud.gd" id="8_hud"]
 [ext_resource type="Script" path="res://src/ui/level_up_screen.gd" id="9_levelup"]
 [ext_resource type="PackedScene" path="res://src/ui/pause_menu.tscn" id="10_pause"]
+[ext_resource type="Script" path="res://src/world/damage_numbers.gd" id="11_numbers"]
 
 [node name="World" type="Node2D"]
 script = ExtResource("1_world")
@@ -31,8 +32,14 @@ script = ExtResource("6_layer")
 [node name="ProjectileLayer" type="MultiMeshInstance2D" parent="."]
 script = ExtResource("6_layer")
 
+[node name="ParticleLayer" type="MultiMeshInstance2D" parent="."]
+script = ExtResource("6_layer")
+
 [node name="Fx" type="Node2D" parent="."]
 script = ExtResource("7_fx")
+
+[node name="DamageNumbers" type="Node2D" parent="."]
+script = ExtResource("11_numbers")
 
 [node name="Camera" type="Camera2D" parent="."]
 script = ExtResource("4_camera")

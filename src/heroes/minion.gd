@@ -147,6 +147,7 @@ func _tick_turret() -> void:
 	_attack_cd = attack_interval
 	var to := world.horde.pos[_target] - position
 	_aim = to.normalized()
+	Audio.play(&"shoot_rivet", -4.0)
 	world.projectiles.spawn(position + Vector2(0, -8) + _aim * 5.0, _aim * 300.0, damage, 3.0, 0.8,
 		ProjectileSim.Team.PLAYER, owner_hero.slot, ProjectileSim.Look.RIVET, 0, 20.0)
 
@@ -158,6 +159,7 @@ func _tick_tesla() -> void:
 	var horde := world.horde
 	var hit := {}
 	var from := position + Vector2(0, -16)
+	Audio.play(&"tesla")
 	var current := _target
 	for jump in CHAIN_JUMPS + 1:
 		if current < 0:

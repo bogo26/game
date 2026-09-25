@@ -40,6 +40,7 @@ var _hero_cache: Dictionary = {}
 
 func _ready() -> void:
 	get_tree().paused = false
+	Audio.play_music(&"menu")
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	InputRouter.unassign_all()
 	GameState.clear_players()
@@ -82,6 +83,7 @@ func _on_join_requested(device: int) -> void:
 	if slot == -1:
 		return
 	InputRouter.assign(slot, device)
+	Audio.play(&"ui_confirm")
 	_is_ready[slot] = false
 	if not _is_available(ROSTER[_choice[slot]]):
 		_choice[slot] = 0
@@ -110,6 +112,7 @@ func _handle_player(slot: int, p: PlayerInput) -> void:
 		changed = true
 	if changed:
 		_refresh(slot)
+		Audio.play(&"ui_confirm" if _is_ready[slot] else &"ui_move")
 
 
 ## Esc / B on a device nobody uses goes back to the menu when no one joined.

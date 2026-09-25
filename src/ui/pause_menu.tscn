@@ -20,10 +20,10 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -80.0
-offset_top = -50.0
-offset_right = 80.0
-offset_bottom = 50.0
+offset_left = -90.0
+offset_top = -80.0
+offset_right = 90.0
+offset_bottom = 80.0
 grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 6
@@ -40,6 +40,47 @@ horizontal_alignment = 1
 unique_name_in_owner = true
 layout_mode = 2
 text = "Resume"
+
+[node name="MusicRow" type="HBoxContainer" parent="Box"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Box/MusicRow"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+text = "Music"
+
+[node name="MusicSlider" type="HSlider" parent="Box/MusicRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 1.0
+step = 0.1
+value = 1.0
+
+[node name="SoundRow" type="HBoxContainer" parent="Box"]
+layout_mode = 2
+
+[node name="Label" type="Label" parent="Box/SoundRow"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+text = "Sounds"
+
+[node name="SoundSlider" type="HSlider" parent="Box/SoundRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 1.0
+step = 0.1
+value = 1.0
+
+[node name="FullscreenButton" type="CheckButton" parent="Box"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Fullscreen (F11)"
 
 [node name="QuitButton" type="Button" parent="Box"]
 unique_name_in_owner = true

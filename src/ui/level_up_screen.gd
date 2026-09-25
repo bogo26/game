@@ -116,9 +116,11 @@ func _handle_input(pk: Picker, delta: float) -> void:
 	if input.ui_pressed(PlayerInput.Action.UI_LEFT):
 		pk.selected = (pk.selected - 1 + n) % n
 		_refresh(pk)
+		Audio.play(&"ui_move")
 	elif input.ui_pressed(PlayerInput.Action.UI_RIGHT):
 		pk.selected = (pk.selected + 1) % n
 		_refresh(pk)
+		Audio.play(&"ui_move")
 	if input.just_pressed(PlayerInput.Action.UI_ACCEPT):
 		_confirm(pk, pk.selected)
 
@@ -131,6 +133,7 @@ func _confirm(pk: Picker, index: int) -> void:
 	pk.chosen = pk.offers[index]
 	pk.hero.apply_upgrade(pk.chosen)
 	pk.hero.input.rumble(0.2, 0.3, 0.1)
+	Audio.play(&"ui_confirm")
 	_refresh(pk)
 
 

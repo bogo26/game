@@ -72,3 +72,7 @@ func heal_on_kill() -> float:
 
 func sprite_scale() -> float:
 	return scale if is_active() else 1.0
+
+
+func sound() -> StringName:
+	return &"buff"

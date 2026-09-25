@@ -16,6 +16,7 @@ var _pan_origin := Vector2.ZERO
 
 func _ready() -> void:
 	get_tree().paused = false
+	Audio.play_music(&"menu")
 	GameState.run_active = false
 	InputRouter.unassign_all()
 	GameState.clear_players()

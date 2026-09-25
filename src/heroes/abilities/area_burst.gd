@@ -84,6 +84,12 @@ func _land(p: Vector2) -> void:
 			w.heal_heroes(p, r, heal_fraction)
 		w.fx.disc(p, r, Color(color, 0.45), 0.2)
 		w.fx.ring(p, r * 1.1, color, 0.3)
+	if delay > 0.0:
+		Audio.play(&"explosion")
 	if revive_allies:
 		w.revive_all(0.5)
 	w.shake(4.0 if radius >= 60.0 or target == Target.SCREEN else 2.0)
+
+
+func sound() -> StringName:
+	return &"cast" if delay > 0.0 or target == Target.SCREEN else &"slam"

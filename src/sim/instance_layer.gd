@@ -9,16 +9,22 @@ extends MultiMeshInstance2D
 ##   [8..11] custom: atlas cell index, hit flash, frozen tint, alpha
 
 const STRIDE := 12
+## Stride when per-instance colours are enabled (particles):
+## [0..7] transform, [8..11] colour, [12..15] custom.
+const STRIDE_COLORED := 16
 const SHADER := preload("res://assets/shaders/atlas_instance.gdshader")
 
 var capacity := 0
+var stride := STRIDE
 var buffer := PackedFloat32Array()
 
 
 ## `anchor` is the pixel inside a cell that sits on the instance position
 ## (e.g. an enemy's feet), so sims can write world positions directly.
-func setup(atlas: Texture2D, cell_size: Vector2i, anchor: Vector2, p_capacity: int) -> void:
+func setup(atlas: Texture2D, cell_size: Vector2i, anchor: Vector2, p_capacity: int,
+		use_colors: bool = false) -> void:
 	capacity = p_capacity
+	stride = STRIDE_COLORED if use_colors else STRIDE
 	texture = atlas
 	var x0 := -anchor.x
 	var y0 := -anchor.y
@@ -37,6 +43,7 @@ func setup(atlas: Texture2D, cell_size: Vector2i, anchor: Vector2, p_capacity: i
 	var mm := MultiMesh.new()
 	mm.transform_format = MultiMesh.TRANSFORM_2D
 	mm.use_custom_data = true
+	mm.use_colors = use_colors
 	mm.mesh = mesh
 	mm.instance_count = capacity
 	mm.visible_instance_count = 0
@@ -49,13 +56,18 @@ func setup(atlas: Texture2D, cell_size: Vector2i, anchor: Vector2, p_capacity: i
 	mat.set_shader_parameter("atlas_cells", Vector2(
 		float(atlas.get_width()) / cell_size.x, float(atlas.get_height()) / cell_size.y))
 	material = mat
-	buffer.resize(capacity * STRIDE)
+	buffer.resize(capacity * stride)
 	# Identity transform + opaque, no flash/tint: sims only rewrite what changes.
 	for i in capacity:
-		var o := i * STRIDE
+		var o := i * stride
 		buffer[o] = 1.0
 		buffer[o + 5] = 1.0
-		buffer[o + 11] = 1.0
+		buffer[o + stride - 1] = 1.0
+		if use_colors:
+			buffer[o + 8] = 1.0
+			buffer[o + 9] = 1.0
+			buffer[o + 10] = 1.0
+			buffer[o + 11] = 1.0
 
 
 func commit(visible_count: int) -> void:

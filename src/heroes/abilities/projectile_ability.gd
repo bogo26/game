@@ -44,3 +44,20 @@ func _activate(aim: Vector2) -> void:
 			sim.set_effect(i, effect, effect_time + mod(&"effect_time"))
 		if splash > 0.0:
 			sim.set_splash(i, splash)
+
+
+func sound() -> StringName:
+	match look:
+		ProjectileSim.Look.ARROW:
+			return &"shoot_arrow"
+		ProjectileSim.Look.BOLT:
+			return &"shoot_magic"
+		ProjectileSim.Look.ORB:
+			return &"shoot_orb"
+		ProjectileSim.Look.KNIFE:
+			return &"shoot_knife"
+		ProjectileSim.Look.RIVET:
+			return &"shoot_rivet"
+		ProjectileSim.Look.SOUL:
+			return &"shoot_soul"
+	return &"shoot_arrow"

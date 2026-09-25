@@ -38,3 +38,7 @@ func _activate(aim: Vector2) -> void:
 	zone.color = color
 	zone.tick_visual = tick_visual
 	w.add_zone(zone)
+
+
+func sound() -> StringName:
+	return &"heal" if heal > 0.0 else &"cast"

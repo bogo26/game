@@ -97,6 +97,7 @@ func _tick_active(delta: float) -> void:
 			w.fx.disc(hero.position, r, Color(color, 0.45), 0.2)
 			w.fx.ring(hero.position, r * 1.15, color, 0.3)
 			w.shake(3.0)
+			Audio.play(&"slam")
 		var burst := mod(&"end_burst")
 		if burst > 0.0:
 			hero.on_hits(w.damage_enemies_in_circle(hero.position, 30.0, scaled_damage(burst), 150.0, hero.slot, 0.3))
@@ -146,3 +147,7 @@ func _tick_active(delta: float) -> void:
 			zone.owner_slot = hero.slot
 			zone.color = Color(1.0, 0.5, 0.15)
 			w.add_zone(zone)
+
+
+func sound() -> StringName:
+	return &"dash"

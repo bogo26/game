@@ -49,9 +49,9 @@ godot --headless --path . -s res://tests/run_tests.gd
 
 ## Status
 
-Milestone 7 (heroes 5–8) is done.
-- The run is playable end to end with all **8 heroes**: Knight, Ranger, Mage, Cleric, Berserker, Rogue, Engineer and Necromancer.
-- Summons included: skeletons, turrets, tesla tower and shadow clones.
-- 50 upgrades.
+Milestone 8 (art & juice) is done with generated art and audio.
+- Particles, damage numbers and screen shake.
+- 32 synthesized sound effects and 3 music loops.
+- Volume and fullscreen options (F11).
 
-Next: the art & juice pass, then macOS/Windows exports. See [docs/DESIGN.md](docs/DESIGN.md#milestones).
+Next: macOS/Windows exports. See [docs/DESIGN.md](docs/DESIGN.md#milestones).

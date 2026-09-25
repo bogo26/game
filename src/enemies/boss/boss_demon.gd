@@ -124,6 +124,7 @@ func _update_phase() -> void:
 		phase = new_phase
 		world.shake(5.0)
 		world.fx.ring(position, 50.0, Color(1, 0.3, 0.2), 0.5)
+		Audio.play(&"roar")
 		_summon(6 + 3 * phase)
 
 
@@ -162,6 +163,7 @@ func _execute_attack(p: Vector2, target: Vector2) -> void:
 			world.fx.disc(p, SLAM_RADIUS, Color(1, 0.45, 0.2, 0.55), 0.3)
 			world.fx.ring(p, SLAM_RADIUS * 1.1, Color(1, 0.8, 0.4), 0.35)
 			world.shake(5.0)
+			Audio.play(&"slam")
 		Attack.RING:
 			var count := 18 + 4 * phase
 			var offset := _rng.randf() * TAU
@@ -183,6 +185,7 @@ func _end_action() -> void:
 
 
 func _fireball(p: Vector2, dir: Vector2, speed: float) -> void:
+	Audio.play(&"fireball")
 	world.projectiles.spawn(p + Vector2(0, -24), dir * speed, FIREBALL_DAMAGE, 5.0, 4.0,
 		ProjectileSim.Team.ENEMY, -1, ProjectileSim.Look.FIRE)
 
