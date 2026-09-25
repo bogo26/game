@@ -1,0 +1,14 @@
+# Godot 4 editor / import cache
+.godot/
+*.translation
+
+# Export output
+build/
+
+# Movie Maker frames and debug captures
+shots/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.tmp

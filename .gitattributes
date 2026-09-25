@@ -1,2 +1,13 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Normalize line endings for all text files (Godot uses LF)
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.aseprite binary
+*.ase binary
+*.wav binary
+*.ogg binary
+*.mp3 binary
+*.ttf binary
+*.otf binary
