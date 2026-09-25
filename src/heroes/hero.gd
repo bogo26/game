@@ -1,52 +1,61 @@
 class_name Hero
 extends Node2D
-## Generic hero body: twin-stick movement and aim, the movement ability
-## (a generic dash until hero abilities land in milestone 4), and rendering.
-## Heroes have no _process of their own; the World ticks them in order.
+## A player's hero: twin-stick movement and aim, the four ability slots
+## (attack, special, movement, ultimate), health, the downed/revive state and
+## rendering. Heroes have no _process of their own; the World ticks them.
 
 enum Frame { IDLE0, IDLE1, RUN0, RUN1, RUN2, RUN3, DASH, DOWNED }
+enum State { ALIVE, DOWNED }
 
 const RADIUS := 5.0
 const HIT_IFRAMES := 0.5
+const REVIVE_TIME := 3.0
+const REVIVE_RADIUS := 20.0
+const REVIVE_HP_FRACTION := 0.3
+const REVIVE_IFRAMES := 2.0
+const ULT_PASSIVE_PER_SECOND := 0.01
 const SPRITE_FEET_OFFSET := Vector2(0, -6)
 const RETICLE_DISTANCE := 22.0
 const ACCELERATION := 14.0
-
-# Generic attack (replaced by per-hero abilities in milestone 4).
-const ATTACK_INTERVAL := 0.16
-const ATTACK_DAMAGE := 6.0
-const ATTACK_SPEED := 260.0
-
-# Generic dash (replaced by per-hero movement abilities in milestone 4).
-const DASH_DISTANCE := 56.0
-const DASH_DURATION := 0.14
-const DASH_COOLDOWN := 1.1
-const DASH_IFRAMES := 0.2
+const HERO_DATA_PATH := "res://src/heroes/data/%s.tres"
 
 var slot := 0
 var hero_id: StringName = &"knight"
+var data: HeroData
 var color := Color.WHITE
 var input: PlayerInput
 var world: World
 
+var state: State = State.ALIVE
+var max_hp := 100.0
+var hp := 100.0
+var armor := 0.0
 var move_speed := 88.0
 var velocity := Vector2.ZERO
 var aim_dir := Vector2.RIGHT
 var invulnerable_time := 0.0
-
-var max_hp := 100.0
-var hp := 100.0
+## 0..1; the ultimate is usable at 1.
+var ult_charge := 0.0
+var revive_progress := 0.0
 ## XP gems within this distance home in on the hero.
 var pickup_range := 28.0
 ## Ignores all damage (stress test, debug).
 var god_mode := false
-var _hurt_flash := 0.0
+
+# Combat multipliers (upgrades adjust these in milestone 5).
+var damage_mult := 1.0
+var attack_speed_mult := 1.0
+var crit_chance := 0.05
+var crit_mult := 1.75
+
+## [attack, special, movement, ultimate], duplicated from the HeroData.
+var abilities: Array[Ability] = []
 
 var dash_time_left := 0.0
-var dash_cooldown_left := 0.0
 var _dash_velocity := Vector2.ZERO
 var _anim_time := 0.0
-var _attack_cooldown := 0.0
+var _hurt_flash := 0.0
+var _rng := RandomNumberGenerator.new()
 
 @onready var sprite: Sprite2D = $Sprite
 
@@ -57,6 +66,18 @@ func setup(p_slot: int, p_hero_id: StringName, p_world: World) -> void:
 	world = p_world
 	input = InputRouter.get_player(slot)
 	color = GameState.player_color(slot)
+	data = load(HERO_DATA_PATH % hero_id) as HeroData
+	max_hp = data.max_hp
+	hp = max_hp
+	armor = data.armor
+	move_speed = data.move_speed
+	abilities.clear()
+	var templates := data.abilities()
+	for i in templates.size():
+		var ability := templates[i].duplicate(true) as Ability
+		ability.bind(self, i as Ability.Slot)
+		abilities.append(ability)
+	_rng.seed = hash(slot * 7919 + Time.get_ticks_usec())
 
 
 func _ready() -> void:
@@ -65,51 +86,87 @@ func _ready() -> void:
 	sprite.position = SPRITE_FEET_OFFSET
 
 
+func attack() -> Ability:
+	return abilities[Ability.Slot.ATTACK]
+
+
+func special() -> Ability:
+	return abilities[Ability.Slot.SPECIAL]
+
+
+func movement() -> Ability:
+	return abilities[Ability.Slot.MOVEMENT]
+
+
+func ultimate() -> Ability:
+	return abilities[Ability.Slot.ULTIMATE]
+
+
+func is_downed() -> bool:
+	return state == State.DOWNED
+
+
 func is_dashing() -> bool:
 	return dash_time_left > 0.0
 
 
 ## Whether enemies and enemy projectiles can currently hurt this hero.
 func is_targetable() -> bool:
-	return invulnerable_time <= 0.0 and not god_mode
+	return state == State.ALIVE and invulnerable_time <= 0.0 and not god_mode
 
 
-## Applies a hit; returns true if damage was taken.
-func take_hit(amount: float) -> bool:
-	if not is_targetable() or amount <= 0.0:
-		return false
-	# Milestone 3: heroes can't go down yet (downed/revive lands in milestone 4).
-	hp = maxf(1.0, hp - amount)
-	invulnerable_time = HIT_IFRAMES
-	_hurt_flash = 0.12
-	Events.hero_damaged.emit(slot, amount)
-	input.rumble(0.4, 0.6, 0.12)
-	return true
+func muzzle_position() -> Vector2:
+	return position + SPRITE_FEET_OFFSET + aim_dir * 5.0
 
 
-func heal(amount: float) -> void:
-	hp = minf(max_hp, hp + amount)
-
+# --- ticking -----------------------------------------------------------------------------
 
 func tick(delta: float) -> void:
+	invulnerable_time = maxf(0.0, invulnerable_time - delta)
+	if state == State.DOWNED:
+		velocity = Vector2.ZERO
+		_update_visuals(delta)
+		return
 	_update_aim()
+	for ability in abilities:
+		ability.tick(delta)
+
 	if dash_time_left > 0.0:
 		dash_time_left -= delta
 		position = world.grid.move_and_slide(position, _dash_velocity * delta, RADIUS)
 	else:
-		var target_velocity := input.move * move_speed
+		var target_velocity := input.move * move_speed * _speed_factor()
 		velocity = velocity.lerp(target_velocity, 1.0 - exp(-ACCELERATION * delta))
 		position = world.grid.move_and_slide(position, velocity * delta, RADIUS)
-		if input.just_pressed(PlayerInput.Action.MOVEMENT) and dash_cooldown_left <= 0.0:
-			_start_dash()
-	_attack_cooldown -= delta
-	if input.is_down(PlayerInput.Action.ATTACK) and _attack_cooldown <= 0.0:
-		_attack_cooldown = ATTACK_INTERVAL
-		world.projectiles.spawn(position + SPRITE_FEET_OFFSET, aim_dir * ATTACK_SPEED, ATTACK_DAMAGE, 3.0,
-			1.2, ProjectileSim.Team.PLAYER, slot, ProjectileSim.Look.ARROW, 0, 40.0)
-	dash_cooldown_left = maxf(0.0, dash_cooldown_left - delta)
-	invulnerable_time = maxf(0.0, invulnerable_time - delta)
+
+	var blocked := false
+	for ability in abilities:
+		if ability.blocks_other_abilities():
+			blocked = true
+	var a := attack()
+	if not blocked:
+		var wants_attack := input.is_down(PlayerInput.Action.ATTACK) if a.hold_to_repeat \
+			else input.just_pressed(PlayerInput.Action.ATTACK)
+		if wants_attack:
+			a.try_activate(aim_dir)
+		if input.just_pressed(PlayerInput.Action.SPECIAL):
+			special().try_activate(aim_dir)
+		if input.just_pressed(PlayerInput.Action.ULTIMATE) and ult_charge >= 1.0:
+			if ultimate().try_activate(aim_dir):
+				ult_charge = 0.0
+				input.rumble(0.6, 0.9, 0.3)
+	if input.just_pressed(PlayerInput.Action.MOVEMENT) and not is_dashing():
+		movement().try_activate(aim_dir)
+
+	ult_charge = minf(1.0, ult_charge + ULT_PASSIVE_PER_SECOND * delta)
 	_update_visuals(delta)
+
+
+func _speed_factor() -> float:
+	var f := 1.0
+	for ability in abilities:
+		f *= ability.move_speed_factor()
+	return f
 
 
 func _update_aim() -> void:
@@ -121,33 +178,117 @@ func _update_aim() -> void:
 		aim_dir = input.aim
 
 
-func _start_dash() -> void:
-	var dir := input.move.normalized() if input.move != Vector2.ZERO else aim_dir
-	_dash_velocity = dir * (DASH_DISTANCE / DASH_DURATION)
-	dash_time_left = DASH_DURATION
-	dash_cooldown_left = DASH_COOLDOWN
-	invulnerable_time = maxf(invulnerable_time, DASH_IFRAMES)
-	velocity = dir * move_speed
+# --- movement helpers used by abilities --------------------------------------------------
 
+func start_dash(dir: Vector2, distance: float, duration: float, iframes: float) -> void:
+	var d := dir.normalized() if dir != Vector2.ZERO else aim_dir
+	_dash_velocity = d * (distance / maxf(duration, 0.01))
+	dash_time_left = duration
+	invulnerable_time = maxf(invulnerable_time, iframes)
+	velocity = d * move_speed
+
+
+func teleport(to: Vector2, iframes: float) -> void:
+	position = to
+	velocity = Vector2.ZERO
+	invulnerable_time = maxf(invulnerable_time, iframes)
+
+
+# --- combat ----------------------------------------------------------------------------------
+
+## Base damage with the hero's multiplier and a crit roll.
+func roll_damage(base: float) -> float:
+	var dmg := base * damage_mult
+	if _rng.randf() < crit_chance:
+		dmg *= crit_mult
+	return dmg
+
+
+## Hook for on-hit effects (lifesteal etc. come with upgrades).
+func on_hits(_count: int) -> void:
+	pass
+
+
+func add_ult_charge(damage_dealt: float) -> void:
+	if state == State.ALIVE and damage_dealt > 0.0:
+		ult_charge = minf(1.0, ult_charge + damage_dealt / maxf(data.ult_cost, 1.0))
+
+
+## Applies a hit; returns true if damage was taken.
+func take_hit(amount: float) -> bool:
+	if not is_targetable() or amount <= 0.0:
+		return false
+	var factor := 1.0
+	for ability in abilities:
+		factor *= ability.damage_taken_factor()
+	var dmg := maxf(1.0, amount * factor - armor)
+	hp -= dmg
+	invulnerable_time = HIT_IFRAMES
+	_hurt_flash = 0.12
+	Events.hero_damaged.emit(slot, dmg)
+	input.rumble(0.4, 0.6, 0.12)
+	if hp <= 0.0:
+		go_down()
+	return true
+
+
+func heal(amount: float) -> void:
+	if state == State.ALIVE:
+		hp = minf(max_hp, hp + amount)
+
+
+func go_down() -> void:
+	hp = 0.0
+	state = State.DOWNED
+	revive_progress = 0.0
+	dash_time_left = 0.0
+	velocity = Vector2.ZERO
+	for ability in abilities:
+		ability.cancel()
+	input.rumble(0.8, 1.0, 0.4)
+	Events.hero_downed.emit(slot)
+
+
+func add_revive_progress(seconds: float) -> void:
+	if state != State.DOWNED:
+		return
+	revive_progress += seconds
+	if revive_progress >= REVIVE_TIME:
+		revive(REVIVE_HP_FRACTION)
+
+
+func revive(hp_fraction: float) -> void:
+	if state != State.DOWNED:
+		return
+	state = State.ALIVE
+	hp = maxf(1.0, max_hp * hp_fraction)
+	revive_progress = 0.0
+	invulnerable_time = REVIVE_IFRAMES
+	Events.hero_revived.emit(slot)
+
+
+# --- rendering -------------------------------------------------------------------------------
 
 func _update_visuals(delta: float) -> void:
 	_anim_time += delta
 	var frame: int = Frame.IDLE0
-	if is_dashing():
+	if state == State.DOWNED:
+		frame = Frame.DOWNED
+	elif is_dashing():
 		frame = Frame.DASH
 	elif velocity.length_squared() > 100.0:
 		frame = Frame.RUN0 + int(_anim_time * 10.0) % 4
 	else:
 		frame = Frame.IDLE0 + int(_anim_time * 2.0) % 2
 	sprite.frame = frame
-	if absf(aim_dir.x) > 0.05:
+	if state == State.ALIVE and absf(aim_dir.x) > 0.05:
 		sprite.flip_h = aim_dir.x < 0.0
 	_hurt_flash = maxf(0.0, _hurt_flash - delta)
 	if _hurt_flash > 0.0:
 		sprite.modulate = Color(2.0, 0.6, 0.6)
 	elif is_dashing():
 		sprite.modulate = Color(1.6, 1.6, 1.6)
-	elif invulnerable_time > 0.0:
+	elif state == State.ALIVE and invulnerable_time > 0.0:
 		sprite.modulate = Color(1, 1, 1, 0.55 if int(invulnerable_time * 20.0) % 2 == 0 else 1.0)
 	else:
 		sprite.modulate = Color.WHITE
@@ -155,12 +296,26 @@ func _update_visuals(delta: float) -> void:
 
 
 func _draw() -> void:
-	# Player-colour ring under the feet.
+	# Player-colour ring under the feet; pulses when the ultimate is ready.
+	var ring_color := color
+	if ult_charge >= 1.0 and state == State.ALIVE:
+		ring_color = color.lerp(Color.WHITE, 0.5 + 0.5 * sin(_anim_time * 10.0))
 	draw_set_transform(Vector2(0, 1), 0.0, Vector2(1.0, 0.5))
-	draw_circle(Vector2.ZERO, 7.0, Color(0, 0, 0, 0.35))
-	draw_arc(Vector2.ZERO, 7.0, 0.0, TAU, 20, color, 1.0)
+	draw_circle(Vector2.ZERO, 7.0, Color(0, 0, 0, 0.35), true, -1.0, false)
+	draw_arc(Vector2.ZERO, 7.0, 0.0, TAU, 20, ring_color, 1.0, false)
 	draw_set_transform(Vector2.ZERO)
+	if state == State.DOWNED:
+		# Revive progress bar.
+		var w := 16.0
+		draw_rect(Rect2(-w * 0.5, -16, w, 3), Color(0, 0, 0, 0.7))
+		draw_rect(Rect2(-w * 0.5 + 1, -15, (w - 2) * revive_progress / REVIVE_TIME, 1), Color(0.5, 1.0, 0.5))
+		return
 	# Aim reticle.
 	var reticle := (SPRITE_FEET_OFFSET + aim_dir * RETICLE_DISTANCE).round()
 	draw_rect(Rect2(reticle - Vector2(1, 1), Vector2(3, 3)), color)
 	draw_rect(Rect2(reticle, Vector2(1, 1)), Color.WHITE)
+	# Small HP bar once hurt.
+	if hp < max_hp:
+		var bw := 12.0
+		draw_rect(Rect2(-bw * 0.5 - 1, 3, bw + 2, 3), Color(0, 0, 0, 0.7))
+		draw_rect(Rect2(-bw * 0.5, 4, bw * hp / max_hp, 1), Color(0.3, 0.95, 0.35) if hp > max_hp * 0.3 else Color(1, 0.3, 0.3))

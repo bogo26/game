@@ -1,0 +1,70 @@
+[gd_resource type="Resource" script_class="HeroData" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/hero_data.gd" id="1_data"]
+[ext_resource type="Script" path="res://src/heroes/abilities/projectile_ability.gd" id="2_projectile"]
+[ext_resource type="Script" path="res://src/heroes/abilities/area_burst.gd" id="3_burst"]
+[ext_resource type="Script" path="res://src/heroes/abilities/blink_ability.gd" id="4_blink"]
+
+[sub_resource type="Resource" id="Resource_attack"]
+script = ExtResource("2_projectile")
+display_name = "Arcane Bolt"
+description = "Bolt that bursts on impact."
+cooldown = 0.4
+hold_to_repeat = true
+damage = 11.0
+speed = 220.0
+radius = 4.0
+lifetime = 1.3
+splash_radius = 18.0
+knockback = 50.0
+look = 1
+
+[sub_resource type="Resource" id="Resource_special"]
+script = ExtResource("3_burst")
+display_name = "Frost Nova"
+description = "Freeze and slow everything around you."
+cooldown = 7.0
+target = 0
+radius = 56.0
+damage = 8.0
+knockback = 40.0
+stun_time = 1.5
+slow_time = 3.5
+color = Color(0.6, 0.85, 1.0, 1.0)
+
+[sub_resource type="Resource" id="Resource_movement"]
+script = ExtResource("4_blink")
+display_name = "Blink"
+description = "Teleport a short distance toward your aim."
+cooldown = 3.0
+distance = 80.0
+iframes = 0.15
+
+[sub_resource type="Resource" id="Resource_ultimate"]
+script = ExtResource("3_burst")
+display_name = "Meteor"
+description = "After 1s a meteor crushes the aimed area."
+cooldown = 0.5
+target = 1
+distance = 100.0
+radius = 72.0
+damage = 120.0
+knockback = 250.0
+stun_time = 0.5
+delay = 1.0
+color = Color(1.0, 0.5, 0.2, 1.0)
+
+[resource]
+script = ExtResource("1_data")
+id = &"mage"
+display_name = "Mage"
+role = "AoE control"
+description = "Fragile caster. Freezes crowds and drops meteors on them."
+max_hp = 80.0
+move_speed = 86.0
+armor = 0.0
+ult_cost = 650.0
+attack = SubResource("Resource_attack")
+special = SubResource("Resource_special")
+movement = SubResource("Resource_movement")
+ultimate = SubResource("Resource_ultimate")

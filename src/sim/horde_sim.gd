@@ -27,6 +27,9 @@ const MAX_NEIGHBORS := 6
 const KNOCKBACK_DECAY := 9.0
 const FLASH_TIME := 0.08
 const SLOW_FACTOR := 0.45
+const MARK_DAMAGE_MULT := 1.75
+const RANGED_BACKOFF := 0.55   # ranged enemies retreat inside this fraction of their range
+const SHOT_POSE_TIME := 0.3
 
 var count := 0
 var pos := PackedVector2Array()
@@ -41,6 +44,8 @@ var stun := PackedFloat32Array()
 var slow := PackedFloat32Array()
 var facing := PackedFloat32Array()     # +1 right, -1 left
 var action := PackedFloat32Array()     # behaviour timer (ranged cooldown, exploder fuse)
+var state := PackedInt32Array()        # behaviour state (exploder: 1 = fuse lit)
+var mark := PackedFloat32Array()       # > 0: takes critical damage (Rogue marks)
 
 # Per-type tables (index = type id).
 var types: Array[EnemyData] = []
@@ -54,6 +59,13 @@ var t_frames := PackedInt32Array()
 var t_fps := PackedFloat32Array()
 var t_behavior := PackedInt32Array()
 var t_xp := PackedInt32Array()
+var t_range := PackedFloat32Array()
+var t_cooldown := PackedFloat32Array()
+var t_shot_damage := PackedFloat32Array()
+var t_shot_speed := PackedFloat32Array()
+var t_blast_radius := PackedFloat32Array()
+var t_blast_damage := PackedFloat32Array()
+var t_fuse := PackedFloat32Array()
 var max_radius := 0.0
 
 # Kill log since the last drain.
@@ -62,10 +74,18 @@ var kill_type := PackedInt32Array()
 var kill_slot := PackedInt32Array()
 ## Damage dealt per player slot since the last drain (ultimate charge).
 var damage_by_slot := PackedFloat32Array([0, 0, 0, 0])
+## Exploder blasts since the last drain (World damages heroes + draws FX).
+var blast_pos := PackedVector2Array()
+var blast_radius := PackedFloat32Array()
+var blast_damage := PackedFloat32Array()
+## Kill-log slot for enemies that died on their own (no XP drop).
+const SELF_KILL := -2
 
 var hash := SpatialHash.new()
 var grid: LevelGrid
 var flow: FlowField
+## Enemy shots are spawned here (optional; ranged enemies hold fire without it).
+var projectiles: ProjectileSim
 
 var _dead_pending := 0
 var _next_uid := 1
@@ -90,6 +110,8 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	slow.resize(CAPACITY)
 	facing.resize(CAPACITY)
 	action.resize(CAPACITY)
+	state.resize(CAPACITY)
+	mark.resize(CAPACITY)
 	count = 0
 	t_speed.clear()
 	t_radius.clear()
@@ -101,6 +123,13 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	t_fps.clear()
 	t_behavior.clear()
 	t_xp.clear()
+	t_range.clear()
+	t_cooldown.clear()
+	t_shot_damage.clear()
+	t_shot_speed.clear()
+	t_blast_radius.clear()
+	t_blast_damage.clear()
+	t_fuse.clear()
 	max_radius = 0.0
 	for data in types:
 		t_speed.append(data.speed)
@@ -113,6 +142,13 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 		t_fps.append(data.anim_fps)
 		t_behavior.append(data.behavior)
 		t_xp.append(data.xp)
+		t_range.append(data.attack_range)
+		t_cooldown.append(data.attack_cooldown)
+		t_shot_damage.append(data.projectile_damage)
+		t_shot_speed.append(data.projectile_speed)
+		t_blast_radius.append(data.explosion_radius)
+		t_blast_damage.append(data.explosion_damage)
+		t_fuse.append(data.fuse_time)
 		max_radius = maxf(max_radius, data.radius)
 	hash.setup(grid.size_px(), HASH_CELL, CAPACITY)
 
@@ -143,6 +179,8 @@ func spawn(type_id: int, p: Vector2, hp_multiplier: float = 1.0) -> int:
 	slow[i] = 0.0
 	facing[i] = 1.0
 	action[i] = randf() * 1.5
+	state[i] = 0
+	mark[i] = 0.0
 	return i
 
 
@@ -159,6 +197,8 @@ func damage(i: int, amount: float, knockback: Vector2, source_slot: int) -> bool
 	var h := hp[i]
 	if h <= 0.0:
 		return false
+	if mark[i] > 0.0:
+		amount *= MARK_DAMAGE_MULT
 	var remaining := h - amount
 	hp[i] = remaining
 	flash[i] = FLASH_TIME
@@ -181,6 +221,16 @@ func apply_stun(i: int, seconds: float) -> void:
 
 func apply_slow(i: int, seconds: float) -> void:
 	slow[i] = maxf(slow[i], seconds)
+
+
+func apply_mark(i: int, seconds: float) -> void:
+	mark[i] = maxf(mark[i], seconds)
+
+
+func clear_blasts() -> void:
+	blast_pos.clear()
+	blast_radius.clear()
+	blast_damage.clear()
 
 
 func relocate(i: int, p: Vector2) -> void:
@@ -214,8 +264,19 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	var STN := stun
 	var SLW := slow
 	var FC := facing
+	var ACT := action
+	var STATE := state
+	var MK := mark
 	var speed_t := t_speed
 	var radius_t := t_radius
+	var behavior_t := t_behavior
+	var range_t := t_range
+	var cooldown_t := t_cooldown
+	var shot_speed_t := t_shot_speed
+	var shot_damage_t := t_shot_damage
+	var blast_radius_t := t_blast_radius
+	var blast_damage_t := t_blast_damage
+	var fuse_t := t_fuse
 	var head := hash.head
 	var nxt := hash.next
 	var hcols := hash.cols
@@ -244,11 +305,15 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 		var sl := SLW[i]
 		if sl > 0.0:
 			SLW[i] = sl - dt
+		var mk := MK[i]
+		if mk > 0.0:
+			MK[i] = mk - dt
 		var desired := Vector2.ZERO
 		var st := STN[i]
 		if st > 0.0:
 			STN[i] = st - dt
 		else:
+			var behavior := behavior_t[t]
 			var ci := int(p.y * INV_TILE) * gw + int(p.x * INV_TILE)
 			var direct := true
 			if ci >= 0 and ci < ncells:
@@ -256,17 +321,53 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 				if fd != 0 and fdist[ci] > DIRECT_CHASE_TILES:
 					desired = dirs[fd]
 					direct = false
-			if direct and ntargets > 0:
-				var best := INF
-				var tp := p
+			# Nearest hero (cheap: at most 4). Chasers only need it up close.
+			var best := INF
+			var tp := p
+			if (direct or behavior != EnemyData.Behavior.CHASER) and ntargets > 0:
 				for k in ntargets:
 					var q := targets[k]
 					var d2 := p.distance_squared_to(q)
 					if d2 < best:
 						best = d2
 						tp = q
-				if best > 1.0:
+				if direct and best > 1.0:
 					desired = (tp - p) / sqrt(best)
+			if behavior == EnemyData.Behavior.RANGED and best < INF:
+				var dist := sqrt(best)
+				var attack_range := range_t[t]
+				if dist < attack_range:
+					if dist < attack_range * RANGED_BACKOFF:
+						desired = (p - tp) / maxf(dist, 0.001)
+					else:
+						desired = Vector2.ZERO
+					var cd := ACT[i] - dt
+					if cd <= 0.0:
+						cd = cooldown_t[t]
+						if projectiles != null and grid.line_of_sight(p, tp):
+							var aim := (tp - p) / maxf(dist, 0.001)
+							projectiles.spawn(p + Vector2(0, -8), aim * shot_speed_t[t], shot_damage_t[t], 3.0,
+								attack_range * 1.6 / shot_speed_t[t], ProjectileSim.Team.ENEMY, -1,
+								ProjectileSim.Look.SPIT)
+					ACT[i] = cd
+			elif behavior == EnemyData.Behavior.EXPLODER and best < INF:
+				if STATE[i] == 0 and best < blast_radius_t[t] * blast_radius_t[t] * 0.4:
+					STATE[i] = 1
+					ACT[i] = fuse_t[t]
+				if STATE[i] == 1:
+					desired = Vector2.ZERO
+					var fuse := ACT[i] - dt
+					ACT[i] = fuse
+					if fuse <= 0.0:
+						blast_pos.append(p)
+						blast_radius.append(blast_radius_t[t])
+						blast_damage.append(blast_damage_t[t])
+						HP[i] = 0.0
+						kill_pos.append(p)
+						kill_type.append(t)
+						kill_slot.append(SELF_KILL)
+						_dead_pending += 1
+						continue
 			var spd := speed_t[t]
 			if sl > 0.0:
 				spd *= SLOW_FACTOR
@@ -329,11 +430,15 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	pos = P
 	vel = V
 	sep = S
+	hp = HP
 	flash = FL
 	anim = AN
 	stun = STN
 	slow = SLW
 	facing = FC
+	action = ACT
+	state = STATE
+	mark = MK
 
 
 ## Removes enemies killed since the last update (swap with the last one).
@@ -364,6 +469,8 @@ func _remove_at(i: int) -> void:
 		slow[i] = slow[last]
 		facing[i] = facing[last]
 		action[i] = action[last]
+		state[i] = state[last]
+		mark[i] = mark[last]
 	count = last
 
 
@@ -467,7 +574,12 @@ func render(layer: InstanceLayer) -> void:
 		buf[o + 6] = 0.0
 		buf[o + 7] = roundf(p.y)
 		var frame := frame0[t]
-		if STN[i] <= 0.0:
+		var beh := t_behavior[t]
+		if beh == EnemyData.Behavior.EXPLODER and state[i] == 1:
+			frame += 4 + int(AN[i] * 12.0) % 2
+		elif beh == EnemyData.Behavior.RANGED and action[i] > t_cooldown[t] - SHOT_POSE_TIME:
+			frame += 4
+		elif STN[i] <= 0.0:
 			frame += int(AN[i] * fps[t]) % frames[t]
 		buf[o + 8] = float(frame)
 		buf[o + 9] = 1.0 if FL[i] > 0.0 else 0.0

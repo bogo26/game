@@ -12,11 +12,15 @@ var players: Array[PlayerInput] = []
 var _join_prev: Dictionary = {}  # device id -> bool (join button held last frame)
 
 
+func _init() -> void:
+	# Built in _init so the slots exist even before _ready (headless tests).
+	for i in MAX_PLAYERS:
+		players.append(PlayerInput.new(i))
+
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	process_priority = -1000
-	for i in MAX_PLAYERS:
-		players.append(PlayerInput.new(i))
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
 
 

@@ -33,10 +33,24 @@ class ErrorCounter extends Logger:
 var _logger := ErrorCounter.new()
 var _passed := 0
 var _failed := 0
+var _started := false
 
 
 func _initialize() -> void:
 	OS.add_logger(_logger)
+
+
+## Tests run on the first frame so the root and autoloads are fully ready
+## (nodes added during _initialize never receive _ready).
+func _process(_delta: float) -> bool:
+	if _started:
+		return false
+	_started = true
+	_run_all()
+	return false
+
+
+func _run_all() -> void:
 	var filter := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--filter="):

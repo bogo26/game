@@ -29,6 +29,12 @@ var look := PackedInt32Array()
 var last_hit := PackedInt32Array()     # uid of the last enemy hit (pierce)
 var effect := PackedInt32Array()
 var effect_time := PackedFloat32Array()
+var splash := PackedFloat32Array()     # > 0: area damage on impact
+
+## Splash impacts this frame (for FX): position + radius pairs.
+var impacts := PackedVector2Array()
+var impact_radius := PackedFloat32Array()
+var _scratch := PackedInt32Array()
 
 ## Heroes hit by enemy projectiles this frame: [hero index, damage] pairs.
 var hero_hits := PackedFloat32Array()
@@ -49,6 +55,7 @@ func _init() -> void:
 	last_hit.resize(CAPACITY)
 	effect.resize(CAPACITY)
 	effect_time.resize(CAPACITY)
+	splash.resize(CAPACITY)
 
 
 ## Returns the projectile index, or -1 when full.
@@ -72,12 +79,17 @@ func spawn(p: Vector2, v: Vector2, dmg: float, r: float, lifetime: float, p_team
 	last_hit[i] = 0
 	effect[i] = Effect.NONE
 	effect_time[i] = 0.0
+	splash[i] = 0.0
 	return i
 
 
 func set_effect(i: int, p_effect: Effect, seconds: float) -> void:
 	effect[i] = p_effect
 	effect_time[i] = seconds
+
+
+func set_splash(i: int, radius_px: float) -> void:
+	splash[i] = radius_px
 
 
 func clear() -> void:
@@ -88,6 +100,8 @@ func clear() -> void:
 func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_positions: PackedVector2Array,
 		hero_targetable: PackedByteArray, hero_radius: float) -> void:
 	hero_hits.clear()
+	impacts.clear()
+	impact_radius.clear()
 	var P := pos
 	var V := vel
 	var L := life
@@ -189,6 +203,16 @@ func _hit_enemy(i: int, j: int, horde: HordeSim, v: Vector2) -> void:
 			horde.apply_stun(j, effect_time[i])
 	last_hit[i] = horde.uid[j]
 	pierce[i] -= 1
+	var r := splash[i]
+	if r > 0.0:
+		var center := horde.pos[j]
+		horde.query_circle(center, r, _scratch)
+		var splash_damage := damage[i] * 0.6
+		for k in _scratch:
+			if k != j:
+				horde.damage(k, splash_damage, (horde.pos[k] - center).normalized() * knockback[i] * 0.5, owner[i])
+		impacts.append(center)
+		impact_radius.append(r)
 
 
 func _remove_at(i: int, P: PackedVector2Array, V: PackedVector2Array, L: PackedFloat32Array) -> void:
@@ -208,6 +232,7 @@ func _remove_at(i: int, P: PackedVector2Array, V: PackedVector2Array, L: PackedF
 		last_hit[i] = last_hit[last]
 		effect[i] = effect[last]
 		effect_time[i] = effect_time[last]
+		splash[i] = splash[last]
 	count = last
 
 

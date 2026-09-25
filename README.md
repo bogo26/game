@@ -40,8 +40,11 @@ godot --headless --path . -s res://tests/run_tests.gd
 
 ## Status
 
-Milestone 3 (horde tech) is done.
+Milestone 4 (combat) is done.
 - `./tools/dev.sh run` opens the test room. Press **Enter** (keyboard) or **A** (gamepad) to join, up to 4 players.
-- A 300-strong horde hunts you through the corridors.
-- Heroes have a temporary basic attack (hold RT / left mouse) and a dash (RB / Space). Real hero abilities arrive in milestone 4.
-- `./tools/dev.sh run -- --bots=3 --bot-fire=12` adds shooting bot players. See the milestone table in [docs/DESIGN.md](docs/DESIGN.md#milestones).
+- P1–P4 get Knight, Ranger, Mage and Cleric (the character select arrives in milestone 6).
+- Every hero has its attack, special, movement ability and ultimate.
+- Downed heroes are revived by standing next to them.
+- `./tools/dev.sh run -- --bots=3` adds bot players that use their abilities.
+
+See the milestone table in [docs/DESIGN.md](docs/DESIGN.md#milestones).

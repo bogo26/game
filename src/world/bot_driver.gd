@@ -50,12 +50,16 @@ func tick(delta: float) -> void:
 			_targets[slot] = world.grid.nearest_open(center + offset)
 		var to_target: Vector2 = _targets[slot] - hero.position
 		input.move = to_target.normalized() if to_target.length() > 6.0 else Vector2.ZERO
-		input.aim = Vector2.from_angle(_time * (1.0 + slot * 0.37) + slot)
+		var enemy := world.horde.nearest(hero.position, 160.0)
+		if enemy != -1:
+			input.aim = (world.horde.pos[enemy] - hero.position).normalized()
+		else:
+			input.aim = Vector2.from_angle(_time * (1.0 + slot * 0.37) + slot)
 		input.aim_active = true
 		input.set_action(PlayerInput.Action.MOVEMENT, _rng.randf() < 0.01)
 		input.set_action(PlayerInput.Action.ATTACK, use_abilities)
-		input.set_action(PlayerInput.Action.SPECIAL, use_abilities and _rng.randf() < 0.05)
-		input.set_action(PlayerInput.Action.ULTIMATE, use_abilities and _rng.randf() < 0.01)
+		input.set_action(PlayerInput.Action.SPECIAL, use_abilities and enemy != -1 and _rng.randf() < 0.05)
+		input.set_action(PlayerInput.Action.ULTIMATE, use_abilities and enemy != -1 and _rng.randf() < 0.02)
 		if fire_rate > 0.0:
 			_fire(hero, delta)
 

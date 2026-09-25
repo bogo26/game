@@ -259,3 +259,71 @@ func test_pickups_home_in_and_merge_when_full() -> void:
 		total += pk.value[i]
 	assert_eq(pk.count, PickupSim.CAPACITY)
 	assert_eq(total, PickupSim.CAPACITY + 5, "overflow merged, no XP lost")
+
+
+func _typed(behavior: EnemyData.Behavior) -> EnemyData:
+	var d := _swarmer()
+	d.behavior = behavior
+	d.attack_range = 100.0
+	d.attack_cooldown = 0.5
+	d.projectile_speed = 100.0
+	d.explosion_radius = 30.0
+	d.fuse_time = 0.3
+	return d
+
+
+func test_spitter_keeps_distance_and_fires() -> void:
+	var g := _open_grid(30, 10)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var target := PackedVector2Array([LevelGrid.cell_center(Vector2i(20, 5))])
+	flow.compute_now(target)
+	var types: Array[EnemyData] = [_typed(EnemyData.Behavior.RANGED)]
+	var h := HordeSim.new()
+	h.setup(g, flow, types)
+	var shots := ProjectileSim.new()
+	h.projectiles = shots
+	h.spawn(0, LevelGrid.cell_center(Vector2i(10, 5)))
+	var fired := 0
+	for frame in 180:
+		h.update(1.0 / 60.0, target)
+		fired = maxi(fired, shots.count)
+	var dist := h.pos[0].distance_to(target[0])
+	assert_true(fired > 0, "fired at the hero")
+	assert_eq(shots.team[0], ProjectileSim.Team.ENEMY)
+	assert_true(dist > 100.0 * 0.5 and dist <= 100.0 + 2.0, "holds position inside range (%.1f px)" % dist)
+
+
+func test_exploder_fuses_then_blasts() -> void:
+	var g := _open_grid(20, 10)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var target := PackedVector2Array([Vector2(160, 80)])
+	flow.compute_now(target)
+	var types: Array[EnemyData] = [_typed(EnemyData.Behavior.EXPLODER)]
+	var h := HordeSim.new()
+	h.setup(g, flow, types)
+	h.spawn(0, Vector2(150, 80))
+	for frame in 60:
+		h.update(1.0 / 60.0, target)
+	assert_eq(h.blast_pos.size(), 1, "exploded once")
+	assert_eq(h.count, 0, "exploder removed")
+	assert_eq(h.kill_slot[0], HordeSim.SELF_KILL, "self-destruct gives no XP credit")
+
+
+func test_killing_exploder_during_fuse_prevents_blast() -> void:
+	var g := _open_grid(20, 10)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var target := PackedVector2Array([Vector2(160, 80)])
+	flow.compute_now(target)
+	var types: Array[EnemyData] = [_typed(EnemyData.Behavior.EXPLODER)]
+	var h := HordeSim.new()
+	h.setup(g, flow, types)
+	h.spawn(0, Vector2(150, 80))
+	h.update(1.0 / 60.0, target)
+	assert_eq(h.state[0], 1, "fuse lit when close")
+	h.damage(0, 100.0, Vector2.ZERO, 0)
+	for frame in 60:
+		h.update(1.0 / 60.0, target)
+	assert_eq(h.blast_pos.size(), 0)

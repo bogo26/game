@@ -6,11 +6,15 @@ extends Camera2D
 
 const LEASH_MARGIN := 14.0
 const FOLLOW_SHARPNESS := 10.0
+const SHAKE_DECAY := 18.0
+const MAX_SHAKE := 6.0
 
 var target := Vector2.ZERO
 var _smoothed := Vector2.ZERO
 var _bounds := Rect2()
 var _has_target := false
+var _shake := 0.0
+var _rng := RandomNumberGenerator.new()
 
 
 func setup(level_size_px: Vector2) -> void:
@@ -44,6 +48,16 @@ func follow(points: Array[Vector2], delta: float) -> void:
 		_has_target = true
 	_smoothed = _smoothed.lerp(target, 1.0 - exp(-FOLLOW_SHARPNESS * delta))
 	global_position = _clamp_to_bounds(_smoothed).round()
+	if _shake > 0.0:
+		_shake = maxf(0.0, _shake - SHAKE_DECAY * delta)
+		offset = Vector2(_rng.randf_range(-_shake, _shake), _rng.randf_range(-_shake, _shake)).round()
+	else:
+		offset = Vector2.ZERO
+
+
+## Screen shake in whole pixels; stronger calls override weaker ones.
+func add_shake(strength: float) -> void:
+	_shake = minf(MAX_SHAKE, maxf(_shake, strength))
 
 
 func snap_to(point: Vector2) -> void:

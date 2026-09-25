@@ -29,10 +29,13 @@ var run_active := false
 var pending_level_ups := 0
 
 
-func _ready() -> void:
-	process_mode = Node.PROCESS_MODE_ALWAYS
+func _init() -> void:
 	for i in MAX_PLAYERS:
 		slots.append(PlayerSlot.new(i))
+
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
 
 
 func player_color(slot: int) -> Color:

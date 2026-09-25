@@ -1,0 +1,73 @@
+[gd_resource type="Resource" script_class="HeroData" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/hero_data.gd" id="1_data"]
+[ext_resource type="Script" path="res://src/heroes/abilities/projectile_ability.gd" id="2_projectile"]
+[ext_resource type="Script" path="res://src/heroes/abilities/zone_ability.gd" id="3_zone"]
+[ext_resource type="Script" path="res://src/heroes/abilities/dash_ability.gd" id="4_dash"]
+[ext_resource type="Script" path="res://src/heroes/abilities/area_burst.gd" id="5_burst"]
+
+[sub_resource type="Resource" id="Resource_attack"]
+script = ExtResource("2_projectile")
+display_name = "Holy Orb"
+description = "Slow orb that pierces and bounces off walls."
+cooldown = 0.45
+hold_to_repeat = true
+damage = 8.0
+speed = 150.0
+radius = 4.0
+lifetime = 1.8
+pierce = 2
+bounces = 3
+knockback = 40.0
+look = 2
+
+[sub_resource type="Resource" id="Resource_special"]
+script = ExtResource("3_zone")
+display_name = "Sanctuary"
+description = "Holy ground that heals allies inside for 5s."
+cooldown = 9.0
+target = 0
+radius = 44.0
+duration = 5.0
+interval = 0.5
+heal = 4.0
+color = Color(1.0, 0.95, 0.5, 1.0)
+
+[sub_resource type="Resource" id="Resource_movement"]
+script = ExtResource("4_dash")
+display_name = "Holy Dash"
+description = "Dash that heals allies you pass (and speeds up revives)."
+cooldown = 4.0
+direction = 0
+distance = 64.0
+duration = 0.2
+iframes = 0.25
+heal_allies = 15.0
+color = Color(1.0, 0.95, 0.6, 0.7)
+
+[sub_resource type="Resource" id="Resource_ultimate"]
+script = ExtResource("5_burst")
+display_name = "Divine Light"
+description = "Revive all allies, heal the team and smite every enemy on screen."
+cooldown = 0.5
+target = 2
+damage = 40.0
+knockback = 120.0
+heal_fraction = 0.4
+revive_allies = true
+color = Color(1.0, 0.95, 0.7, 1.0)
+
+[resource]
+script = ExtResource("1_data")
+id = &"cleric"
+display_name = "Cleric"
+role = "Support"
+description = "Keeps the team standing. Heals, revives, and smites the whole screen."
+max_hp = 110.0
+move_speed = 88.0
+armor = 0.5
+ult_cost = 550.0
+attack = SubResource("Resource_attack")
+special = SubResource("Resource_special")
+movement = SubResource("Resource_movement")
+ultimate = SubResource("Resource_ultimate")
