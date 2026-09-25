@@ -7,6 +7,7 @@ enum Behavior {
 	CHASER,    ## walks straight at the nearest hero along the flow field
 	RANGED,    ## keeps distance and fires projectiles when in line of sight
 	EXPLODER,  ## rushes in, stops to telegraph, then explodes
+	BOSS,      ## body only: a boss controller node moves it and drives attacks
 }
 
 @export var id: StringName = &"swarmer"

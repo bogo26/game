@@ -51,3 +51,6 @@ layout = "
         #.........................................#
         ###########################################
 "
+enemy_weights = {&"swarmer": 1.0, &"brute": 0.07, &"spitter": 0.08, &"exploder": 0.06}
+corridor_cap_fraction = 1.0
+corridor_spawn_rate = 30.0

@@ -38,11 +38,20 @@ godot --headless --path . -s res://tests/run_tests.gd
 | Ultimate | LB (or Y) | Q |
 | Pause | Start | Esc |
 
+## Playing
+
+1. `./tools/dev.sh run`, then pick **Start Run**.
+2. Every player presses **A** (gamepad) or **Enter** (keyboard) to join. Browse heroes with left/right and press A/Enter to ready up.
+3. Fight through 3 levels: clear the lockdown arena rooms, then reach the exit portal.
+4. Beat the Demon Lord in the throne room.
+
+**Test Room** on the main menu is a drop-in sandbox with an endless horde.
+
 ## Status
 
-Milestone 5 (progression) is done.
-- `./tools/dev.sh run` opens the test room. Press **Enter** (keyboard) or **A** (gamepad) to join, up to 4 players.
-- Enemies drop XP gems that fill the shared team XP bar.
-- Every team level-up pauses the game so each player picks 1 of 3 upgrade cards.
+Milestone 6 is done: the vertical slice is playable end to end.
+- Main menu → character select → 3 levels + boss → victory/defeat screen.
+- 4 heroes (Knight, Ranger, Mage, Cleric) and 4 enemy types plus the boss.
+- Upgrades on every team level-up, and a full HUD.
 
-See the milestone table in [docs/DESIGN.md](docs/DESIGN.md#milestones).
+Next: heroes 5–8, the art pass, then exports. See [docs/DESIGN.md](docs/DESIGN.md#milestones).

@@ -97,13 +97,45 @@ Spawn director:
 
 ## Levels and run flow
 
-- Levels are authored as ASCII layouts in `LevelData` resources (`src/levels/data/*.tres`; legend in `level_data.gd`). `Level` turns a layout into a `TileMapLayer` for rendering and a `LevelGrid` for collision and pathfinding. Wall tiles also carry a custom `solid` flag, so painting levels in the editor stays possible later.
-- Each level has corridors with a steady trickle of enemies and 2–3 **arena rooms**. In an arena room the doors lock and waves run until the kill quota is met.
-- A level ends at an **exit portal** that all living players must stand in.
-- Run: Level 1 → Level 2 → Level 3 → Boss arena → Victory. Difficulty rises per level.
-- Screen flow: Main menu → Character select (4 quadrants: join, pick, ready) → Levels → Victory / Game over → Main menu.
-- Shared camera: follows the middle of the group with fixed zoom, and players can't leave the screen. The leash blocks the player who is running away rather than dragging the others along. Levels are designed for this.
-- If an assigned controller is unplugged, the game pauses until it is reconnected, or until another controller presses A and takes over that player.
+- **Authoring:**
+  - Levels are ASCII layouts in `LevelData` resources; the legend is in `level_data.gd`.
+  - `tools/gen_levels.py` builds the run's layouts from rooms and corridors and writes `src/levels/data/level_*.tres` / `boss.tres` with each level's difficulty settings.
+  - The sandbox `test_room.tres` is hand-written.
+- **Rendering:** `Level` turns a layout into a `TileMapLayer` for rendering and a `LevelGrid` for collision and pathfinding.
+- **Run order:** `src/levels/run_config.tres` lists Crypt Entrance → Flooded Halls → Bone Pits → Demon's Throne (boss). Each level sets:
+  - enemy mix
+  - an HP multiplier (1.0 / 1.35 / 1.8 / 2.2)
+  - corridor pressure
+  - arena quotas
+  - a floor tint
+- **`LevelDirector` runs the objectives:**
+  - An **arena room** (digit tiles) activates when a living hero is 36+ px inside it. Stragglers are pulled in with the leader, every door touching the room turns solid, and the spawner switches to arena mode.
+  - The room is cleared once its quota has spawned and nothing is left alive in it. Quotas are ×(1 + 0.4 per extra player).
+  - Clearing opens the doors, drops a heart, and returns the spawner to the corridor trickle.
+  - The **exit portal** opens when every arena is cleared. The level completes after all living heroes stand in it for 1 s.
+  - The **boss level's** throne room spawns the Demon Lord instead of waves. Its death ends the run in victory.
+- **HUD:**
+  - The objective text sits under the XP bar.
+  - A yellow arrow at the screen edge points to off-screen objectives (the next arena or the exit).
+- **Spawner modes:**
+  - CORRIDOR: off-screen trickle at a fraction of the alive cap.
+  - ARENA: spawns on the room's floor at least 96 px from heroes, until the quota is spent.
+  - OFF.
+- **Boss (Demon Lord):**
+  - Its body is a `HordeSim` entry, so every ability, projectile and zone hits it.
+  - `BossDemon` moves it and runs three phases:
+    - fireball fans and ground slams
+    - plus fire rings and swarmer summons
+    - enraged: faster, plus telegraphed charges
+  - HP is 1800 × level multiplier × player-count scaling. It is immune to stun and slow.
+- **Screens:** Main menu → Character select → Game (levels) → End screen (victory/defeat + stats) → Play again / Main menu.
+  - **Main menu:** Start Run, Test Room (drop-in sandbox), Quit. Menus use Godot focus navigation, so keyboard, any gamepad or mouse all work.
+  - **Character select:** 4 quadrants. Press A/Enter to join, left/right to browse the 8-hero roster (unreleased heroes show "Coming soon"), A to ready and B to un-ready or leave. The run starts 1.5 s after everyone is ready.
+  - **`Game`:** builds a `World` per level, shows "LEVEL n" and "LEVEL CLEAR!" banners, and banks stats. A team wipe means defeat; the boss's death means victory.
+  - **Pause:** Start or Esc opens it for any player, with Resume and Quit to menu. The press that closes it can't also trigger a dash.
+- **Shared camera:** follows the middle of the group with fixed zoom, and players can't leave the screen. The leash blocks the player who is running away rather than dragging the others along.
+- **Disconnects:** if an assigned controller is unplugged, the game pauses until it is reconnected, or until another controller presses A and takes over that player.
+- **Bots** (`BotDriver`) follow the current objective with A* over the level grid and use their abilities. The test suite has four god-mode bots finish every level including the boss, and `./tools/dev.sh run res://src/main/game.tscn -- --bots=4 --level=4` shows a bot boss fight.
 
 ## Technical architecture
 
@@ -136,10 +168,12 @@ src/
   heroes/     Hero (body, 4 ability slots, downed/revive), HeroData, Ability (abstract) +
               reusable abilities (projectile, melee arc, area burst, dash, blink, zone, channel),
               data/<hero>.tres (generated by tools/gen_hero_data.py)
-  enemies/    EnemyData, SpawnDirector, behaviours, boss
+  enemies/    EnemyData + data/*.tres, SpawnDirector (corridor/arena modes), boss/BossDemon
   upgrades/   UpgradeData, UpgradePool, data/*.tres
-  levels/     Level (builds tiles + grid from LevelData), levels/data/*.tres, arena rooms, exit portal
-  ui/         HUD (team XP bar), level-up screen, join HUD; menus + character select next
+  levels/     Level (tiles + grid + arena rooms from LevelData), LevelDirector (arenas, exit, boss),
+              RunConfig, data/*.tres (generated by tools/gen_levels.py)
+  ui/         HUD, level-up screen, main menu, character select, pause menu, end screen
+  main/       Game (run controller: levels, banners, victory/defeat)
 assets/fonts  Pixel5x8 proportional bitmap font (BMFont, generated), default theme font
 tests/        headless test runner + test_*.gd
 tools/        dev.sh helper, stress test scene
@@ -194,7 +228,7 @@ docs/         this document
 | 3 | Horde tech: HordeSim, MultiMesh shader, spatial hash, threaded flow field, projectiles, pickups, stress test + **perf gate** | done: gate passed in GDScript |
 | 4 | Combat: ability framework, Knight / Ranger / Mage / Cleric, downed/revive, 4 enemy types | done |
 | 5 | Progression: stats and modifiers, upgrade pool, simultaneous level-up screen | done |
-| 6 | Levels & flow: 3 levels + boss, arena rooms, menus, HUD, scaling (**vertical slice**) | |
+| 6 | Levels & flow: 3 levels + boss, arena rooms, menus, HUD, scaling (**vertical slice**) | done |
 | 7 | Heroes 5–8: Berserker, Rogue, Engineer, Necromancer + summons | |
 | 8 | Art & juice: pixel-art pack, particles, shake, SFX/music | |
 | 9 | Export: macOS + Windows builds | |

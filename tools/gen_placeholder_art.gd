@@ -10,6 +10,7 @@ extends SceneTree
 ##                                          cols 0-3 walk, 4-5 action (see ENEMY_ROWS)
 ##   assets/sprites/fx/fx_atlas.png         16x16 cells; row 0 projectiles, row 1 pickups
 ##   assets/fonts/pixel5x8.png + .fnt       proportional 5x8 pixel font (BMFont), ASCII 32-126
+##   assets/sprites/enemies/boss_demon.png  4 frames of 64x64: walk0, walk1, windup, charge
 
 const OUTLINE := Color("140c1c")
 const SKIN := Color("f0c8a0")
@@ -53,6 +54,7 @@ func _initialize() -> void:
 	_gen_horde_atlas()
 	_gen_fx_atlas()
 	_gen_font()
+	_gen_boss()
 	print("placeholder art generated")
 	quit()
 
@@ -619,3 +621,61 @@ func _gen_font() -> void:
 	fnt.append_array(chars)
 	var file := FileAccess.open("res://assets/fonts/pixel5x8.fnt", FileAccess.WRITE)
 	file.store_string("\n".join(fnt) + "\n")
+
+
+# --- boss (64x64 frames: walk0, walk1, windup, charge; feet at y=58) -------------------
+
+func _gen_boss() -> void:
+	var img := _img(256, 64)
+	for f in 4:
+		_draw_demon(img, f * 64, f)
+		_outline(img, Rect2i(f * 64, 0, 64, 64))
+	_save(img, "res://assets/sprites/enemies/boss_demon.png")
+
+
+func _draw_demon(img: Image, ox: int, frame: int) -> void:
+	var skin := Color("b8322a")
+	var dark := Color("7a1e1a")
+	var belly := Color("d8704a")
+	var horn := Color("e8dcc0")
+	var eye := Color("fff060") if frame != 2 else Color("ffffff")
+	var bob := 1 if frame == 1 else 0
+	var lean := 3 if frame == 3 else 0
+	# Wings
+	var wing := Color("4a1a2a")
+	for i in 10:
+		_rect(img, ox + 8 + i, 18 + i + bob, 3, 14 - i, wing)
+		_rect(img, ox + 53 - i, 18 + i + bob, 3, 14 - i, wing)
+	# Legs
+	var step := 2 if frame == 1 else 0
+	_rect(img, ox + 22 + lean, 46, 7, 12 - step, dark)
+	_rect(img, ox + 36 + lean, 46, 7, 12 - (2 - step), dark)
+	_rect(img, ox + 20 + lean, 56 - step, 10, 3, Color("2a1010"))
+	_rect(img, ox + 35 + lean, 56 - (2 - step), 10, 3, Color("2a1010"))
+	# Body
+	_rect(img, ox + 18 + lean, 24 + bob, 29, 24, skin)
+	_rect(img, ox + 24 + lean, 30 + bob, 17, 14, belly)
+	_rect(img, ox + 18 + lean, 44 + bob, 29, 4, dark)
+	# Arms (raised in windup)
+	if frame == 2:
+		_rect(img, ox + 12, 8, 6, 20, skin)
+		_rect(img, ox + 47, 8, 6, 20, skin)
+		_rect(img, ox + 11, 4, 8, 6, Color("ff9a3a"))
+		_rect(img, ox + 46, 4, 8, 6, Color("ff9a3a"))
+	else:
+		_rect(img, ox + 12 + lean, 26 + bob, 6, 18, skin)
+		_rect(img, ox + 47 + lean, 26 + bob, 6, 18, skin)
+		_rect(img, ox + 11 + lean, 42 + bob, 8, 5, dark)
+		_rect(img, ox + 46 + lean, 42 + bob, 8, 5, dark)
+	# Head
+	_rect(img, ox + 24 + lean, 10 + bob, 17, 15, skin)
+	_rect(img, ox + 24 + lean, 21 + bob, 17, 4, dark)
+	_rect(img, ox + 27 + lean, 15 + bob, 3, 2, eye)
+	_rect(img, ox + 35 + lean, 15 + bob, 3, 2, eye)
+	_rect(img, ox + 28 + lean, 21 + bob, 9, 2, Color("2a0a0a"))
+	_px(img, ox + 29 + lean, 22 + bob, horn)
+	_px(img, ox + 35 + lean, 22 + bob, horn)
+	# Horns
+	for i in 6:
+		_rect(img, ox + 21 - i / 2 + lean, 10 - i + bob, 3, 1, horn)
+		_rect(img, ox + 41 + i / 2 + lean, 10 - i + bob, 3, 1, horn)

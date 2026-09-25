@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="RunConfig" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://src/levels/run_config.gd" id="1_run"]
+[ext_resource type="Script" path="res://src/levels/level_data.gd" id="2_data"]
+[ext_resource type="Resource" path="res://src/levels/data/level_1.tres" id="3_l1"]
+[ext_resource type="Resource" path="res://src/levels/data/level_2.tres" id="4_l2"]
+[ext_resource type="Resource" path="res://src/levels/data/level_3.tres" id="5_l3"]
+[ext_resource type="Resource" path="res://src/levels/data/boss.tres" id="6_boss"]
+
+[resource]
+script = ExtResource("1_run")
+levels = Array[ExtResource("2_data")]([ExtResource("3_l1"), ExtResource("4_l2"), ExtResource("5_l3"), ExtResource("6_boss")])

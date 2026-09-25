@@ -93,6 +93,13 @@ func set_action(action: Action, down: bool) -> void:
 	_down[action] = 1 if down else 0
 
 
+## Marks every held action as already seen, so nothing counts as just pressed.
+func consume_presses() -> void:
+	for i in ACTION_COUNT:
+		_prev[i] = _down[i]
+		_repeat_fired[i] = 0
+
+
 func clear() -> void:
 	move = Vector2.ZERO
 	aim_active = false

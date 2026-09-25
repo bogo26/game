@@ -29,6 +29,11 @@ var level_index := 0
 var run_active := false
 ## Level-ups earned but not yet resolved by the pick screen.
 var pending_level_ups := 0
+## Run statistics (shown on the end screen).
+var run_kills := 0
+var run_time := 0.0
+var levels_cleared := 0
+var last_run_victory := false
 
 
 func _init() -> void:
@@ -66,6 +71,10 @@ func reset_run() -> void:
 	xp = 0
 	level_index = 0
 	pending_level_ups = 0
+	run_kills = 0
+	run_time = 0.0
+	levels_cleared = 0
+	last_run_victory = false
 	run_active = true
 	for s in slots:
 		s.upgrades.clear()

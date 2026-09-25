@@ -10,6 +10,7 @@ const MAX_PLAYERS := 4
 var players: Array[PlayerInput] = []
 
 var _join_prev: Dictionary = {}  # device id -> bool (join button held last frame)
+var _swallow_presses := false
 
 
 func _init() -> void:
@@ -22,12 +23,44 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	process_priority = -1000
 	Input.joy_connection_changed.connect(_on_joy_connection_changed)
+	_extend_ui_actions()
+
+
+## Menus use Godot's built-in ui_* actions (focus navigation for any device).
+## Add WASD and the left stick to them; gameplay never reads the InputMap.
+static func _extend_ui_actions() -> void:
+	var extra := {
+		&"ui_up": [KEY_W, JOY_AXIS_LEFT_Y, -1.0],
+		&"ui_down": [KEY_S, JOY_AXIS_LEFT_Y, 1.0],
+		&"ui_left": [KEY_A, JOY_AXIS_LEFT_X, -1.0],
+		&"ui_right": [KEY_D, JOY_AXIS_LEFT_X, 1.0],
+	}
+	for action: StringName in extra:
+		if not InputMap.has_action(action):
+			continue
+		var key := InputEventKey.new()
+		key.physical_keycode = extra[action][0]
+		InputMap.action_add_event(action, key)
+		var stick := InputEventJoypadMotion.new()
+		stick.device = -1
+		stick.axis = extra[action][1]
+		stick.axis_value = extra[action][2]
+		InputMap.action_add_event(action, stick)
 
 
 func _process(delta: float) -> void:
 	for p in players:
 		p.poll(delta)
+		if _swallow_presses:
+			p.consume_presses()
+	_swallow_presses = false
 	_poll_join_requests()
+
+
+## Hides this frame's new presses from gameplay (e.g. the A press that closed
+## a menu shouldn't also dash).
+func swallow_presses() -> void:
+	_swallow_presses = true
 
 
 func get_player(slot: int) -> PlayerInput:

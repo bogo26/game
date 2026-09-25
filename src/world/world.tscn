@@ -4,11 +4,11 @@
 [ext_resource type="Resource" path="res://src/levels/data/test_room.tres" id="2_level"]
 [ext_resource type="Script" path="res://src/levels/level.gd" id="3_level"]
 [ext_resource type="Script" path="res://src/camera/shared_camera.gd" id="4_camera"]
-[ext_resource type="Script" path="res://src/ui/join_hud.gd" id="5_join"]
 [ext_resource type="Script" path="res://src/sim/instance_layer.gd" id="6_layer"]
 [ext_resource type="Script" path="res://src/world/fx_layer.gd" id="7_fx"]
 [ext_resource type="Script" path="res://src/ui/hud.gd" id="8_hud"]
 [ext_resource type="Script" path="res://src/ui/level_up_screen.gd" id="9_levelup"]
+[ext_resource type="PackedScene" path="res://src/ui/pause_menu.tscn" id="10_pause"]
 
 [node name="World" type="Node2D"]
 script = ExtResource("1_world")
@@ -37,11 +37,10 @@ script = ExtResource("7_fx")
 [node name="Camera" type="Camera2D" parent="."]
 script = ExtResource("4_camera")
 
-[node name="JoinHud" type="CanvasLayer" parent="."]
-script = ExtResource("5_join")
-
 [node name="Hud" type="CanvasLayer" parent="."]
 script = ExtResource("8_hud")
 
 [node name="LevelUp" type="CanvasLayer" parent="."]
 script = ExtResource("9_levelup")
+
+[node name="PauseMenu" parent="." instance=ExtResource("10_pause")]

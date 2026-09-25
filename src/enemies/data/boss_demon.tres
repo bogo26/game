@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"boss_demon"
+max_hp = 1800.0
+speed = 0.0
+radius = 14.0
+contact_damage = 18.0
+xp = 0
+knockback_taken = 0.0
+behavior = 3
+atlas_row = 7

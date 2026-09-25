@@ -5,7 +5,7 @@ extends Node2D
 ## the horde for ground effects and one above heroes. Replaced/augmented by
 ## sprite particles in the art pass.
 
-enum Kind { RING, DISC, SLASH, LINE, TELEGRAPH, ZONE }
+enum Kind { RING, DISC, SLASH, LINE, TELEGRAPH, ZONE, WARN_LINE }
 
 const MAX_EFFECTS := 256
 
@@ -60,6 +60,11 @@ func slash(p: Vector2, radius: float, angle: float, arc: float, color: Color, du
 
 func line(a: Vector2, b: Vector2, color: Color, duration: float = 0.1) -> void:
 	_add(Kind.LINE, a, b, 1.0, duration, 0.0, 0.0, color)
+
+
+## Warning line that stays solid until it fires (charges).
+func warn_line(a: Vector2, b: Vector2, color: Color, duration: float) -> void:
+	_add(Kind.WARN_LINE, a, b, 3.0, duration, 0.0, 0.0, color)
 
 
 ## Warning circle that fills up until the effect lands.
@@ -124,6 +129,8 @@ func _draw() -> void:
 			Kind.TELEGRAPH:
 				draw_arc(p, r, 0.0, TAU, _segments(r), Color(c, 0.9), 1.0, false)
 				draw_circle(p, r * t, Color(c, 0.22), true, -1.0, false)
+			Kind.WARN_LINE:
+				draw_line(p, _pos2[i].round(), Color(c, 0.35 + 0.4 * t), r, false)
 			Kind.ZONE:
 				var fade := clampf((1.0 - t) / 0.2, 0.0, 1.0)
 				draw_circle(p, r, Color(c, c.a * 0.25 * fade), true, -1.0, false)

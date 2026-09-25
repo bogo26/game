@@ -9,6 +9,10 @@ extends Node2D
 ## revive, zones, fx, shake). Timings go to PerfMonitor (F3).
 
 signal team_wiped
+signal level_completed
+signal boss_defeated
+## The pause menu's "Quit to menu" in a run (the Game handles it).
+signal quit_requested
 
 ## Loaded at runtime: preloading would create a load cycle (hero.gd types World).
 const HERO_SCENE_PATH := "res://src/heroes/hero.tscn"
@@ -18,6 +22,7 @@ const ENEMY_TYPES: Array[String] = [
 	"res://src/enemies/data/brute.tres",
 	"res://src/enemies/data/spitter.tres",
 	"res://src/enemies/data/exploder.tres",
+	"res://src/enemies/data/boss_demon.tres",
 ]
 const HORDE_ATLAS := preload("res://assets/sprites/enemies/horde_atlas.png")
 const FX_ATLAS := preload("res://assets/sprites/fx/fx_atlas.png")
@@ -38,6 +43,9 @@ const TEST_ROOM_WIPE_RESET := 3.0
 @export var auto_revive_on_wipe := true
 ## Off for the stress test (the pick screen pauses the game).
 @export var level_ups_enabled := true
+## Part of a run (vs. the sandbox test room): no drop-in, wipes end the run,
+## reaching the exit completes the level.
+@export var run_mode := false
 
 var grid: LevelGrid
 var heroes: Array[Hero] = []
@@ -49,6 +57,11 @@ var projectiles := ProjectileSim.new()
 var pickups := PickupSim.new()
 var spawner := SpawnDirector.new()
 var upgrade_pool := UpgradePool.new()
+var director := LevelDirector.new()
+var boss: BossDemon
+## Run statistics for this level.
+var kills := 0
+var elapsed := 0.0
 
 ## Per-frame hero snapshots handed to the sims. `hero_positions` has every
 ## hero (camera, leash); `target_positions` only those enemies should chase.
@@ -71,12 +84,16 @@ var _wipe_timer := 0.0
 @onready var horde_layer: InstanceLayer = $HordeLayer
 @onready var projectile_layer: InstanceLayer = $ProjectileLayer
 @onready var level_up: LevelUpScreen = $LevelUp
+@onready var hud: Hud = $Hud
+@onready var pause_menu: PauseMenu = $PauseMenu
 
 
 func _ready() -> void:
 	if not GameState.run_active:
 		GameState.reset_run()
 	level_up.closed.connect(_on_level_up_closed)
+	hud.setup(self)
+	pause_menu.quit_requested.connect(_on_quit_requested)
 	level.build(level_data)
 	grid = level.grid
 	camera.setup(grid.size_px())
@@ -90,9 +107,9 @@ func _ready() -> void:
 	horde.projectiles = projectiles
 	spawner.setup(horde, grid, flow, level.enemy_spawn_hints)
 	spawner.enabled = spawn_enemies
-	spawner.set_weight(&"brute", 0.07)
-	spawner.set_weight(&"spitter", 0.08)
-	spawner.set_weight(&"exploder", 0.06)
+	if run_mode:
+		allow_drop_in = false
+		auto_revive_on_wipe = false
 	horde_layer.setup(HORDE_ATLAS, Vector2i(32, 32), Vector2(16, 24), HordeSim.CAPACITY)
 	projectile_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 8), ProjectileSim.CAPACITY)
 	pickup_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 11), PickupSim.CAPACITY)
@@ -113,6 +130,11 @@ func _ready() -> void:
 	Events.player_device_restored.connect(_on_device_changed)
 	_snapshot_heroes()
 	flow.compute_now(target_positions)
+	director.setup(self)
+	if not run_mode:
+		director.exit_open = false  # the sandbox never ends
+	director.level_completed.connect(level_completed.emit)
+	director.boss_defeated.connect(boss_defeated.emit)
 	GameState.pending_level_ups += _cmdline_int("--debug-levelups=", 0)
 
 
@@ -154,7 +176,9 @@ func _process(delta: float) -> void:
 	_snapshot_heroes()
 	var t_heroes := Time.get_ticks_usec()
 
+	elapsed += dt
 	flow.tick(dt, target_positions)
+	director.tick(dt)
 	spawner.tick(dt, camera.visible_rect(), hero_positions)
 	horde.update(dt, target_positions)
 	_apply_blasts()
@@ -175,6 +199,11 @@ func _process(delta: float) -> void:
 	if level_ups_enabled and GameState.pending_level_ups > 0 and not level_up.is_open() and not heroes.is_empty():
 		level_up.open(heroes, upgrade_pool)
 		get_tree().paused = true
+	elif not level_up.is_open() and Engine.get_process_frames() > pause_menu.closed_at_frame + 1:
+		for hero in heroes:
+			if hero.input.just_pressed(PlayerInput.Action.PAUSE):
+				pause_menu.open()
+				break
 	var t_sim_end := Time.get_ticks_usec()
 
 	horde.render(horde_layer)
@@ -381,6 +410,8 @@ func _process_kills() -> void:
 		var p := horde.kill_pos[k]
 		var t := horde.kill_type[k]
 		var killer := horde.kill_slot[k]
+		kills += 1
+		director.on_enemy_killed()
 		if killer >= 0:
 			var hero := hero_for_slot(killer)
 			if hero:
@@ -430,6 +461,14 @@ func _on_device_changed(_slot: int) -> void:
 
 func _on_level_up_closed() -> void:
 	get_tree().paused = InputRouter.has_disconnected_player()
+
+
+func _on_quit_requested() -> void:
+	if run_mode:
+		quit_requested.emit()
+	else:
+		get_tree().paused = false
+		get_tree().change_scene_to_file("res://src/ui/main_menu.tscn")
 
 
 ## Keeps the group within one screen: a hero can't move further from the

@@ -216,11 +216,23 @@ func damage(i: int, amount: float, knockback: Vector2, source_slot: int) -> bool
 
 
 func apply_stun(i: int, seconds: float) -> void:
-	stun[i] = maxf(stun[i], seconds)
+	if t_behavior[type[i]] != EnemyData.Behavior.BOSS:
+		stun[i] = maxf(stun[i], seconds)
 
 
 func apply_slow(i: int, seconds: float) -> void:
-	slow[i] = maxf(slow[i], seconds)
+	if t_behavior[type[i]] != EnemyData.Behavior.BOSS:
+		slow[i] = maxf(slow[i], seconds)
+
+
+## Current index of the enemy with this uid (indices move on removal), or -1.
+func index_of_uid(id: int, hint: int = -1) -> int:
+	if hint >= 0 and hint < count and uid[hint] == id:
+		return hint
+	for i in count:
+		if uid[i] == id:
+			return i
+	return -1
 
 
 func apply_mark(i: int, seconds: float) -> void:
@@ -308,6 +320,8 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 		var mk := MK[i]
 		if mk > 0.0:
 			MK[i] = mk - dt
+		if behavior_t[t] == EnemyData.Behavior.BOSS:
+			continue  # moved by its controller (BossDemon)
 		var desired := Vector2.ZERO
 		var st := STN[i]
 		if st > 0.0:
@@ -564,6 +578,8 @@ func render(layer: InstanceLayer) -> void:
 			continue
 		var p := P[i]
 		var t := T[i]
+		if t_behavior[t] == EnemyData.Behavior.BOSS:
+			continue  # drawn by its controller node
 		var o := w * InstanceLayer.STRIDE
 		buf[o] = FC[i]
 		buf[o + 1] = 0.0
