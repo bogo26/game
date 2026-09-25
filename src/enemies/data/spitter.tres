@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"spitter"
+max_hp = 16.0
+speed = 30.0
+radius = 6.0
+contact_damage = 5.0
+xp = 2
+knockback_taken = 0.8
+behavior = 1
+attack_range = 120.0
+attack_cooldown = 2.4
+projectile_damage = 8.0
+projectile_speed = 110.0
+atlas_row = 2
+anim_fps = 6.0

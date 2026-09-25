@@ -152,7 +152,7 @@ docs/         this document
 |---|---|---|
 | 1 | Setup: project settings, autoloads, test runner, perf overlay, docs | done |
 | 2 | Co-op movement: input router + join, hero move/aim/dash, shared camera, test room | done |
-| 3 | Horde tech: HordeSim, MultiMesh shader, spatial hash, threaded flow field, projectiles, pickups, stress test + **perf gate** | |
+| 3 | Horde tech: HordeSim, MultiMesh shader, spatial hash, threaded flow field, projectiles, pickups, stress test + **perf gate** | done: gate passed in GDScript |
 | 4 | Combat: ability framework, Knight / Ranger / Mage / Cleric, downed/revive, 4 enemy types | |
 | 5 | Progression: stats and modifiers, upgrade pool, simultaneous level-up screen | |
 | 6 | Levels & flow: 3 levels + boss, arena rooms, menus, HUD, scaling (**vertical slice**) | |
@@ -160,9 +160,26 @@ docs/         this document
 | 8 | Art & juice: pixel-art pack, particles, shake, SFX/music | |
 | 9 | Export: macOS + Windows builds | |
 
+## Performance results
+
+Measured with `./tools/dev.sh stress` on 2026-09-25: MacBook Air M2 (fanless), macOS fullscreen **3840×2410**, which is more pixels than 4K. Load: 300 enemies, 4 bot heroes, a 400-projectile cap (~398 alive) and ~160–230 XP gems.
+
+| Run | Avg frame | p99 | Max | Sim (CPU) |
+|---|---|---|---|---|
+| Uncapped, V-Sync off, 10–30 s | 3.7–4.2 ms (240–270 fps) | 5.2 ms | 6.4 ms | 1.5–1.7 ms |
+| Uncapped, 30 s, after the laptop heats up | 4.2 ms | 12.7 ms | 44 ms | 1.7 ms |
+| **Capped at 120 fps, 60 s** | 8.33 ms (7200/7200 frames) | 8.47 ms | 10.8 ms | 2.7 ms |
+
+Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 ms, instance buffers 0.33 ms, draw submission 0.23 ms.
+
+- **Gate verdict:** the typed GDScript sims meet the budget, so no GDExtension port is needed.
+- **The p99 failures** only happen after ~17 s of uncapped rendering at ~250 fps on the fanless M2 Air. That points to thermal throttling: frames go to 13 ms while game code stays at 1.7 ms. At 120 fps (the target), the same machine holds every frame for a full minute.
+- **Why sim cost rises when capped:** the CPU clocks down between frames, so sim time goes up to 2.7 ms. That still leaves most of the 8.3 ms budget free, but milestone 4+ features (enemy behaviours, abilities, particles) must stay in budget.
+- **Re-check after milestones 4 and 7** with `./tools/dev.sh stress --fullscreen --max-fps=120 --seconds=60`.
+
 ## Verification
 
 - `./tools/dev.sh test` runs the headless test suite. It compiles and loads every script and scene, then runs `tests/test_*.gd`. Any engine error fails the run.
-- `./tools/dev.sh stress` runs the horde stress test (milestone 3+). It prints frame and sim timings and exits non-zero when it misses the targets.
+- `./tools/dev.sh stress [--fullscreen] [--max-fps=120] [--seconds=60] [--log-slow]` runs the horde stress test. It prints frame, sim and draw timings plus entity counts, and exits non-zero when it misses the targets. Uncapped runs check avg ≤ 6 ms and p99 ≤ 8.3 ms. Capped runs check that p99 stays within 125% of the frame budget.
 - Movie Maker captures (`--write-movie shots/frame.png`) are used to check rendering.
 - The F3 overlay shows FPS, frame times, per-system costs and entity counts in any build.

@@ -13,6 +13,7 @@ var _head := 0
 var _filled := 0
 var _last_usec := 0
 var _timers: Dictionary = {}    # StringName -> float (ms, smoothed)
+var _last: Dictionary = {}      # StringName -> float (ms, most recent)
 var _counters: Dictionary = {}  # StringName -> int
 var _refresh_left := 0.0
 
@@ -20,6 +21,7 @@ var _capturing := false
 var _cap_frames := PackedFloat32Array()
 var _cap_timer_sums: Dictionary = {}  # StringName -> float (ms)
 var _cap_timer_max: Dictionary = {}   # StringName -> float (ms)
+var _cap_counter_sums: Dictionary = {}  # StringName -> float
 
 var _panel: ColorRect
 var _label: Label
@@ -61,6 +63,8 @@ func _process(delta: float) -> void:
 		_filled = mini(_filled + 1, WINDOW)
 		if _capturing:
 			_cap_frames.append(ms)
+			for counter: StringName in _counters:
+				_cap_counter_sums[counter] = _cap_counter_sums.get(counter, 0.0) + float(_counters[counter])
 	_last_usec = now
 	if visible:
 		_refresh_left -= delta
@@ -72,10 +76,16 @@ func _process(delta: float) -> void:
 ## Report how long a system took this frame, in microseconds.
 func record(system: StringName, usec: int) -> void:
 	var ms := float(usec) / 1000.0
+	_last[system] = ms
 	_timers[system] = lerpf(_timers.get(system, ms), ms, EMA_ALPHA)
 	if _capturing:
 		_cap_timer_sums[system] = _cap_timer_sums.get(system, 0.0) + ms
 		_cap_timer_max[system] = maxf(_cap_timer_max.get(system, 0.0), ms)
+
+
+## Most recent value reported for `system`, in ms.
+func last_ms(system: StringName) -> float:
+	return _last.get(system, 0.0)
 
 
 func set_counter(counter: StringName, value: int) -> void:
@@ -91,6 +101,7 @@ func begin_capture() -> void:
 	_cap_frames = PackedFloat32Array()
 	_cap_timer_sums.clear()
 	_cap_timer_max.clear()
+	_cap_counter_sums.clear()
 
 
 ## Stops capturing and returns frame statistics (all times in ms).
@@ -114,6 +125,10 @@ func end_capture() -> Dictionary:
 	for system: StringName in _cap_timer_sums:
 		timers[system] = {"avg_ms": _cap_timer_sums[system] / n, "max_ms": _cap_timer_max[system]}
 	result["timers"] = timers
+	var counters := {}
+	for counter: StringName in _cap_counter_sums:
+		counters[counter] = _cap_counter_sums[counter] / n
+	result["counters"] = counters
 	return result
 
 

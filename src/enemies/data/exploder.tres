@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"exploder"
+max_hp = 8.0
+speed = 58.0
+radius = 6.0
+contact_damage = 0.0
+xp = 2
+knockback_taken = 1.2
+behavior = 2
+explosion_radius = 30.0
+explosion_damage = 22.0
+fuse_time = 0.7
+atlas_row = 3
+anim_fps = 10.0

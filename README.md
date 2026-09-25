@@ -14,6 +14,7 @@ Design, controls, heroes and architecture: [docs/DESIGN.md](docs/DESIGN.md).
 ./tools/dev.sh run      # play
 ./tools/dev.sh editor   # open in the Godot editor
 ./tools/dev.sh test     # headless test suite
+./tools/dev.sh stress --fullscreen --max-fps=120 --seconds=60   # horde perf test
 ```
 
 - `tools/dev.sh` looks for Godot in `/Applications`, `~/Applications` and `~/Downloads`. Set `GODOT=/path/to/Godot` to override.
@@ -39,4 +40,8 @@ godot --headless --path . -s res://tests/run_tests.gd
 
 ## Status
 
-Milestone 2 (co-op movement) is done. `./tools/dev.sh run` opens the test room: press **Enter** (keyboard) or **A** (gamepad) to join, up to 4 players. `./tools/dev.sh run -- --bots=3` adds bot players. See the milestone table in [docs/DESIGN.md](docs/DESIGN.md#milestones).
+Milestone 3 (horde tech) is done.
+- `./tools/dev.sh run` opens the test room. Press **Enter** (keyboard) or **A** (gamepad) to join, up to 4 players.
+- A 300-strong horde hunts you through the corridors.
+- Heroes have a temporary basic attack (hold RT / left mouse) and a dash (RB / Space). Real hero abilities arrive in milestone 4.
+- `./tools/dev.sh run -- --bots=3 --bot-fire=12` adds shooting bot players. See the milestone table in [docs/DESIGN.md](docs/DESIGN.md#milestones).

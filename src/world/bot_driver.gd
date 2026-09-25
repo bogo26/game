@@ -6,10 +6,15 @@ extends RefCounted
 
 var world: World
 var use_abilities := false
+## Stress testing: each bot fires this many projectiles per second directly
+## (stand-in for hero abilities until milestone 4).
+var fire_rate := 0.0
+var projectile_cap := 400
 var _rng := RandomNumberGenerator.new()
 var _targets: Dictionary = {}      # slot -> Vector2
 var _retarget_in: Dictionary = {}  # slot -> float
 var _time := 0.0
+var _fire_budget: Dictionary = {}  # slot -> float
 
 
 func _init(p_world: World, seed_value: int = 7) -> void:
@@ -51,3 +56,18 @@ func tick(delta: float) -> void:
 		input.set_action(PlayerInput.Action.ATTACK, use_abilities)
 		input.set_action(PlayerInput.Action.SPECIAL, use_abilities and _rng.randf() < 0.05)
 		input.set_action(PlayerInput.Action.ULTIMATE, use_abilities and _rng.randf() < 0.01)
+		if fire_rate > 0.0:
+			_fire(hero, delta)
+
+
+func _fire(hero: Hero, delta: float) -> void:
+	var budget: float = _fire_budget.get(hero.slot, 0.0) + fire_rate * delta
+	var target := world.horde.nearest(hero.position, 200.0)
+	while budget >= 1.0 and world.projectiles.count < projectile_cap:
+		budget -= 1.0
+		var dir := Vector2.from_angle(_rng.randf() * TAU)
+		if target != -1 and _rng.randf() < 0.7:
+			dir = (world.horde.pos[target] - hero.position).normalized().rotated(_rng.randf_range(-0.2, 0.2))
+		world.projectiles.spawn(hero.position + Vector2(0, -6), dir * 220.0, 4.0, 3.0, 1.6,
+			ProjectileSim.Team.PLAYER, hero.slot, ProjectileSim.Look.ARROW, 1, 30.0)
+	_fire_budget[hero.slot] = minf(budget, 5.0)
