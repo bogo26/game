@@ -128,17 +128,8 @@ func render(layer: InstanceLayer) -> void:
 		var p := pos[i]
 		var bob := roundf(sin(age[i] * 5.0 + float(i)) * 1.0) if target[i] == -1 else 0.0
 		var o := i * InstanceLayer.STRIDE
-		buf[o] = 1.0
-		buf[o + 1] = 0.0
-		buf[o + 2] = 0.0
 		buf[o + 3] = roundf(p.x)
-		buf[o + 4] = 0.0
-		buf[o + 5] = 1.0
-		buf[o + 6] = 0.0
 		buf[o + 7] = roundf(p.y) + bob
 		buf[o + 8] = float(FX_ROW + look_of(kind[i], value[i]))
-		buf[o + 9] = 0.0
-		buf[o + 10] = 0.0
-		buf[o + 11] = 1.0
 	layer.buffer = buf
 	layer.commit(n)

@@ -14,7 +14,8 @@ const KNOWN_ABILITY_MODS: Array[StringName] = [
 	&"damage_pct", &"cooldown_pct", &"area_pct", &"count", &"spread_deg", &"speed_pct",
 	&"pierce", &"bounces", &"effect_time", &"arc_deg", &"stun_time", &"slow_time",
 	&"distance_pct", &"iframes", &"end_burst", &"heal_allies", &"arrival_damage",
-	&"duration", &"zone_damage", &"heal_pct",
+	&"duration", &"zone_damage", &"heal_pct", &"buff_damage", &"lifesteal", &"minion_hp_pct",
+	&"max_active",
 ]
 
 static var _shared_library: UpgradeLibrary

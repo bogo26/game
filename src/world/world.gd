@@ -49,6 +49,7 @@ const TEST_ROOM_WIPE_RESET := 3.0
 
 var grid: LevelGrid
 var heroes: Array[Hero] = []
+var minions: Array[Minion] = []
 var zones: Array[EffectZone] = []
 var bots: BotDriver
 var flow := FlowField.new()
@@ -74,6 +75,11 @@ var _rng := RandomNumberGenerator.new()
 var _scratch := PackedInt32Array()
 var _wiped := false
 var _wipe_timer := 0.0
+## Recent enemy deaths (Raise Dead): positions and times.
+var _corpse_pos := PackedVector2Array()
+var _corpse_time := PackedFloat32Array()
+const CORPSE_MEMORY := 5.0
+const MAX_CORPSES := 96
 
 @onready var level: Level = $Level
 @onready var ground_fx: FxLayer = $GroundFx
@@ -114,6 +120,11 @@ func _ready() -> void:
 	projectile_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 8), ProjectileSim.CAPACITY)
 	pickup_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 11), PickupSim.CAPACITY)
 
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--heroes="):  # debug: pick heroes for bots / drop-ins
+			var ids := arg.get_slice("=", 1).split(",")
+			for i in mini(ids.size(), GameState.MAX_PLAYERS):
+				GameState.slots[i].hero_id = StringName(ids[i])
 	var bots_wanted := maxi(bot_count, _cmdline_int("--bots=", 0))
 	if bots_wanted > 0:
 		BotDriver.add_bots(bots_wanted)
@@ -133,6 +144,8 @@ func _ready() -> void:
 	director.setup(self)
 	if not run_mode:
 		director.exit_open = false  # the sandbox never ends
+		director.objective = "Test room: endless horde  (Start/Esc: menu)"
+		director.objective_target = Vector2.INF
 	director.level_completed.connect(level_completed.emit)
 	director.boss_defeated.connect(boss_defeated.emit)
 	GameState.pending_level_ups += _cmdline_int("--debug-levelups=", 0)
@@ -171,6 +184,9 @@ func _process(delta: float) -> void:
 		bots.tick(dt)
 	for hero in heroes:
 		hero.tick(dt)
+	var t_minions := Time.get_ticks_usec()
+	_tick_minions(dt)
+	PerfMonitor.record(&"minions", Time.get_ticks_usec() - t_minions)
 	_apply_leash()
 	_update_revives(dt)
 	_snapshot_heroes()
@@ -209,9 +225,11 @@ func _process(delta: float) -> void:
 	horde.render(horde_layer)
 	projectiles.render(projectile_layer)
 	pickups.render(pickup_layer)
+	var t_fx := Time.get_ticks_usec()
 	ground_fx.tick(dt)
 	fx.tick(dt)
 	var t_end := Time.get_ticks_usec()
+	PerfMonitor.record(&"fx", t_end - t_fx)
 
 	PerfMonitor.record(&"heroes", t_heroes - t_start)
 	PerfMonitor.record(&"horde", t_horde - t_heroes)
@@ -221,6 +239,7 @@ func _process(delta: float) -> void:
 	PerfMonitor.set_counter(&"enemies", horde.alive_count())
 	PerfMonitor.set_counter(&"projectiles", projectiles.count)
 	PerfMonitor.set_counter(&"gems", pickups.count)
+	PerfMonitor.set_counter(&"minions", minions.size())
 
 
 # --- combat helpers for abilities -------------------------------------------------------------
@@ -283,6 +302,36 @@ func revive_all(hp_fraction: float) -> void:
 		if hero.is_downed():
 			hero.revive(hp_fraction)
 			fx.ring(hero.position, 20.0, Color(1, 1, 0.6), 0.5)
+
+
+func add_minion(minion: Minion) -> void:
+	entities.add_child(minion)
+	minions.append(minion)
+
+
+## Up to `max_count` recent corpse positions near `center`; they're consumed.
+func recent_corpses(center: Vector2, radius: float, max_count: int) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var i := _corpse_pos.size() - 1
+	while i >= 0 and out.size() < max_count:
+		if elapsed - _corpse_time[i] <= CORPSE_MEMORY and _corpse_pos[i].distance_to(center) <= radius:
+			out.append(_corpse_pos[i])
+			_corpse_pos.remove_at(i)
+			_corpse_time.remove_at(i)
+		i -= 1
+	return out
+
+
+func _tick_minions(dt: float) -> void:
+	var i := 0
+	while i < minions.size():
+		var m := minions[i]
+		m.tick(dt)
+		if m.is_expired():
+			minions.remove_at(i)
+			m.queue_free()
+		else:
+			i += 1
 
 
 func add_zone(zone: EffectZone) -> void:
@@ -411,6 +460,11 @@ func _process_kills() -> void:
 		var t := horde.kill_type[k]
 		var killer := horde.kill_slot[k]
 		kills += 1
+		_corpse_pos.append(p)
+		_corpse_time.append(elapsed)
+		if _corpse_pos.size() > MAX_CORPSES:
+			_corpse_pos.remove_at(0)
+			_corpse_time.remove_at(0)
 		director.on_enemy_killed()
 		if killer >= 0:
 			var hero := hero_for_slot(killer)
@@ -429,6 +483,7 @@ func _apply_ult_charge() -> void:
 	for hero in heroes:
 		if hero.slot < dealt.size() and dealt[hero.slot] > 0.0:
 			hero.add_ult_charge(dealt[hero.slot])
+			hero.on_damage_dealt(dealt[hero.slot])
 	dealt.fill(0.0)
 	horde.damage_by_slot = dealt
 

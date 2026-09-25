@@ -18,7 +18,7 @@ var _swings := 0
 func _activate(aim: Vector2) -> void:
 	_swings += 1
 	var multiplier := 1.0
-	var reach_now := reach * (1.0 + mod(&"area_pct"))
+	var reach_now := reach * area_scale()
 	var heavy := combo_every > 0 and _swings % combo_every == 0
 	if heavy:
 		multiplier = combo_multiplier

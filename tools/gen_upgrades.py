@@ -73,6 +73,42 @@ UPGRADES = [
      ["ability special heal_pct 0.3"]),
     ("cleric_wrath", "Wrath of Heaven", "Divine Light: +50% damage", RARE, 2, "cleric",
      ["ability ultimate damage_pct 0.5"]),
+    # --- berserker ----------------------------------------------------------------------------
+    ("berserker_cleaver", "Cleaver", "Axe Cleave: +10% damage, +15% reach", COMMON, 3, "berserker",
+     ["ability attack damage_pct 0.1", "ability attack area_pct 0.15"]),
+    ("berserker_bloodlust", "Bloodlust", "Blood Frenzy: +5% lifesteal, +1s", RARE, 3, "berserker",
+     ["ability special lifesteal 0.05", "ability special duration 1"]),
+    ("berserker_earthshaker", "Earthshaker", "Leap Slam: +0.3s stun, +25% area", RARE, 2, "berserker",
+     ["ability movement stun_time 0.3", "ability movement area_pct 0.25"]),
+    ("berserker_unstoppable", "Unstoppable", "Rampage lasts 3s longer", RARE, 2, "berserker",
+     ["ability ultimate duration 3"]),
+    # --- rogue --------------------------------------------------------------------------------
+    ("rogue_precision", "Deadly Precision", "+8% critical hit chance", COMMON, 3, "rogue",
+     ["stat crit_chance flat 0.08"]),
+    ("rogue_fan", "Fan of Knives", "Knife Ring: +6 knives", COMMON, 3, "rogue",
+     ["ability special count 6"]),
+    ("rogue_shadow_dance", "Shadow Dance", "Shadow Step: -20% cooldown, +25% distance", RARE, 2, "rogue",
+     ["ability movement cooldown_pct -0.2", "ability movement distance_pct 0.25"]),
+    ("rogue_legion", "Legion of Shadows", "Shadow Clones: +2 clones", RARE, 2, "rogue",
+     ["ability ultimate count 2"]),
+    # --- engineer -----------------------------------------------------------------------------
+    ("engineer_overclock", "Overclocked Turrets", "Turrets deal 30% more damage", COMMON, 3, "engineer",
+     ["ability special damage_pct 0.3"]),
+    ("engineer_extra_turret", "Extra Turret", "Deploy Turret: +1 turret", RARE, 2, "engineer",
+     ["ability special max_active 1"]),
+    ("engineer_afterburner", "Afterburner", "Rocket Boots: -20% cooldown, +20% distance", COMMON, 3, "engineer",
+     ["ability movement cooldown_pct -0.2", "ability movement distance_pct 0.2"]),
+    ("engineer_supercoil", "Supercoil", "Tesla Tower lasts 4s longer, +20% range", RARE, 2, "engineer",
+     ["ability ultimate duration 4", "ability ultimate area_pct 0.2"]),
+    # --- necromancer --------------------------------------------------------------------------
+    ("necro_bone_horde", "Bone Horde", "Raise Dead: +2 skeletons, max +4", COMMON, 3, "necromancer",
+     ["ability special count 2", "ability special max_active 4"]),
+    ("necro_sturdy_bones", "Sturdy Bones", "Skeletons have 50% more HP", COMMON, 3, "necromancer",
+     ["ability special minion_hp_pct 0.5", "ability ultimate minion_hp_pct 0.5"]),
+    ("necro_soul_rend", "Soul Rend", "Soul Bolt: +1 pierce, +10% damage", COMMON, 3, "necromancer",
+     ["ability attack pierce 1", "ability attack damage_pct 0.1"]),
+    ("necro_endless_legion", "Endless Legion", "Army of the Dead: +6 skeletons", RARE, 2, "necromancer",
+     ["ability ultimate count 6", "ability ultimate max_active 6"]),
 ]
 
 

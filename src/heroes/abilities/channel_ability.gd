@@ -49,7 +49,7 @@ func _tick_active(delta: float) -> void:
 	_tick_left -= delta
 	_spin += delta * 18.0
 	var w := world()
-	var r := radius * (1.0 + mod(&"area_pct"))
+	var r := radius * area_scale()
 	w.fx.slash(hero.position + Vector2(0, -5), r * 0.75, _spin, PI * 0.9, Color(color, 0.8), 0.08)
 	if _tick_left <= 0.0:
 		_tick_left = interval

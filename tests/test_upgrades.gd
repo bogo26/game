@@ -32,7 +32,8 @@ func test_each_hero_has_its_own_upgrades() -> void:
 	for u in UpgradePool.shared_library().upgrades:
 		if u.hero_id != &"":
 			counts[u.hero_id] = int(counts.get(u.hero_id, 0)) + 1
-	for hero_id: StringName in [&"knight", &"ranger", &"mage", &"cleric"]:
+	for hero_id: StringName in [&"knight", &"ranger", &"mage", &"cleric", &"berserker", &"rogue",
+			&"engineer", &"necromancer"]:
 		assert_true(int(counts.get(hero_id, 0)) >= 4, "%s has hero-specific upgrades" % hero_id)
 
 

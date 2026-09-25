@@ -253,15 +253,10 @@ func render(layer: InstanceLayer) -> void:
 		var o := i * InstanceLayer.STRIDE
 		buf[o] = c
 		buf[o + 1] = -s
-		buf[o + 2] = 0.0
 		buf[o + 3] = roundf(p.x)
 		buf[o + 4] = s
 		buf[o + 5] = c
-		buf[o + 6] = 0.0
 		buf[o + 7] = roundf(p.y)
 		buf[o + 8] = float(look[i])
-		buf[o + 9] = 0.0
-		buf[o + 10] = 0.0
-		buf[o + 11] = 1.0
 	layer.buffer = buf
 	layer.commit(n)

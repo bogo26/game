@@ -2,6 +2,8 @@ class_name InstanceLayer
 extends MultiMeshInstance2D
 ## Draws up to `capacity` atlas cells in a single draw call. Sims write
 ## STRIDE floats per instance into `buffer`, then call commit(visible_count).
+## The buffer starts as identity transforms with alpha 1, so sims can skip
+## writing fields they never change (e.g. rotation for enemies).
 ## Per-instance layout (MultiMesh TRANSFORM_2D + custom data):
 ##   [0..7]  transform rows: x.x, y.x, 0, origin.x, x.y, y.y, 0, origin.y
 ##   [8..11] custom: atlas cell index, hit flash, frozen tint, alpha
@@ -48,6 +50,12 @@ func setup(atlas: Texture2D, cell_size: Vector2i, anchor: Vector2, p_capacity: i
 		float(atlas.get_width()) / cell_size.x, float(atlas.get_height()) / cell_size.y))
 	material = mat
 	buffer.resize(capacity * STRIDE)
+	# Identity transform + opaque, no flash/tint: sims only rewrite what changes.
+	for i in capacity:
+		var o := i * STRIDE
+		buffer[o] = 1.0
+		buffer[o + 5] = 1.0
+		buffer[o + 11] = 1.0
 
 
 func commit(visible_count: int) -> void:

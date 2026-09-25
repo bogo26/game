@@ -7,6 +7,9 @@ extends Node2D
 enum Frame { IDLE0, IDLE1, RUN0, RUN1, RUN2, RUN3, DASH, DOWNED }
 enum State { ALIVE, DOWNED }
 
+## Emitted when the attack ability fires (Shadow Clones mirror it).
+signal attack_performed(aim: Vector2)
+
 const RADIUS := 5.0
 const HIT_IFRAMES := 0.5
 const REVIVE_TIME := 3.0
@@ -59,6 +62,8 @@ var revive_speed := 1.0
 var abilities: Array[Ability] = []
 
 var dash_time_left := 0.0
+## Visual jump height in pixels (Leap Slam); the body stays on the ground.
+var air_height := 0.0
 var _dash_velocity := Vector2.ZERO
 var _anim_time := 0.0
 var _hurt_flash := 0.0
@@ -79,7 +84,7 @@ func setup(p_slot: int, p_hero_id: StringName, p_world: World) -> void:
 	stats.set_base(Stats.MOVE_SPEED, data.move_speed)
 	stats.set_base(Stats.DAMAGE, 1.0)
 	stats.set_base(Stats.ATTACK_SPEED, 1.0)
-	stats.set_base(Stats.CRIT_CHANCE, 0.05)
+	stats.set_base(Stats.CRIT_CHANCE, data.crit_chance)
 	stats.set_base(Stats.CRIT_DAMAGE, 1.75)
 	stats.set_base(Stats.PICKUP_RANGE, 28.0)
 	stats.set_base(Stats.REGEN, 0.0)
@@ -201,8 +206,8 @@ func tick(delta: float) -> void:
 	if not blocked:
 		var wants_attack := input.is_down(PlayerInput.Action.ATTACK) if a.hold_to_repeat \
 			else input.just_pressed(PlayerInput.Action.ATTACK)
-		if wants_attack:
-			a.try_activate(aim_dir)
+		if wants_attack and a.try_activate(aim_dir):
+			attack_performed.emit(aim_dir)
 		if input.just_pressed(PlayerInput.Action.SPECIAL):
 			special().try_activate(aim_dir)
 		if input.just_pressed(PlayerInput.Action.ULTIMATE) and ult_charge >= 1.0:
@@ -219,10 +224,22 @@ func tick(delta: float) -> void:
 
 
 func _speed_factor() -> float:
+	return buff_product(&"move_speed_factor")
+
+
+## Product of a buff hook (e.g. &"damage_factor") over all four abilities.
+func buff_product(hook: StringName) -> float:
 	var f := 1.0
 	for ability in abilities:
-		f *= ability.move_speed_factor()
+		f *= float(ability.call(hook))
 	return f
+
+
+func buff_sum(hook: StringName) -> float:
+	var total := 0.0
+	for ability in abilities:
+		total += float(ability.call(hook))
+	return total
 
 
 func _update_aim() -> void:
@@ -252,9 +269,9 @@ func teleport(to: Vector2, iframes: float) -> void:
 
 # --- combat ----------------------------------------------------------------------------------
 
-## Base damage with the hero's multiplier and a crit roll.
+## Base damage with the hero's multipliers, active buffs and a crit roll.
 func roll_damage(base: float) -> float:
-	var dmg := base * damage_mult
+	var dmg := base * damage_mult * buff_product(&"damage_factor")
 	if _rng.randf() < crit_chance:
 		dmg *= crit_mult
 	return dmg
@@ -267,8 +284,16 @@ func on_hits(_count: int) -> void:
 
 ## Called by the World when an enemy this hero damaged last dies.
 func on_kill() -> void:
-	if life_on_kill > 0.0:
-		heal(life_on_kill)
+	var amount := life_on_kill + buff_sum(&"heal_on_kill")
+	if amount > 0.0:
+		heal(amount)
+
+
+## Called by the World with the damage this hero (and its minions) dealt.
+func on_damage_dealt(amount: float) -> void:
+	var steal := buff_sum(&"lifesteal")
+	if steal > 0.0:
+		heal(amount * steal)
 
 
 func add_ult_charge(damage_dealt: float) -> void:
@@ -280,10 +305,7 @@ func add_ult_charge(damage_dealt: float) -> void:
 func take_hit(amount: float) -> bool:
 	if not is_targetable() or amount <= 0.0:
 		return false
-	var factor := 1.0
-	for ability in abilities:
-		factor *= ability.damage_taken_factor()
-	var dmg := maxf(1.0, amount * factor - armor)
+	var dmg := maxf(1.0, amount * buff_product(&"damage_taken_factor") - armor)
 	hp -= dmg
 	invulnerable_time = HIT_IFRAMES
 	_hurt_flash = 0.12
@@ -343,6 +365,9 @@ func _update_visuals(delta: float) -> void:
 	else:
 		frame = Frame.IDLE0 + int(_anim_time * 2.0) % 2
 	sprite.frame = frame
+	var s := buff_product(&"sprite_scale")
+	sprite.scale = Vector2(s, s)
+	sprite.position = SPRITE_FEET_OFFSET * s - Vector2(0, roundf(air_height))
 	if state == State.ALIVE and absf(aim_dir.x) > 0.05:
 		sprite.flip_h = aim_dir.x < 0.0
 	_hurt_flash = maxf(0.0, _hurt_flash - delta)

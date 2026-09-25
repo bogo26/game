@@ -16,6 +16,9 @@ SCRIPTS = {
     "blink": "res://src/heroes/abilities/blink_ability.gd",
     "zone": "res://src/heroes/abilities/zone_ability.gd",
     "channel": "res://src/heroes/abilities/channel_ability.gd",
+    "buff": "res://src/heroes/abilities/buff_ability.gd",
+    "summon": "res://src/heroes/abilities/summon_ability.gd",
+    "clones": "res://src/heroes/abilities/shadow_clones.gd",
 }
 
 # Enum values (must match the GDScript enums).
@@ -23,6 +26,7 @@ LOOK = {"arrow": 0, "bolt": 1, "orb": 2, "spit": 3, "knife": 4, "rivet": 5, "sou
 DASH_DIR = {"move_or_aim": 0, "aim": 1, "away_from_aim": 2}
 BURST_TARGET = {"self": 0, "aim_point": 1, "screen": 2}
 ZONE_TARGET = {"self": 0, "aim_point": 1}
+MINION = {"skeleton": 0, "turret": 1, "tesla": 2}
 
 HEROES = {
     "knight": {
@@ -96,6 +100,80 @@ HEROES = {
                                "cooldown": 0.5, "target": BURST_TARGET["screen"], "damage": 40.0, "knockback": 120.0,
                                "heal_fraction": 0.4, "revive_allies": True, "color": (1.0, 0.95, 0.7)}),
     },
+    "berserker": {
+        "display_name": "Berserker", "role": "Bruiser",
+        "description": "Reckless axe-wielder. Heals by hurting, leaps into packs and goes on a rampage.",
+        "max_hp": 130.0, "move_speed": 90.0, "armor": 0.5, "ult_cost": 550.0,
+        "attack": ("melee", {"display_name": "Axe Cleave", "description": "Heavy cleave; every third swing hits twice as hard.",
+                             "cooldown": 0.48, "hold_to_repeat": True, "reach": 24.0, "arc_degrees": 110.0,
+                             "damage": 13.0, "knockback": 80.0, "combo_every": 3, "combo_multiplier": 2.2,
+                             "color": (1.0, 0.75, 0.6, 0.9)}),
+        "special": ("buff", {"display_name": "Blood Frenzy", "description": "Pay 10% HP: +60% attack speed and 15% lifesteal for 5s.",
+                             "cooldown": 10.0, "duration": 5.0, "hp_cost": 0.1, "attack_speed_multiplier": 1.6,
+                             "lifesteal_fraction": 0.15, "color": (1.0, 0.25, 0.25)}),
+        "movement": ("dash", {"display_name": "Leap Slam", "description": "Leap toward your aim and slam down, stunning enemies.",
+                              "cooldown": 4.5, "direction": DASH_DIR["aim"], "distance": 80.0, "duration": 0.34,
+                              "iframes": 0.4, "arc_height": 14.0, "landing_damage": 20.0, "landing_radius": 36.0,
+                              "landing_stun": 0.4, "color": (1.0, 0.55, 0.3, 0.7)}),
+        "ultimate": ("buff", {"display_name": "Rampage", "description": "10s: grow huge, +50% damage, bigger cleaves, heal on kill.",
+                              "cooldown": 0.5, "duration": 10.0, "damage_multiplier": 1.5, "area_multiplier": 1.4,
+                              "damage_taken_multiplier": 0.7, "move_speed_multiplier": 1.1, "heal_per_kill": 4.0,
+                              "scale": 1.5, "color": (1.0, 0.45, 0.2)}),
+    },
+    "rogue": {
+        "display_name": "Rogue", "role": "Crit assassin",
+        "description": "Fast and fragile. Marks enemies for critical hits and fights with shadow clones.",
+        "max_hp": 85.0, "move_speed": 100.0, "armor": 0.0, "ult_cost": 600.0, "crit_chance": 0.15,
+        "attack": ("melee", {"display_name": "Twin Daggers", "description": "Very fast short-range stabs.",
+                             "cooldown": 0.2, "hold_to_repeat": True, "reach": 20.0, "arc_degrees": 70.0,
+                             "damage": 7.0, "knockback": 20.0, "color": (0.85, 0.85, 1.0, 0.9)}),
+        "special": ("projectile", {"display_name": "Knife Ring", "description": "Throw 12 knives in every direction.",
+                                   "cooldown": 5.0, "count": 12, "spread_degrees": 360.0, "damage": 9.0, "speed": 260.0,
+                                   "radius": 3.0, "lifetime": 0.6, "pierce": 1, "knockback": 30.0, "look": LOOK["knife"]}),
+        "movement": ("dash", {"display_name": "Shadow Step", "description": "Dash through enemies, marking them: marked enemies take x1.75 damage.",
+                              "cooldown": 3.0, "direction": DASH_DIR["move_or_aim"], "distance": 72.0, "duration": 0.16,
+                              "iframes": 0.25, "damage": 6.0, "hit_radius": 12.0, "mark_time": 3.0,
+                              "color": (0.5, 0.3, 0.8, 0.7)}),
+        "ultimate": ("clones", {"display_name": "Shadow Clones", "description": "3 shadow clones copy your attacks for 6s.",
+                                "cooldown": 0.5, "duration": 6.0, "clone_count": 3, "damage": 7.0, "reach": 22.0,
+                                "arc_degrees": 80.0}),
+    },
+    "engineer": {
+        "display_name": "Engineer", "role": "Turrets",
+        "description": "Builds turrets and a tesla tower, and rockets around leaving fire.",
+        "max_hp": 100.0, "move_speed": 88.0, "armor": 0.5, "ult_cost": 650.0,
+        "attack": ("projectile", {"display_name": "Rivet Gun", "description": "Rapid-fire rivets.",
+                                  "cooldown": 0.14, "hold_to_repeat": True, "damage": 6.0, "speed": 320.0, "radius": 3.0,
+                                  "lifetime": 0.9, "knockback": 20.0, "look": LOOK["rivet"]}),
+        "special": ("summon", {"display_name": "Deploy Turret", "description": "Place a turret that shoots nearby enemies (max 2).",
+                               "cooldown": 6.0, "kind": MINION["turret"], "count": 1, "max_active": 2, "lifetime": 20.0,
+                               "minion_damage": 5.0, "attack_interval": 0.3, "attack_range": 140.0}),
+        "movement": ("dash", {"display_name": "Rocket Boots", "description": "Rocket dash that leaves a burning trail.",
+                              "cooldown": 3.5, "direction": DASH_DIR["move_or_aim"], "distance": 76.0, "duration": 0.18,
+                              "iframes": 0.25, "trail_damage": 4.0, "color": (1.0, 0.6, 0.2, 0.7)}),
+        "ultimate": ("summon", {"display_name": "Tesla Tower", "description": "8s tower: chain lightning through nearby enemies.",
+                                "cooldown": 0.5, "kind": MINION["tesla"], "count": 1, "max_active": 1, "lifetime": 8.0,
+                                "minion_damage": 14.0, "attack_interval": 0.35, "attack_range": 150.0}),
+    },
+    "necromancer": {
+        "display_name": "Necromancer", "role": "Summoner",
+        "description": "Raises the fallen to fight for the team and walks through the horde as a wraith.",
+        "max_hp": 90.0, "move_speed": 86.0, "armor": 0.0, "ult_cost": 650.0,
+        "attack": ("projectile", {"display_name": "Soul Bolt", "description": "Piercing bolt of soul fire.",
+                                  "cooldown": 0.35, "hold_to_repeat": True, "damage": 9.0, "speed": 200.0, "radius": 4.0,
+                                  "lifetime": 1.2, "pierce": 1, "knockback": 30.0, "look": LOOK["soul"]}),
+        "special": ("summon", {"display_name": "Raise Dead", "description": "Raise 4 skeletons from fresh corpses (max 8).",
+                               "cooldown": 7.0, "kind": MINION["skeleton"], "count": 4, "max_active": 8, "lifetime": 20.0,
+                               "use_corpses": True, "corpse_radius": 140.0, "minion_hp": 30.0, "minion_damage": 8.0,
+                               "attack_interval": 0.6, "attack_range": 140.0}),
+        "movement": ("dash", {"display_name": "Wraith Walk", "description": "Drift through the horde untouchable, chilling everything you pass.",
+                              "cooldown": 4.0, "direction": DASH_DIR["move_or_aim"], "distance": 90.0, "duration": 0.45,
+                              "iframes": 0.6, "slow_time": 2.0, "hit_radius": 12.0, "color": (0.35, 0.95, 0.8, 0.6)}),
+        "ultimate": ("summon", {"display_name": "Army of the Dead", "description": "Summon 16 skeletons for 10s.",
+                                "cooldown": 0.5, "kind": MINION["skeleton"], "count": 16, "max_active": 16, "lifetime": 10.0,
+                                "spawn_radius": 30.0, "minion_hp": 25.0, "minion_damage": 7.0, "attack_interval": 0.6,
+                                "attack_range": 140.0}),
+    },
 }
 
 
@@ -134,8 +212,9 @@ def write_hero(hero_id, hero):
     out.append("[resource]")
     out.append('script = ExtResource("1_data")')
     out.append('id = &"%s"' % hero_id)
-    for key in ("display_name", "role", "description", "max_hp", "move_speed", "armor", "ult_cost"):
-        out.append("%s = %s" % (key, fmt(hero[key])))
+    for key in ("display_name", "role", "description", "max_hp", "move_speed", "armor", "crit_chance", "ult_cost"):
+        if key in hero:
+            out.append("%s = %s" % (key, fmt(hero[key])))
     for slot in ("attack", "special", "movement", "ultimate"):
         out.append('%s = SubResource("Resource_%s")' % (slot, slot))
     path = os.path.join(os.path.dirname(__file__), "..", "src", "heroes", "data", hero_id + ".tres")

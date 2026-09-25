@@ -26,7 +26,7 @@ func _activate(aim: Vector2) -> void:
 	zone.position = hero.position
 	if target == Target.AIM_POINT:
 		zone.position = w.grid.sweep_until_blocked(hero.position, hero.position + aim * distance, 2.0)
-	zone.radius = radius * (1.0 + mod(&"area_pct"))
+	zone.radius = radius * area_scale()
 	zone.duration = duration + mod(&"duration")
 	zone.interval = interval
 	var base_damage := damage + mod(&"zone_damage")

@@ -2,6 +2,7 @@ extends Node
 ## Horde stress test and performance gate.
 ##   ./tools/dev.sh stress [--seconds=20] [--warmup=4] [--enemies=300]
 ##       [--projectiles=400] [--fullscreen | --size=3840x2160] [--vsync=on]
+##       [--max-fps=120] [--log-slow] [--heroes=necromancer,engineer,...] [--ult-spam]
 ## Four bot heroes fire constantly while the spawner keeps the horde at the
 ## cap. After a warm-up it measures frame times and exits with code 0 when the
 ## targets from docs/DESIGN.md are met, 1 otherwise.
@@ -18,6 +19,7 @@ var _projectiles := 400
 var _elapsed := 0.0
 var _capturing := false
 var _world: World
+var _ult_spam := false
 var _log_slow := false
 var _last_usec := 0
 var _slow_frames: PackedStringArray = []
@@ -47,6 +49,12 @@ func _ready() -> void:
 			_log_slow = true
 		elif arg.begins_with("--max-fps="):
 			Engine.max_fps = value.to_int()
+		elif arg.begins_with("--heroes="):
+			var ids := value.split(",")
+			for i in mini(ids.size(), 4):
+				GameState.slots[i].hero_id = StringName(ids[i])
+		elif arg == "--ult-spam":
+			_ult_spam = true
 
 	DisplayServer.window_set_vsync_mode(
 		DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
@@ -74,6 +82,9 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_elapsed += delta
+	if _ult_spam:
+		for hero in _world.heroes:
+			hero.ult_charge = 1.0
 	var viewport_rid := get_viewport().get_viewport_rid()
 	PerfMonitor.record(&"gpu", int(RenderingServer.viewport_get_measured_render_time_gpu(viewport_rid) * 1000.0))
 	PerfMonitor.record(&"draw_cpu", int(RenderingServer.viewport_get_measured_render_time_cpu(viewport_rid) * 1000.0))

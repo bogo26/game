@@ -1,0 +1,75 @@
+[gd_resource type="Resource" script_class="HeroData" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/hero_data.gd" id="1_data"]
+[ext_resource type="Script" path="res://src/heroes/abilities/melee_arc.gd" id="2_melee"]
+[ext_resource type="Script" path="res://src/heroes/abilities/buff_ability.gd" id="3_buff"]
+[ext_resource type="Script" path="res://src/heroes/abilities/dash_ability.gd" id="4_dash"]
+
+[sub_resource type="Resource" id="Resource_attack"]
+script = ExtResource("2_melee")
+display_name = "Axe Cleave"
+description = "Heavy cleave; every third swing hits twice as hard."
+cooldown = 0.48
+hold_to_repeat = true
+reach = 24.0
+arc_degrees = 110.0
+damage = 13.0
+knockback = 80.0
+combo_every = 3
+combo_multiplier = 2.2
+color = Color(1.0, 0.75, 0.6, 0.9)
+
+[sub_resource type="Resource" id="Resource_special"]
+script = ExtResource("3_buff")
+display_name = "Blood Frenzy"
+description = "Pay 10% HP: +60% attack speed and 15% lifesteal for 5s."
+cooldown = 10.0
+duration = 5.0
+hp_cost = 0.1
+attack_speed_multiplier = 1.6
+lifesteal_fraction = 0.15
+color = Color(1.0, 0.25, 0.25, 1.0)
+
+[sub_resource type="Resource" id="Resource_movement"]
+script = ExtResource("4_dash")
+display_name = "Leap Slam"
+description = "Leap toward your aim and slam down, stunning enemies."
+cooldown = 4.5
+direction = 1
+distance = 80.0
+duration = 0.34
+iframes = 0.4
+arc_height = 14.0
+landing_damage = 20.0
+landing_radius = 36.0
+landing_stun = 0.4
+color = Color(1.0, 0.55, 0.3, 0.7)
+
+[sub_resource type="Resource" id="Resource_ultimate"]
+script = ExtResource("3_buff")
+display_name = "Rampage"
+description = "10s: grow huge, +50% damage, bigger cleaves, heal on kill."
+cooldown = 0.5
+duration = 10.0
+damage_multiplier = 1.5
+area_multiplier = 1.4
+damage_taken_multiplier = 0.7
+move_speed_multiplier = 1.1
+heal_per_kill = 4.0
+scale = 1.5
+color = Color(1.0, 0.45, 0.2, 1.0)
+
+[resource]
+script = ExtResource("1_data")
+id = &"berserker"
+display_name = "Berserker"
+role = "Bruiser"
+description = "Reckless axe-wielder. Heals by hurting, leaps into packs and goes on a rampage."
+max_hp = 130.0
+move_speed = 90.0
+armor = 0.5
+ult_cost = 550.0
+attack = SubResource("Resource_attack")
+special = SubResource("Resource_special")
+movement = SubResource("Resource_movement")
+ultimate = SubResource("Resource_ultimate")

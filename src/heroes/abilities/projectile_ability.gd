@@ -26,7 +26,7 @@ func _activate(aim: Vector2) -> void:
 	var shot_speed := speed * (1.0 + mod(&"speed_pct"))
 	var shot_pierce := pierce + int(mod(&"pierce"))
 	var shot_bounces := bounces + int(mod(&"bounces"))
-	var splash := splash_radius * (1.0 + mod(&"area_pct")) if splash_radius > 0.0 else 0.0
+	var splash := splash_radius * area_scale() if splash_radius > 0.0 else 0.0
 	var sim := world().projectiles
 	for k in n:
 		var offset := 0.0

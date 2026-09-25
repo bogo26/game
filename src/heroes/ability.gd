@@ -50,7 +50,7 @@ func try_activate(aim: Vector2) -> bool:
 func effective_cooldown() -> float:
 	var scale := 1.0 + mod(&"cooldown_pct", 0.0)
 	if slot == Slot.ATTACK:
-		scale /= maxf(0.1, hero.attack_speed_mult)
+		scale /= maxf(0.1, hero.attack_speed_mult * hero.buff_product(&"attack_speed_factor"))
 	return maxf(0.05, cooldown * scale)
 
 
@@ -83,6 +83,37 @@ func damage_taken_factor() -> float:
 ## Multiplier on the hero's move speed while this ability is running.
 func move_speed_factor() -> float:
 	return 1.0
+
+
+# Buff hooks (BuffAbility overrides these while active).
+func damage_factor() -> float:
+	return 1.0
+
+
+func attack_speed_factor() -> float:
+	return 1.0
+
+
+func area_factor() -> float:
+	return 1.0
+
+
+## Fraction of damage dealt returned as healing.
+func lifesteal() -> float:
+	return 0.0
+
+
+func heal_on_kill() -> float:
+	return 0.0
+
+
+func sprite_scale() -> float:
+	return 1.0
+
+
+## Radius multiplier from upgrades (area_pct) and active buffs.
+func area_scale() -> float:
+	return (1.0 + mod(&"area_pct")) * hero.buff_product(&"area_factor")
 
 
 func mod(key: StringName, default_value: float = 0.0) -> float:

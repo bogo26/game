@@ -75,20 +75,69 @@ func test_downed_hero_is_revived_by_teammate() -> void:
 
 
 func test_each_ability_activates_without_errors() -> void:
-	var world := _make_world([&"knight", &"ranger", &"mage", &"cleric"])
-	world.bots = null
-	for i in 20:
-		world.horde.spawn(0, world.heroes[0].position + Vector2(30 + i, (i % 5) * 6 - 12))
-	_run(world, 0.1)
-	for hero in world.heroes:
-		hero.ult_charge = 1.0
-		for ability in hero.abilities:
-			ability.cooldown_left = 0.0
-			assert_true(ability.try_activate(Vector2.RIGHT), "%s: %s activates" % [hero.hero_id, ability.display_name])
-		_run(world, 1.5)
-	assert_true(world.horde.kill_pos.size() >= 0)
-	_teardown(world)
+	for team: Array[StringName] in [
+			[&"knight", &"ranger", &"mage", &"cleric"] as Array[StringName],
+			[&"berserker", &"rogue", &"engineer", &"necromancer"] as Array[StringName]]:
+		var world := _make_world(team)
+		world.bots = null
+		for i in 30:
+			world.horde.spawn(0, world.heroes[0].position + Vector2(30 + i, (i % 5) * 6 - 12))
+		_run(world, 0.1)
+		for hero in world.heroes:
+			hero.ult_charge = 1.0
+			for ability in hero.abilities:
+				ability.cooldown_left = 0.0
+				assert_true(ability.try_activate(Vector2.RIGHT), "%s: %s activates" % [hero.hero_id, ability.display_name])
+				hero.attack_performed.emit(Vector2.RIGHT)
+			_run(world, 1.5)
+		_teardown(world)
 
+
+func test_new_hero_mechanics() -> void:
+	var world := _make_world([&"berserker", &"rogue", &"engineer", &"necromancer"])
+	world.bots = null
+	world.spawner.enabled = false
+	var berserker := world.heroes[0]
+	var rogue := world.heroes[1]
+	var engineer := world.heroes[2]
+	var necro := world.heroes[3]
+	# Blood Frenzy costs HP and speeds attacks up.
+	var hp_before := berserker.hp
+	var base_cd := berserker.attack().effective_cooldown()
+	berserker.special().try_activate(Vector2.RIGHT)
+	assert_true(berserker.hp < hp_before, "frenzy costs HP")
+	assert_true(berserker.attack().effective_cooldown() < base_cd, "frenzy speeds up attacks")
+	# Rampage grows the hero and boosts damage.
+	berserker.ultimate().try_activate(Vector2.RIGHT)
+	assert_true(berserker.buff_product(&"damage_factor") > 1.4)
+	assert_true(berserker.buff_product(&"sprite_scale") > 1.4)
+	# Shadow Step marks enemies it passes: marked enemies take more damage.
+	var target := world.horde.spawn(0, rogue.position + Vector2(20, 0), 10.0)
+	world.horde.update(0.0, world.target_positions)
+	rogue.input.move = Vector2.ZERO
+	rogue.movement().try_activate(Vector2.RIGHT)
+	_run(world, 0.3)
+	target = world.horde.index_of_uid(world.horde.uid[target]) if target >= 0 else -1
+	assert_true(target >= 0 and world.horde.mark[target] > 0.0, "shadow step marked the enemy")
+	# Turrets are capped at 2 and replace the oldest.
+	for i in 3:
+		engineer.special().cooldown_left = 0.0
+		engineer.special().try_activate(Vector2.RIGHT)
+	_run(world, 0.05)
+	var turrets := world.minions.filter(func(m: Minion) -> bool: return m.kind == Minion.Kind.TURRET)
+	assert_eq(turrets.size(), 2, "max 2 turrets")
+	# Raise Dead uses fresh corpses.
+	var corpse_spot := necro.position + Vector2(40, 10)
+	var victim := world.horde.spawn(0, corpse_spot)
+	world.horde.damage(victim, 9999.0, Vector2.ZERO, necro.slot)
+	_run(world, 0.05)
+	necro.special().try_activate(Vector2.RIGHT)
+	_run(world, 0.05)
+	var skeletons := world.minions.filter(func(m: Minion) -> bool: return m.kind == Minion.Kind.SKELETON)
+	assert_eq(skeletons.size(), 4, "raised 4 skeletons")
+	var near_corpse := skeletons.filter(func(m: Minion) -> bool: return m.position.distance_to(corpse_spot) < 16.0)
+	assert_true(near_corpse.size() >= 1, "one rose from the corpse")
+	_teardown(world)
 
 func test_level_up_round_with_bots() -> void:
 	var world := _make_world([&"knight", &"mage"])

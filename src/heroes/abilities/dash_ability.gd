@@ -28,6 +28,12 @@ enum Direction { MOVE_OR_AIM, AIM, AWAY_FROM_AIM }
 @export var start_zone_slow := 0.0
 ## Burning trail left along the path (Engineer); damage per tick.
 @export var trail_damage := 0.0
+@export_group("Leap")
+## > 0 turns the dash into a jump arc (visual) that lands with an impact.
+@export var arc_height := 0.0
+@export var landing_damage := 0.0
+@export var landing_radius := 36.0
+@export var landing_stun := 0.0
 @export var color := Color(1, 1, 1, 0.6)
 
 var _active := false
@@ -71,14 +77,26 @@ func is_active() -> bool:
 
 func cancel() -> void:
 	_active = false
+	hero.air_height = 0.0
 
 
 func _tick_active(delta: float) -> void:
 	if not _active:
 		return
 	var w := world()
+	if arc_height > 0.0:
+		var t := 1.0 - clampf(hero.dash_time_left / maxf(duration, 0.01), 0.0, 1.0)
+		hero.air_height = sin(t * PI) * arc_height if hero.is_dashing() else 0.0
 	if not hero.is_dashing():
 		_active = false
+		hero.air_height = 0.0
+		if landing_damage > 0.0:
+			var r := landing_radius * area_scale()
+			hero.on_hits(w.damage_enemies_in_circle(hero.position, r, scaled_damage(landing_damage),
+				160.0, hero.slot, landing_stun + mod(&"stun_time")))
+			w.fx.disc(hero.position, r, Color(color, 0.45), 0.2)
+			w.fx.ring(hero.position, r * 1.15, color, 0.3)
+			w.shake(3.0)
 		var burst := mod(&"end_burst")
 		if burst > 0.0:
 			hero.on_hits(w.damage_enemies_in_circle(hero.position, 30.0, scaled_damage(burst), 150.0, hero.slot, 0.3))

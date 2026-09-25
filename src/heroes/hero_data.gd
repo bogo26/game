@@ -11,6 +11,7 @@ extends Resource
 @export var max_hp := 100.0
 @export var move_speed := 88.0
 @export var armor := 0.0
+@export var crit_chance := 0.05
 ## Damage the hero must deal to fill the ultimate meter once.
 @export var ult_cost := 600.0
 

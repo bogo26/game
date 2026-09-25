@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="UpgradeLibrary" load_steps=37 format=3]
+[gd_resource type="Resource" script_class="UpgradeLibrary" load_steps=53 format=3]
 
 [ext_resource type="Script" path="res://src/upgrades/upgrade_library.gd" id="1_library"]
 [ext_resource type="Script" path="res://src/upgrades/upgrade_data.gd" id="2_upgrade"]
@@ -343,6 +343,166 @@ max_stacks = 2
 hero_id = &"cleric"
 effects = PackedStringArray("ability ultimate damage_pct 0.5")
 
+[sub_resource type="Resource" id="Resource_berserker_cleaver"]
+script = ExtResource("2_upgrade")
+id = &"berserker_cleaver"
+display_name = "Cleaver"
+description = "Axe Cleave: +10% damage, +15% reach"
+rarity = 0
+max_stacks = 3
+hero_id = &"berserker"
+effects = PackedStringArray("ability attack damage_pct 0.1", "ability attack area_pct 0.15")
+
+[sub_resource type="Resource" id="Resource_berserker_bloodlust"]
+script = ExtResource("2_upgrade")
+id = &"berserker_bloodlust"
+display_name = "Bloodlust"
+description = "Blood Frenzy: +5% lifesteal, +1s"
+rarity = 1
+max_stacks = 3
+hero_id = &"berserker"
+effects = PackedStringArray("ability special lifesteal 0.05", "ability special duration 1")
+
+[sub_resource type="Resource" id="Resource_berserker_earthshaker"]
+script = ExtResource("2_upgrade")
+id = &"berserker_earthshaker"
+display_name = "Earthshaker"
+description = "Leap Slam: +0.3s stun, +25% area"
+rarity = 1
+max_stacks = 2
+hero_id = &"berserker"
+effects = PackedStringArray("ability movement stun_time 0.3", "ability movement area_pct 0.25")
+
+[sub_resource type="Resource" id="Resource_berserker_unstoppable"]
+script = ExtResource("2_upgrade")
+id = &"berserker_unstoppable"
+display_name = "Unstoppable"
+description = "Rampage lasts 3s longer"
+rarity = 1
+max_stacks = 2
+hero_id = &"berserker"
+effects = PackedStringArray("ability ultimate duration 3")
+
+[sub_resource type="Resource" id="Resource_rogue_precision"]
+script = ExtResource("2_upgrade")
+id = &"rogue_precision"
+display_name = "Deadly Precision"
+description = "+8% critical hit chance"
+rarity = 0
+max_stacks = 3
+hero_id = &"rogue"
+effects = PackedStringArray("stat crit_chance flat 0.08")
+
+[sub_resource type="Resource" id="Resource_rogue_fan"]
+script = ExtResource("2_upgrade")
+id = &"rogue_fan"
+display_name = "Fan of Knives"
+description = "Knife Ring: +6 knives"
+rarity = 0
+max_stacks = 3
+hero_id = &"rogue"
+effects = PackedStringArray("ability special count 6")
+
+[sub_resource type="Resource" id="Resource_rogue_shadow_dance"]
+script = ExtResource("2_upgrade")
+id = &"rogue_shadow_dance"
+display_name = "Shadow Dance"
+description = "Shadow Step: -20% cooldown, +25% distance"
+rarity = 1
+max_stacks = 2
+hero_id = &"rogue"
+effects = PackedStringArray("ability movement cooldown_pct -0.2", "ability movement distance_pct 0.25")
+
+[sub_resource type="Resource" id="Resource_rogue_legion"]
+script = ExtResource("2_upgrade")
+id = &"rogue_legion"
+display_name = "Legion of Shadows"
+description = "Shadow Clones: +2 clones"
+rarity = 1
+max_stacks = 2
+hero_id = &"rogue"
+effects = PackedStringArray("ability ultimate count 2")
+
+[sub_resource type="Resource" id="Resource_engineer_overclock"]
+script = ExtResource("2_upgrade")
+id = &"engineer_overclock"
+display_name = "Overclocked Turrets"
+description = "Turrets deal 30% more damage"
+rarity = 0
+max_stacks = 3
+hero_id = &"engineer"
+effects = PackedStringArray("ability special damage_pct 0.3")
+
+[sub_resource type="Resource" id="Resource_engineer_extra_turret"]
+script = ExtResource("2_upgrade")
+id = &"engineer_extra_turret"
+display_name = "Extra Turret"
+description = "Deploy Turret: +1 turret"
+rarity = 1
+max_stacks = 2
+hero_id = &"engineer"
+effects = PackedStringArray("ability special max_active 1")
+
+[sub_resource type="Resource" id="Resource_engineer_afterburner"]
+script = ExtResource("2_upgrade")
+id = &"engineer_afterburner"
+display_name = "Afterburner"
+description = "Rocket Boots: -20% cooldown, +20% distance"
+rarity = 0
+max_stacks = 3
+hero_id = &"engineer"
+effects = PackedStringArray("ability movement cooldown_pct -0.2", "ability movement distance_pct 0.2")
+
+[sub_resource type="Resource" id="Resource_engineer_supercoil"]
+script = ExtResource("2_upgrade")
+id = &"engineer_supercoil"
+display_name = "Supercoil"
+description = "Tesla Tower lasts 4s longer, +20% range"
+rarity = 1
+max_stacks = 2
+hero_id = &"engineer"
+effects = PackedStringArray("ability ultimate duration 4", "ability ultimate area_pct 0.2")
+
+[sub_resource type="Resource" id="Resource_necro_bone_horde"]
+script = ExtResource("2_upgrade")
+id = &"necro_bone_horde"
+display_name = "Bone Horde"
+description = "Raise Dead: +2 skeletons, max +4"
+rarity = 0
+max_stacks = 3
+hero_id = &"necromancer"
+effects = PackedStringArray("ability special count 2", "ability special max_active 4")
+
+[sub_resource type="Resource" id="Resource_necro_sturdy_bones"]
+script = ExtResource("2_upgrade")
+id = &"necro_sturdy_bones"
+display_name = "Sturdy Bones"
+description = "Skeletons have 50% more HP"
+rarity = 0
+max_stacks = 3
+hero_id = &"necromancer"
+effects = PackedStringArray("ability special minion_hp_pct 0.5", "ability ultimate minion_hp_pct 0.5")
+
+[sub_resource type="Resource" id="Resource_necro_soul_rend"]
+script = ExtResource("2_upgrade")
+id = &"necro_soul_rend"
+display_name = "Soul Rend"
+description = "Soul Bolt: +1 pierce, +10% damage"
+rarity = 0
+max_stacks = 3
+hero_id = &"necromancer"
+effects = PackedStringArray("ability attack pierce 1", "ability attack damage_pct 0.1")
+
+[sub_resource type="Resource" id="Resource_necro_endless_legion"]
+script = ExtResource("2_upgrade")
+id = &"necro_endless_legion"
+display_name = "Endless Legion"
+description = "Army of the Dead: +6 skeletons"
+rarity = 1
+max_stacks = 2
+hero_id = &"necromancer"
+effects = PackedStringArray("ability ultimate count 6", "ability ultimate max_active 6")
+
 [resource]
 script = ExtResource("1_library")
-upgrades = Array[ExtResource("2_upgrade")]([SubResource("Resource_sharpened"), SubResource("Resource_quick_hands"), SubResource("Resource_swift_boots"), SubResource("Resource_vitality"), SubResource("Resource_iron_skin"), SubResource("Resource_keen_eye"), SubResource("Resource_brutal"), SubResource("Resource_magnet"), SubResource("Resource_recharge"), SubResource("Resource_regeneration"), SubResource("Resource_focus"), SubResource("Resource_nimble"), SubResource("Resource_amplify"), SubResource("Resource_bloodthirst"), SubResource("Resource_guardian_angel"), SubResource("Resource_glass_cannon"), SubResource("Resource_overcharge"), SubResource("Resource_knight_wide_slash"), SubResource("Resource_knight_aftershock"), SubResource("Resource_knight_shockwave"), SubResource("Resource_knight_endless_spin"), SubResource("Resource_ranger_twin_arrows"), SubResource("Resource_ranger_piercing"), SubResource("Resource_ranger_wide_volley"), SubResource("Resource_ranger_deluge"), SubResource("Resource_mage_bigger_bursts"), SubResource("Resource_mage_twin_bolts"), SubResource("Resource_mage_deep_freeze"), SubResource("Resource_mage_blink_nova"), SubResource("Resource_cleric_radiant"), SubResource("Resource_cleric_blessed_orbs"), SubResource("Resource_cleric_swift_grace"), SubResource("Resource_cleric_mending"), SubResource("Resource_cleric_wrath")])
+upgrades = Array[ExtResource("2_upgrade")]([SubResource("Resource_sharpened"), SubResource("Resource_quick_hands"), SubResource("Resource_swift_boots"), SubResource("Resource_vitality"), SubResource("Resource_iron_skin"), SubResource("Resource_keen_eye"), SubResource("Resource_brutal"), SubResource("Resource_magnet"), SubResource("Resource_recharge"), SubResource("Resource_regeneration"), SubResource("Resource_focus"), SubResource("Resource_nimble"), SubResource("Resource_amplify"), SubResource("Resource_bloodthirst"), SubResource("Resource_guardian_angel"), SubResource("Resource_glass_cannon"), SubResource("Resource_overcharge"), SubResource("Resource_knight_wide_slash"), SubResource("Resource_knight_aftershock"), SubResource("Resource_knight_shockwave"), SubResource("Resource_knight_endless_spin"), SubResource("Resource_ranger_twin_arrows"), SubResource("Resource_ranger_piercing"), SubResource("Resource_ranger_wide_volley"), SubResource("Resource_ranger_deluge"), SubResource("Resource_mage_bigger_bursts"), SubResource("Resource_mage_twin_bolts"), SubResource("Resource_mage_deep_freeze"), SubResource("Resource_mage_blink_nova"), SubResource("Resource_cleric_radiant"), SubResource("Resource_cleric_blessed_orbs"), SubResource("Resource_cleric_swift_grace"), SubResource("Resource_cleric_mending"), SubResource("Resource_cleric_wrath"), SubResource("Resource_berserker_cleaver"), SubResource("Resource_berserker_bloodlust"), SubResource("Resource_berserker_earthshaker"), SubResource("Resource_berserker_unstoppable"), SubResource("Resource_rogue_precision"), SubResource("Resource_rogue_fan"), SubResource("Resource_rogue_shadow_dance"), SubResource("Resource_rogue_legion"), SubResource("Resource_engineer_overclock"), SubResource("Resource_engineer_extra_turret"), SubResource("Resource_engineer_afterburner"), SubResource("Resource_engineer_supercoil"), SubResource("Resource_necro_bone_horde"), SubResource("Resource_necro_sturdy_bones"), SubResource("Resource_necro_soul_rend"), SubResource("Resource_necro_endless_legion")])

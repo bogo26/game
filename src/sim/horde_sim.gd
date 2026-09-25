@@ -582,12 +582,7 @@ func render(layer: InstanceLayer) -> void:
 			continue  # drawn by its controller node
 		var o := w * InstanceLayer.STRIDE
 		buf[o] = FC[i]
-		buf[o + 1] = 0.0
-		buf[o + 2] = 0.0
 		buf[o + 3] = roundf(p.x)
-		buf[o + 4] = 0.0
-		buf[o + 5] = 1.0
-		buf[o + 6] = 0.0
 		buf[o + 7] = roundf(p.y)
 		var frame := frame0[t]
 		var beh := t_behavior[t]
@@ -600,7 +595,6 @@ func render(layer: InstanceLayer) -> void:
 		buf[o + 8] = float(frame)
 		buf[o + 9] = 1.0 if FL[i] > 0.0 else 0.0
 		buf[o + 10] = 1.0 if SLW[i] > 0.0 else 0.0
-		buf[o + 11] = 1.0
 		w += 1
 	layer.buffer = buf
 	layer.commit(w)

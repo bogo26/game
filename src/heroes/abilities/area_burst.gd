@@ -59,7 +59,7 @@ func cancel() -> void:
 
 
 func _radius() -> float:
-	return radius * (1.0 + mod(&"area_pct"))
+	return radius * area_scale()
 
 
 func _land(p: Vector2) -> void:

@@ -49,9 +49,9 @@ godot --headless --path . -s res://tests/run_tests.gd
 
 ## Status
 
-Milestone 6 is done: the vertical slice is playable end to end.
-- Main menu → character select → 3 levels + boss → victory/defeat screen.
-- 4 heroes (Knight, Ranger, Mage, Cleric) and 4 enemy types plus the boss.
-- Upgrades on every team level-up, and a full HUD.
+Milestone 7 (heroes 5–8) is done.
+- The run is playable end to end with all **8 heroes**: Knight, Ranger, Mage, Cleric, Berserker, Rogue, Engineer and Necromancer.
+- Summons included: skeletons, turrets, tesla tower and shadow clones.
+- 50 upgrades.
 
-Next: heroes 5–8, the art pass, then exports. See [docs/DESIGN.md](docs/DESIGN.md#milestones).
+Next: the art & juice pass, then macOS/Windows exports. See [docs/DESIGN.md](docs/DESIGN.md#milestones).

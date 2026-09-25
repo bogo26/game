@@ -190,7 +190,18 @@ docs/         this document
   - `BlinkAbility`
   - `ZoneAbility`: lasting heal/damage areas
   - `ChannelAbility`: Whirlwind-style stances
-- Upgrades tweak abilities through `Ability.mods` (e.g. `pierce`, `count`, `area_pct`).
+- Heroes 5–8 add more ability types:
+  - `BuffAbility`: timed self-buffs (damage, attack speed, area, lifesteal, heal-on-kill, damage taken, growth). Blood Frenzy and Rampage use it.
+  - `SummonAbility`: skeletons (optionally raised from corpses of the last 5 s), turrets and tesla towers, capped per ability with the oldest replaced.
+  - `ShadowClonesAbility`: orbiting clones repeat each attack.
+  - Leap arcs for `DashAbility`, with landing impacts.
+- **Buff hooks:** the hero multiplies/sums hooks over its four abilities (`damage_factor`, `attack_speed_factor`, `area_factor`, `lifesteal`, …).
+- **Minions:** they are nodes ticked by the World.
+  - Skeletons walk to and melee the nearest enemy and take contact damage. Turrets shoot rivets. Tesla towers chain lightning across 5 targets.
+  - Minion damage counts toward the owner's ultimate charge and lifesteal.
+  - They retarget every 0.4 s.
+  - Caps: Raise Dead 8, Army of the Dead 16, turrets 2, towers 1.
+- Upgrades tweak abilities through `Ability.mods` (e.g. `pierce`, `count`, `area_pct`, `max_active`, `minion_hp_pct`). There are 50 upgrades: 17 generic plus 4–5 per hero.
 - Hero tuning lives in `tools/gen_hero_data.py`, which writes `src/heroes/data/*.tres`. Edit the table and re-run it, or edit the `.tres` in the Godot inspector.
 - **Ultimate charge:** damage dealt ÷ the hero's `ult_cost`, plus 1% per second passively. The player ring pulses when the ultimate is ready.
 - **Movement abilities:** give i-frames (0.15–0.3 s) and never share a cooldown with other slots.
@@ -229,7 +240,7 @@ docs/         this document
 | 4 | Combat: ability framework, Knight / Ranger / Mage / Cleric, downed/revive, 4 enemy types | done |
 | 5 | Progression: stats and modifiers, upgrade pool, simultaneous level-up screen | done |
 | 6 | Levels & flow: 3 levels + boss, arena rooms, menus, HUD, scaling (**vertical slice**) | done |
-| 7 | Heroes 5–8: Berserker, Rogue, Engineer, Necromancer + summons | |
+| 7 | Heroes 5–8: Berserker, Rogue, Engineer, Necromancer + summons | done |
 | 8 | Art & juice: pixel-art pack, particles, shake, SFX/music | |
 | 9 | Export: macOS + Windows builds | |
 
@@ -249,6 +260,11 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
 - **The p99 failures** only happen after ~17 s of uncapped rendering at ~250 fps on the fanless M2 Air. That points to thermal throttling: frames go to 13 ms while game code stays at 1.7 ms. At 120 fps (the target), the same machine holds every frame for a full minute.
 - **Why sim cost rises when capped:** the CPU clocks down between frames, so sim time goes up to 2.7 ms. That still leaves most of the 8.3 ms budget free, but milestone 4+ features (enemy behaviours, abilities, particles) must stay in budget.
 - **Re-check after milestones 4 and 7** with `./tools/dev.sh stress --fullscreen --max-fps=120 --seconds=60`.
+- **Milestone 7 re-check** with summoner-heavy heroes and ultimates kept always ready (`--heroes=necromancer,necromancer,engineer,rogue --ult-spam`):
+  - Averaged ~46 minions on top of 300 enemies, ~360 projectiles and 110–230 gems.
+  - Minions cost 0.3 ms and the whole frame 6.9 ms (146 fps).
+  - Measured on an already heat-throttled Air: the plain baseline read 6.5 ms / 3.2 ms sim in the same state, versus 4.1 ms / 1.7 ms when cool. Summoners add about 0.1–0.3 ms over that throttled baseline.
+  - After the change that writes only the instance fields that change, re-measure on a cool machine or a desktop.
 
 ## Verification
 
