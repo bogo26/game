@@ -27,6 +27,15 @@ godot --headless --path . -s res://tests/run_tests.gd
 
 - Press **F3** in game for the performance overlay (FPS, frame times, per-system costs).
 
+## Building releases
+
+1. Install the export templates once: open the editor (`./tools/dev.sh editor`), go to **Editor → Manage Export Templates → Download and Install**, and pick 4.7.2 stable.
+2. Run `./tools/dev.sh export`. It writes:
+   - `build/macos/HordeCrawler.zip`: a universal .app, ad-hoc signed.
+   - `build/windows/HordeCrawler.exe`: x86_64, single file with the game data embedded.
+
+The macOS build runs on your own Mac; other people have to right-click → Open the first time, because it isn't notarized. Distributing widely (Steam, itch.io) needs an Apple Developer ID and notarization. Test the Windows build on a Windows PC.
+
 ## Controls
 
 | Action | Gamepad | Keyboard + mouse |
@@ -49,9 +58,8 @@ godot --headless --path . -s res://tests/run_tests.gd
 
 ## Status
 
-Milestone 8 (art & juice) is done with generated art and audio.
-- Particles, damage numbers and screen shake.
-- 32 synthesized sound effects and 3 music loops.
-- Volume and fullscreen options (F11).
+Milestone 9 (exports) is prepared:
+- macOS + Windows presets, an app icon and `./tools/dev.sh export`.
+- Building needs the Godot export templates installed once (see above).
 
-Next: macOS/Windows exports. See [docs/DESIGN.md](docs/DESIGN.md#milestones).
+See [docs/DESIGN.md](docs/DESIGN.md#milestones).

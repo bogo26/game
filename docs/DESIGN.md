@@ -242,7 +242,7 @@ docs/         this document
 | 6 | Levels & flow: 3 levels + boss, arena rooms, menus, HUD, scaling (**vertical slice**) | done |
 | 7 | Heroes 5–8: Berserker, Rogue, Engineer, Necromancer + summons | done |
 | 8 | Art & juice: pixel-art pack, particles, shake, SFX/music | done (generated art; 0x72 pack swap pending your OK) |
-| 9 | Export: macOS + Windows builds | |
+| 9 | Export: macOS + Windows builds | presets + icon ready; needs export templates installed to build |
 
 ## Performance results
 

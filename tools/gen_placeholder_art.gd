@@ -11,6 +11,7 @@ extends SceneTree
 ##   assets/sprites/fx/fx_atlas.png         16x16 cells; row 0 projectiles, row 1 pickups
 ##   assets/fonts/pixel5x8.png + .fnt       proportional 5x8 pixel font (BMFont), ASCII 32-126
 ##   assets/sprites/enemies/boss_demon.png  4 frames of 64x64: walk0, walk1, windup, charge
+##   assets/icon.png                        256x256 app icon (knight vs. the horde)
 
 const OUTLINE := Color("140c1c")
 const SKIN := Color("f0c8a0")
@@ -55,6 +56,7 @@ func _initialize() -> void:
 	_gen_fx_atlas()
 	_gen_font()
 	_gen_boss()
+	_gen_icon()
 	print("placeholder art generated")
 	quit()
 
@@ -679,3 +681,31 @@ func _draw_demon(img: Image, ox: int, frame: int) -> void:
 	for i in 6:
 		_rect(img, ox + 21 - i / 2 + lean, 10 - i + bob, 3, 1, horn)
 		_rect(img, ox + 41 + i / 2 + lean, 10 - i + bob, 3, 1, horn)
+
+
+# --- app icon (drawn at 32x32, scaled x8 with nearest filtering) ----------------------
+
+func _gen_icon() -> void:
+	var small := _img(32, 32)
+	# Background: dungeon floor disc.
+	for y in 32:
+		for x in 32:
+			var d := Vector2(x + 0.5, y + 0.5).distance_to(Vector2(16, 16))
+			if d < 15.5:
+				small.set_pixel(x, y, Color("2e2b40") if (x + y) % 7 != 0 else Color("262436"))
+	# Two goblins behind, the knight in front.
+	var goblin := _img(256, 256)
+	_draw_swarmer(goblin, 0, 0, 0)
+	_outline(goblin, Rect2i(0, 0, 32, 32))
+	small.blend_rect(goblin, Rect2i(8, 8, 18, 18), Vector2i(1, 4))
+	small.blend_rect(goblin, Rect2i(8, 8, 18, 18), Vector2i(14, 4))
+	var knight := _img(16, 16)
+	_draw_hero(knight, 0, "idle0", HEROES["knight"])
+	_outline(knight, Rect2i(0, 0, 16, 16))
+	small.blend_rect(knight, Rect2i(0, 0, 16, 16), Vector2i(8, 12))
+	# Ring.
+	for a in 64:
+		var p := Vector2(16, 16) + Vector2.from_angle(TAU * a / 64.0) * 15.0
+		small.set_pixel(int(p.x), int(p.y), Color("f2c63c"))
+	small.resize(256, 256, Image.INTERPOLATE_NEAREST)
+	_save(small, "res://assets/icon.png")
