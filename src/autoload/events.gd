@@ -9,6 +9,7 @@ signal player_device_lost(slot: int)
 signal player_device_restored(slot: int)
 
 # --- Heroes ------------------------------------------------------------------
+signal hero_spawned(slot: int)
 signal hero_damaged(slot: int, amount: float)
 signal hero_downed(slot: int)
 signal hero_revived(slot: int)

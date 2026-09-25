@@ -39,4 +39,4 @@ godot --headless --path . -s res://tests/run_tests.gd
 
 ## Status
 
-Milestone 1 (project setup) is done. See the milestone table in [docs/DESIGN.md](docs/DESIGN.md#milestones).
+Milestone 2 (co-op movement) is done. `./tools/dev.sh run` opens the test room: press **Enter** (keyboard) or **A** (gamepad) to join, up to 4 players. `./tools/dev.sh run -- --bots=3` adds bot players. See the milestone table in [docs/DESIGN.md](docs/DESIGN.md#milestones).

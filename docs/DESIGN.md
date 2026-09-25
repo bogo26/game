@@ -88,12 +88,13 @@ Spawn director:
 
 ## Levels and run flow
 
-- Levels are tile maps (`TileMapLayer`, 16 px tiles). Wall tiles carry a custom `solid` flag that collision and pathfinding read.
+- Levels are authored as ASCII layouts in `LevelData` resources (`src/levels/data/*.tres`; legend in `level_data.gd`). `Level` turns a layout into a `TileMapLayer` for rendering and a `LevelGrid` for collision and pathfinding. Wall tiles also carry a custom `solid` flag, so painting levels in the editor stays possible later.
 - Each level has corridors with a steady trickle of enemies and 2–3 **arena rooms**. In an arena room the doors lock and waves run until the kill quota is met.
 - A level ends at an **exit portal** that all living players must stand in.
 - Run: Level 1 → Level 2 → Level 3 → Boss arena → Victory. Difficulty rises per level.
 - Screen flow: Main menu → Character select (4 quadrants: join, pick, ready) → Levels → Victory / Game over → Main menu.
-- Shared camera: follows the middle of the group with fixed zoom, and players can't leave the screen. Levels are designed for this.
+- Shared camera: follows the middle of the group with fixed zoom, and players can't leave the screen. The leash blocks the player who is running away rather than dragging the others along. Levels are designed for this.
+- If an assigned controller is unplugged, the game pauses until it is reconnected, or until another controller presses A and takes over that player.
 
 ## Technical architecture
 
@@ -119,13 +120,14 @@ Nodes are too expensive for 300+ enemies at 120 fps, so hordes are **plain data*
 ```
 src/
   autoload/   Events (signal bus), InputRouter, GameState, PerfMonitor
-  core/       PlayerInput, XpCurve, Stats, SpatialHash, FlowField
+  core/       PlayerInput, LevelGrid (walkability + collision), XpCurve, Stats, SpatialHash, FlowField
   sim/        HordeSim, ProjectileSim, PickupSim, FxSim
   camera/     shared camera
+  world/      World (gameplay root, fixed tick order), BotDriver (bot players for demos/stress tests)
   heroes/     Hero (generic body), HeroData, Ability + reusable abilities, per-hero data
   enemies/    EnemyData, SpawnDirector, behaviours, boss
   upgrades/   UpgradeData, UpgradePool, data/*.tres
-  levels/     Level, level data, arena rooms, exit portal
+  levels/     Level (builds tiles + grid from LevelData), levels/data/*.tres, arena rooms, exit portal
   ui/         menus, character select, HUD, level-up screen
 tests/        headless test runner + test_*.gd
 tools/        dev.sh helper, stress test scene
@@ -149,7 +151,7 @@ docs/         this document
 | # | Milestone | Status |
 |---|---|---|
 | 1 | Setup: project settings, autoloads, test runner, perf overlay, docs | done |
-| 2 | Co-op movement: input router + join, hero move/aim/dash, shared camera, test room | |
+| 2 | Co-op movement: input router + join, hero move/aim/dash, shared camera, test room | done |
 | 3 | Horde tech: HordeSim, MultiMesh shader, spatial hash, threaded flow field, projectiles, pickups, stress test + **perf gate** | |
 | 4 | Combat: ability framework, Knight / Ranger / Mage / Cleric, downed/revive, 4 enemy types | |
 | 5 | Progression: stats and modifiers, upgrade pool, simultaneous level-up screen | |
