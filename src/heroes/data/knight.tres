@@ -1,0 +1,73 @@
+[gd_resource type="Resource" script_class="HeroData" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/hero_data.gd" id="1_data"]
+[ext_resource type="Script" path="res://src/heroes/abilities/melee_arc.gd" id="2_melee"]
+[ext_resource type="Script" path="res://src/heroes/abilities/area_burst.gd" id="3_burst"]
+[ext_resource type="Script" path="res://src/heroes/abilities/dash_ability.gd" id="4_dash"]
+[ext_resource type="Script" path="res://src/heroes/abilities/channel_ability.gd" id="5_channel"]
+
+[sub_resource type="Resource" id="Resource_attack"]
+script = ExtResource("2_melee")
+display_name = "Sword Slash"
+description = "Wide sword arc in front of you."
+cooldown = 0.42
+hold_to_repeat = true
+reach = 26.0
+arc_degrees = 120.0
+damage = 12.0
+knockback = 90.0
+
+[sub_resource type="Resource" id="Resource_special"]
+script = ExtResource("3_burst")
+display_name = "Ground Slam"
+description = "Stuns and knocks back everything around you."
+cooldown = 6.0
+target = 0
+radius = 48.0
+damage = 16.0
+knockback = 140.0
+stun_time = 1.2
+color = Color(0.9, 0.8, 0.6, 1.0)
+
+[sub_resource type="Resource" id="Resource_movement"]
+script = ExtResource("4_dash")
+display_name = "Shield Charge"
+description = "Charge forward, bashing and stunning enemies in your path."
+cooldown = 3.5
+direction = 0
+distance = 72.0
+duration = 0.22
+iframes = 0.3
+damage = 10.0
+hit_radius = 12.0
+knockback = 170.0
+stun_time = 0.6
+color = Color(0.5, 0.7, 1.0, 0.7)
+
+[sub_resource type="Resource" id="Resource_ultimate"]
+script = ExtResource("5_channel")
+display_name = "Whirlwind"
+description = "Spin for 4s: constant damage around you, half damage taken."
+cooldown = 0.5
+duration = 4.0
+radius = 34.0
+interval = 0.2
+damage = 9.0
+knockback = 60.0
+damage_taken_multiplier = 0.5
+move_speed_multiplier = 1.1
+
+[resource]
+script = ExtResource("1_data")
+id = &"knight"
+display_name = "Knight"
+role = "Tank"
+description = "Sturdy frontliner. Bashes through crowds and spins into the horde."
+max_hp = 140.0
+move_speed = 84.0
+armor = 1.0
+ult_cost = 500.0
+attack = SubResource("Resource_attack")
+special = SubResource("Resource_special")
+movement = SubResource("Resource_movement")
+ultimate = SubResource("Resource_ultimate")

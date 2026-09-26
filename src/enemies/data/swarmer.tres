@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"swarmer"
+max_hp = 10.0
+speed = 42.0
+radius = 5.0
+contact_damage = 6.0
+xp = 1
+knockback_taken = 1.0
+behavior = 0
+atlas_row = 0
+anim_fps = 8.0

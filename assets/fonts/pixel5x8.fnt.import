@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://bavyoui8acyce"
+path="res://.godot/imported/pixel5x8.fnt-f36f61f9c3bd7c0f8b02a29d7ad9afaf.fontdata"
+
+[deps]
+
+source_file="res://assets/fonts/pixel5x8.fnt"
+dest_files=["res://.godot/imported/pixel5x8.fnt-f36f61f9c3bd7c0f8b02a29d7ad9afaf.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2

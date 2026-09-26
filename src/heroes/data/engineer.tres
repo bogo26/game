@@ -1,0 +1,72 @@
+[gd_resource type="Resource" script_class="HeroData" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/hero_data.gd" id="1_data"]
+[ext_resource type="Script" path="res://src/heroes/abilities/projectile_ability.gd" id="2_projectile"]
+[ext_resource type="Script" path="res://src/heroes/abilities/summon_ability.gd" id="3_summon"]
+[ext_resource type="Script" path="res://src/heroes/abilities/dash_ability.gd" id="4_dash"]
+
+[sub_resource type="Resource" id="Resource_attack"]
+script = ExtResource("2_projectile")
+display_name = "Rivet Gun"
+description = "Rapid-fire rivets."
+cooldown = 0.14
+hold_to_repeat = true
+damage = 6.0
+speed = 320.0
+radius = 3.0
+lifetime = 0.9
+knockback = 20.0
+look = 5
+
+[sub_resource type="Resource" id="Resource_special"]
+script = ExtResource("3_summon")
+display_name = "Deploy Turret"
+description = "Place a turret that shoots nearby enemies (max 2)."
+cooldown = 6.0
+kind = 1
+count = 1
+max_active = 2
+lifetime = 20.0
+minion_damage = 5.0
+attack_interval = 0.3
+attack_range = 140.0
+
+[sub_resource type="Resource" id="Resource_movement"]
+script = ExtResource("4_dash")
+display_name = "Rocket Boots"
+description = "Rocket dash that leaves a burning trail."
+cooldown = 3.5
+direction = 0
+distance = 76.0
+duration = 0.18
+iframes = 0.25
+trail_damage = 4.0
+color = Color(1.0, 0.6, 0.2, 0.7)
+
+[sub_resource type="Resource" id="Resource_ultimate"]
+script = ExtResource("3_summon")
+display_name = "Tesla Tower"
+description = "8s tower: chain lightning through nearby enemies."
+cooldown = 0.5
+kind = 2
+count = 1
+max_active = 1
+lifetime = 8.0
+minion_damage = 14.0
+attack_interval = 0.35
+attack_range = 150.0
+
+[resource]
+script = ExtResource("1_data")
+id = &"engineer"
+display_name = "Engineer"
+role = "Turrets"
+description = "Builds turrets and a tesla tower, and rockets around leaving fire."
+max_hp = 100.0
+move_speed = 88.0
+armor = 0.5
+ult_cost = 650.0
+attack = SubResource("Resource_attack")
+special = SubResource("Resource_special")
+movement = SubResource("Resource_movement")
+ultimate = SubResource("Resource_ultimate")

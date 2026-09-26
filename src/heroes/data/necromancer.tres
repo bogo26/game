@@ -1,0 +1,79 @@
+[gd_resource type="Resource" script_class="HeroData" load_steps=9 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/hero_data.gd" id="1_data"]
+[ext_resource type="Script" path="res://src/heroes/abilities/projectile_ability.gd" id="2_projectile"]
+[ext_resource type="Script" path="res://src/heroes/abilities/summon_ability.gd" id="3_summon"]
+[ext_resource type="Script" path="res://src/heroes/abilities/dash_ability.gd" id="4_dash"]
+
+[sub_resource type="Resource" id="Resource_attack"]
+script = ExtResource("2_projectile")
+display_name = "Soul Bolt"
+description = "Piercing bolt of soul fire."
+cooldown = 0.35
+hold_to_repeat = true
+damage = 9.0
+speed = 200.0
+radius = 4.0
+lifetime = 1.2
+pierce = 1
+knockback = 30.0
+look = 6
+
+[sub_resource type="Resource" id="Resource_special"]
+script = ExtResource("3_summon")
+display_name = "Raise Dead"
+description = "Raise 4 skeletons from fresh corpses (max 8)."
+cooldown = 7.0
+kind = 0
+count = 4
+max_active = 8
+lifetime = 20.0
+use_corpses = true
+corpse_radius = 140.0
+minion_hp = 30.0
+minion_damage = 8.0
+attack_interval = 0.6
+attack_range = 140.0
+
+[sub_resource type="Resource" id="Resource_movement"]
+script = ExtResource("4_dash")
+display_name = "Wraith Walk"
+description = "Drift through the horde untouchable, chilling everything you pass."
+cooldown = 4.0
+direction = 0
+distance = 90.0
+duration = 0.45
+iframes = 0.6
+slow_time = 2.0
+hit_radius = 12.0
+color = Color(0.35, 0.95, 0.8, 0.6)
+
+[sub_resource type="Resource" id="Resource_ultimate"]
+script = ExtResource("3_summon")
+display_name = "Army of the Dead"
+description = "Summon 16 skeletons for 10s."
+cooldown = 0.5
+kind = 0
+count = 16
+max_active = 16
+lifetime = 10.0
+spawn_radius = 30.0
+minion_hp = 25.0
+minion_damage = 7.0
+attack_interval = 0.6
+attack_range = 140.0
+
+[resource]
+script = ExtResource("1_data")
+id = &"necromancer"
+display_name = "Necromancer"
+role = "Summoner"
+description = "Raises the fallen to fight for the team and walks through the horde as a wraith."
+max_hp = 90.0
+move_speed = 86.0
+armor = 0.0
+ult_cost = 650.0
+attack = SubResource("Resource_attack")
+special = SubResource("Resource_special")
+movement = SubResource("Resource_movement")
+ultimate = SubResource("Resource_ultimate")

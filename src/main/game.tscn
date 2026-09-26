@@ -1,0 +1,37 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/main/game.gd" id="1_game"]
+
+[node name="Game" type="Node"]
+script = ExtResource("1_game")
+
+[node name="BannerLayer" type="CanvasLayer" parent="."]
+layer = 60
+
+[node name="Banner" type="Label" parent="BannerLayer"]
+unique_name_in_owner = true
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 110.0
+offset_bottom = 142.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.88, 0.48, 1)
+theme_override_colors/font_outline_color = Color(0.15, 0.05, 0.05, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 32
+horizontal_alignment = 1
+
+[node name="BannerSub" type="Label" parent="BannerLayer"]
+unique_name_in_owner = true
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 146.0
+offset_bottom = 166.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.9, 0.9, 0.95, 1)
+theme_override_colors/font_outline_color = Color(0, 0, 0, 1)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
