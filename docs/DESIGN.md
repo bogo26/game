@@ -51,7 +51,7 @@ Two players may pick the same hero. Every player has a colour (P1 red, P2 blue, 
 | **Berserker** (bruiser) | Axe cleave (3rd hit of the combo is bigger) | Blood Frenzy: +attack speed and lifesteal for 5 s, costs HP | Leap Slam: jump to the aim point with an AoE on landing | Rampage: 10 s, grows in size, huge cleaves, heals on kill |
 | **Rogue** (crit) | Fast twin-dagger stabs | Knife Ring: 12 knives thrown in 360° | Shadow Step: dash through enemies and mark them (marked enemies take guaranteed crits) | Shadow Clones: 3 clones copy the Rogue's attacks for 6 s |
 | **Engineer** (turrets) | Rivet gun | Deploy Turret (max 2, auto-fires) | Rocket Boots: dash that leaves a fire trail | Tesla Tower: chain lightning for 8 s |
-| **Necromancer** (summoner) | Soul bolt | Raise Dead: fallen enemies rise as skeleton allies (max 8) | Wraith Walk: 1 s incorporeal dash through enemies, which also chills them | Army of the Dead: 20 skeletons for 10 s |
+| **Necromancer** (summoner) | Soul bolt | Raise Dead: fallen enemies rise as skeleton allies (max 8) | Wraith Walk: 1 s incorporeal dash through enemies, which also chills them | Army of the Dead: 16 skeletons for 10 s |
 
 Backlog ideas for 9+: Alchemist (thrown flasks), Monk (dash-strike combos), Bard (team buffs).
 
@@ -112,6 +112,10 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
 - **Stats (`src/core/stats.gd`):** `value = (base + flat) × (1 + pct)`. The stat list is max HP, armor, move speed, damage, attack speed, crit chance, crit damage, pickup range, regen, ultimate charge rate, life on kill and revive speed.
 - **Pick screen controls:** each player picks in their own area: one centred panel, two halves, or four quadrants. Gamepads use left/right + A. Keyboard players use A/D or arrows + Enter, or the mouse. Bots pick after 0.6 s.
 - **Accidental-pick guard:** human input is ignored for the first 0.35 s after the cards appear, so a player mashing A (dash) or left-click (attack) can't pick one by accident.
+- **Rounds:** `GameState.pending_rounds` queues them oldest first, each labelled with the team level it was earned at, or as a treasure (chest, shown first) or bonus (debug) round, so titles are always right.
+  - Once everyone has picked, the result stays up for 0.3 s so the last player sees "PICKED!" too.
+  - With 3–4 players each panel sits in its player's HUD corner; with 2 the lower slot is on the left.
+  - Rounds wait until the level banner has gone. Rounds earned after the exit is reached, or once the run is won or lost, carry over to the next level instead of opening then.
 - Upgrades last for the whole run and reset on game over.
 - XP needed per level: `6·L^1.35 + 4·L`, scaled by `1 + 0.35 × (players − 1)` (see `src/core/xp_curve.gd`).
 
@@ -130,13 +134,13 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
   - a theme (tile sheet and decorations) and an optional tint
 - **`LevelDirector` runs the objectives:**
   - An **arena room** (digit tiles) activates when a living hero is 36+ px inside it. Stragglers are pulled in with the leader, every door touching the room turns solid, and the spawner switches to arena mode.
-  - The room is cleared once its quota has spawned and nothing is left alive in it. Quotas are ×(1 + 0.4 per extra player).
+  - The room is cleared once its quota has spawned and nothing is left alive in it. Quotas are ×(1 + 0.4 per extra player). The objective shows the enemies left: the part of the quota not yet spawned plus those alive inside.
   - Clearing opens the doors, drops a heart, and returns the spawner to the corridor trickle.
   - The **exit portal** opens when every arena is cleared. The level completes after all living heroes stand in it for 1 s.
   - The **boss level's** throne room spawns the Demon Lord instead of waves. Its death ends the run in victory.
 - **HUD:**
   - The objective text sits under the XP bar.
-  - A yellow arrow at the screen edge points to off-screen objectives (the next arena or the exit).
+  - A yellow arrow at the screen edge points to off-screen objectives (the next arena or the exit). The next arena is the one closest **on foot** from the team (`LevelGrid.walk_distances`, a BFS where walls, closed doors and chasms block and props don't), not in a straight line.
 - **Spawner modes:**
   - CORRIDOR: off-screen trickle at a fraction of the alive cap.
   - ARENA: spawns on the room's floor at least 96 px from heroes, until the quota is spent.
@@ -149,14 +153,18 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
     - enraged: faster, plus telegraphed charges
   - HP is 1800 × level multiplier × player-count scaling. It is immune to stun and slow.
 - **Screens:** Main menu → Character select → Game (levels) → End screen (victory/defeat + stats) → Play again / Main menu.
-  - **Main menu:** Start Run, Test Room (drop-in sandbox), Quit. Menus use Godot focus navigation, so keyboard, any gamepad or mouse all work.
+  - **Main menu:** Start Run, Test Room (drop-in sandbox), Quit. The main, pause and end menus use Godot focus navigation, so keyboard, any gamepad or mouse all work, with move/confirm sounds (`UiSounds`).
   - **Character select:** 4 quadrants.
     - Press A/Enter to join (holding that button doesn't also ready you up).
     - Left/right to browse the 8-hero roster.
     - A/Enter to ready, B/Esc to un-ready or leave.
     - When everyone who joined is ready, any of them presses A/Enter (or Start on a gamepad) to begin. There is no countdown.
+    - With nobody joined, B/Esc/Backspace returns to the main menu. The press that makes the last player leave doesn't count.
+  - **Enter with Alt held** is the fullscreen shortcut and never counts as a confirm press, even if Alt is let go first.
   - **`Game`:** builds a `World` per level, shows "LEVEL n" and "LEVEL CLEAR!" banners, and banks stats. A team wipe means defeat; the boss's death means victory.
-  - **Pause:** Start or Esc opens it for any player, with Resume and Quit to menu. The press that closes it can't also trigger a dash.
+  - **Pause:** Start or Esc opens it for any player: Resume, Music and Sounds volume, Fullscreen, and Quit to menu, which needs a second press within 3 s. The press that closes it can't also trigger a dash. It can't be opened under the victory/defeat banner.
+  - **End screen:** its buttons ignore input for 0.6 s, so a player still mashing from the fight doesn't skip the results.
+  - **Test Room:** with nobody joined, Esc (or Start/B on a pad) goes back to the menu.
 - **Shared camera:** follows the middle of the group with fixed zoom, and players can't leave the screen. The leash blocks the player who is running away rather than dragging the others along.
 - **Disconnects:** if an assigned controller is unplugged, the game pauses until it is reconnected, or until another controller presses A and takes over that player.
 - **Bots** (`BotDriver`) follow the current objective with A* over the level grid and use their abilities. The test suite has four god-mode bots finish every level including the boss, and `./tools/dev.sh run res://src/main/game.tscn -- --bots=4 --level=4` shows a bot boss fight.
@@ -260,7 +268,7 @@ docs/         this document
   - Minion damage counts toward the owner's ultimate charge and lifesteal.
   - They retarget every 0.4 s.
   - Caps: Raise Dead 8, Army of the Dead 16, turrets 2, towers 1.
-- Upgrades tweak abilities through `Ability.mods` (e.g. `pierce`, `count`, `area_pct`, `max_active`, `minion_hp_pct`). There are 50 upgrades: 17 generic plus 4–5 per hero.
+- Upgrades tweak abilities through `Ability.mods` (e.g. `pierce`, `count`, `area_pct`, `max_active`, `minion_hp_pct`). There are 62 upgrades: 17 generic, 4–5 per hero, and 12 elemental.
 - Hero tuning lives in `tools/gen_hero_data.py`, which writes `src/heroes/data/*.tres`. Edit the table and re-run it, or edit the `.tres` in the Godot inspector.
 - **Ultimate charge:** damage dealt ÷ the hero's `ult_cost`, plus 1% per second passively. The player ring pulses when the ultimate is ready.
 - **Critical hits:**
@@ -280,14 +288,14 @@ docs/         this document
 ### Enemy behaviours
 - **Chaser:** flow field; direct steering within 2 tiles of a hero.
 - **Ranged (spitter):** holds position inside its range, backs off when heroes get closer than 55% of it, and fires when it has line of sight.
-- **Exploder:** lights its fuse when close, then blasts heroes in its radius. Killing it during the fuse cancels the blast, and self-destructs drop no XP.
+- **Exploder:** lights its fuse when close, then blasts heroes in its radius that it has line of sight to (walls stop it, like the boss slam). Killing it during the fuse cancels the blast, and self-destructs drop no XP.
 - **Knockback:** damage pushes enemies away from the hit source, scaled per type (brutes resist). Stun freezes, slow halves speed, and marks make enemies take ×1.75 damage.
 
 ### Input
 - `InputRouter` (autoload) owns four `PlayerInput` slots and polls hardware directly, not through the InputMap. That keeps any mix of keyboard and gamepads separated per player.
 - It reports join presses from unassigned devices. The button used to join counts as already held, so it doesn't also trigger "ready" in menus or a dash in game.
 - It handles hot-plug: an unplugged pad pauses the game, and a new device pressing A takes over the disconnected player.
-- Menus navigate per player through `PlayerInput.ui_pressed()`, not Godot's global focus.
+- Character select and the level-up screen navigate per player through `PlayerInput.ui_pressed()`; the main, pause and end menus use Godot's focus, so any device can drive them.
 
 ### Conventions
 - Typed GDScript everywhere. Hot loops use locals and packed arrays.

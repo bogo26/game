@@ -49,6 +49,7 @@ static func _extend_ui_actions() -> void:
 
 
 func _process(delta: float) -> void:
+	PlayerInput.update_enter_latch()
 	for p in players:
 		p.poll(delta)
 		if _swallow_presses:
@@ -164,7 +165,7 @@ static func _treat_held_as_old(p: PlayerInput) -> void:
 
 func _join_button_down(device: int) -> bool:
 	if device == PlayerInput.DEVICE_KEYBOARD:
-		return Input.is_physical_key_pressed(KEY_ENTER) or Input.is_physical_key_pressed(KEY_SPACE)
+		return PlayerInput.enter_down() or Input.is_physical_key_pressed(KEY_SPACE)
 	return Input.is_joy_button_pressed(device, JOY_BUTTON_A) or Input.is_joy_button_pressed(device, JOY_BUTTON_START)
 
 

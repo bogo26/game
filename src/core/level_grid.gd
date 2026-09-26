@@ -217,6 +217,42 @@ func sweep_until_blocked(a: Vector2, b: Vector2, r: float) -> Vector2:
 	return pos
 
 
+## Walking distance in tiles from `from` to every cell (-1 = unreachable).
+## Walls, closed doors and chasms block; props don't (they can be broken or
+## walked around).
+func walk_distances(from: Vector2i) -> PackedInt32Array:
+	var dist := PackedInt32Array()
+	dist.resize(width * height)
+	dist.fill(-1)
+	if not in_bounds(from.x, from.y):
+		return dist
+	var queue := PackedInt32Array()
+	queue.resize(width * height)
+	var head := 0
+	var tail := 0
+	var start := from.y * width + from.x
+	dist[start] = 0
+	queue[tail] = start
+	tail += 1
+	var chasm := Terrain.CHASM
+	while head < tail:
+		var i := queue[head]
+		head += 1
+		var x := i % width
+		var next_d := dist[i] + 1
+		for n: int in [i - 1, i + 1, i - width, i + width]:
+			if n < 0 or n >= dist.size() or dist[n] != -1:
+				continue
+			if (n == i - 1 and x == 0) or (n == i + 1 and x == width - 1):
+				continue  # don't wrap around the row
+			if shot_solid[n] != 0 or terrain[n] == chasm:
+				continue
+			dist[n] = next_d
+			queue[tail] = n
+			tail += 1
+	return dist
+
+
 ## Nearest walkable cell centre to `pos` (spiral search), for safe spawns.
 func nearest_open(pos: Vector2, max_radius: int = 6) -> Vector2:
 	var c := cell_of(pos)

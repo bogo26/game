@@ -14,6 +14,7 @@ const PANEL_SIZE := Vector2(112, 28)
 const EDGE := 4.0
 const HERO_SHEET := "res://assets/sprites/heroes/%s.png"
 const MAP_HINT_TIME := 8.0
+const CAPTIONS: Array[String] = ["SPC", "MOV", "ULT"]
 
 var world: World
 var minimap: Minimap
@@ -119,8 +120,6 @@ func _update_slot_labels(view: Vector2) -> void:
 		var origin := _panel_origin(i, view)
 		if hero:
 			label.text = "P%d %s" % [i + 1, hero.data.display_name.to_upper()]
-			if hero.is_downed():
-				label.text += "  DOWN!"
 			label.position = origin + Vector2(20, 0)
 		elif world and world.allow_drop_in and not InputRouter.get_player(i).is_assigned():
 			label.text = "P%d  ENTER / (A) to join" % (i + 1)
@@ -202,8 +201,15 @@ func _draw_player_panel(hero: Hero, origin: Vector2) -> void:
 	if hero.ult_charge >= 1.0:
 		ult_color = ult_color.lerp(Color.WHITE, 0.5 + 0.5 * sin(_time * 10.0))
 	_bar(Vector2(x + (third + 2) * 2, origin.y + 17), third, 2, hero.ult_charge, ult_color)
-	_canvas.draw_string(_canvas.get_theme_default_font(), Vector2(x, origin.y + 27), "SPC  MOV  ULT",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.5, 0.5, 0.56))
+	var font := _canvas.get_theme_default_font()
+	if hero.is_downed():
+		_canvas.draw_string(font, Vector2(x, origin.y + 27), "DOWN!  revive me",
+			HORIZONTAL_ALIGNMENT_LEFT, w, 8, Color(1, 0.4, 0.35))
+		return
+	# Each caption centred under its own bar.
+	for k in 3:
+		_canvas.draw_string(font, Vector2(x + (third + 2) * k, origin.y + 27), CAPTIONS[k],
+			HORIZONTAL_ALIGNMENT_CENTER, third, 8, Color(0.5, 0.5, 0.56))
 
 
 func _bar(pos: Vector2, width: float, height: float, ratio: float, color: Color) -> void:

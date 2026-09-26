@@ -3,7 +3,8 @@ extends CanvasLayer
 ## Pauses the game on a team level-up and lets every player pick one of three
 ## upgrade cards at the same time, each in their own screen area with their
 ## own controller (left/right + A, or arrows/WASD + Enter, or mouse).
-## Queued level-ups resolve one round at a time.
+## Queued rounds (GameState.pending_rounds) resolve one at a time; panels sit
+## in their player's HUD corner when 3-4 people play.
 
 signal closed
 
@@ -14,6 +15,9 @@ const BOT_PICK_DELAY := 0.6
 const INPUT_GRACE := 0.35
 const MARGIN := 6.0
 const TITLE_HEIGHT := 20.0
+## Once everyone has picked, the result stays up this long (so the last
+## player sees "PICKED!" too) before the next round or the game resumes.
+const ROUND_END_DELAY := 0.3
 
 
 class Picker:
@@ -35,7 +39,7 @@ var _pickers: Array[Picker] = []
 var _root: Control
 var _title: Label
 var _open := false
-var _treasure_round := false
+var _round_end_left := -1.0
 
 
 func _ready() -> void:
@@ -84,28 +88,40 @@ func _process(delta: float) -> void:
 			_handle_input(pk, delta)
 		if not pk.picked:
 			all_done = false
-	if all_done:
-		GameState.pending_level_ups = maxi(0, GameState.pending_level_ups - 1)
-		if _treasure_round:
-			GameState.pending_treasures = maxi(0, GameState.pending_treasures - 1)
-		if GameState.pending_level_ups > 0:
-			_start_round()
-		else:
-			close()
+	if not all_done:
+		return
+	if _round_end_left < 0.0:
+		_round_end_left = ROUND_END_DELAY
+		for pk in _pickers:
+			_refresh(pk)  # everyone done: drop the "waiting..."
+	_round_end_left -= delta
+	if _round_end_left > 0.0:
+		return
+	_round_end_left = -1.0
+	GameState.pop_round()
+	if GameState.pending_level_ups > 0:
+		_start_round()
+	else:
+		close()
+
+
+## Title for a pick round (see GameState.pending_rounds).
+static func round_title(pick_round: int) -> String:
+	match pick_round:
+		GameState.TREASURE_ROUND:
+			return "TREASURE!  PICK AN UPGRADE"
+		GameState.BONUS_ROUND:
+			return "BONUS!  PICK AN UPGRADE"
+	return "LEVEL %d!  PICK AN UPGRADE" % pick_round
 
 
 func _start_round() -> void:
 	_clear_panels()
 	var view := _root.get_viewport_rect().size
-	_treasure_round = GameState.pending_treasures > 0
-	if _treasure_round:
-		_title.text = "TREASURE!  PICK AN UPGRADE"
-	else:
-		var level := GameState.team_level - (GameState.pending_level_ups - GameState.pending_treasures) + 1
-		_title.text = "LEVEL %d!  PICK AN UPGRADE" % level
+	_title.text = round_title(GameState.next_round())
 	_title.position = Vector2(0, 2)
 	_title.size = Vector2(view.x, TITLE_HEIGHT)
-	var rects := _layout(_heroes.size(), view)
+	var rects := _layout(_heroes, view)
 	for i in _heroes.size():
 		var pk := Picker.new()
 		pk.hero = _heroes[i]
@@ -114,6 +130,10 @@ func _start_round() -> void:
 		_build_panel(pk, rects[i])
 		_pickers.append(pk)
 		_refresh(pk)
+
+
+func is_round_finished() -> bool:
+	return _round_end_left >= 0.0
 
 
 func _handle_input(pk: Picker, delta: float) -> void:
@@ -153,11 +173,13 @@ func _confirm(pk: Picker, index: int) -> void:
 
 # --- layout / widgets -------------------------------------------------------------------------
 
-func _layout(count: int, view: Vector2) -> Array[Rect2]:
+## One panel per hero: centred for 1 player, halves for 2 (in slot order),
+## and each player's HUD corner (by slot) for 3-4.
+func _layout(heroes: Array[Hero], view: Vector2) -> Array[Rect2]:
 	var top := TITLE_HEIGHT + 2.0
 	var full := Rect2(MARGIN, top, view.x - MARGIN * 2.0, view.y - top - MARGIN)
 	var out: Array[Rect2] = []
-	match count:
+	match heroes.size():
 		1:
 			var w := minf(360.0, full.size.x)
 			var h := minf(170.0, full.size.y)
@@ -166,14 +188,15 @@ func _layout(count: int, view: Vector2) -> Array[Rect2]:
 			var w := (full.size.x - MARGIN) * 0.5
 			var h := minf(180.0, full.size.y)
 			var y := full.position.y + (full.size.y - h) * 0.5
-			out.append(Rect2(full.position.x, y, w, h))
-			out.append(Rect2(full.position.x + w + MARGIN, y, w, h))
+			var first_left := heroes[0].slot < heroes[1].slot
+			out.append(Rect2(full.position.x + (0.0 if first_left else w + MARGIN), y, w, h))
+			out.append(Rect2(full.position.x + (w + MARGIN if first_left else 0.0), y, w, h))
 		_:
 			var w := (full.size.x - MARGIN) * 0.5
 			var h := (full.size.y - MARGIN) * 0.5
-			for i in count:
-				var col := i % 2
-				var row := i / 2
+			for hero in heroes:
+				var col := hero.slot % 2
+				var row := (hero.slot / 2) % 2
 				out.append(Rect2(full.position.x + col * (w + MARGIN), full.position.y + row * (h + MARGIN), w, h))
 	return out
 
@@ -258,7 +281,7 @@ func _refresh(pk: Picker) -> void:
 		card.add_theme_stylebox_override("panel", _box(bg, border, 2 if is_selected else 1))
 		card.position.y = 13.0 if is_selected and not pk.picked else 16.0
 	if pk.picked:
-		pk.status.text = "PICKED! waiting..." if pk.chosen else ""
+		pk.status.text = "" if pk.chosen == null else ("PICKED!" if _round_end_left >= 0.0 else "PICKED! waiting...")
 	elif pk.hero.input.uses_mouse:
 		pk.status.text = "A/D choose, ENTER or click"
 	else:

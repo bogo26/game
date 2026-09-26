@@ -48,6 +48,10 @@ var aim := Vector2.RIGHT
 var aim_active := false
 var uses_mouse := false
 
+## Enter pressed while Alt is held is the fullscreen shortcut, not "accept":
+## it stays ignored until released (see update_enter_latch()).
+static var _enter_latched := false
+
 var _down := PackedByteArray()
 var _prev := PackedByteArray()
 var _repeat_timer := PackedFloat32Array()
@@ -111,6 +115,20 @@ func clear() -> void:
 		_repeat_fired[i] = 0
 
 
+## Called once per frame by the InputRouter, before any player is polled.
+static func update_enter_latch() -> void:
+	if not (Input.is_physical_key_pressed(KEY_ENTER) or Input.is_physical_key_pressed(KEY_KP_ENTER)):
+		_enter_latched = false
+	elif Input.is_physical_key_pressed(KEY_ALT):
+		_enter_latched = true
+
+
+## Enter (or keypad Enter) held, unless it's part of Alt+Enter.
+static func enter_down() -> bool:
+	return not _enter_latched and \
+		(Input.is_physical_key_pressed(KEY_ENTER) or Input.is_physical_key_pressed(KEY_KP_ENTER))
+
+
 func rumble(weak: float, strong: float, duration: float) -> void:
 	if device >= 0 and connected:
 		Input.start_joy_vibration(device, weak, strong, duration)
@@ -148,7 +166,7 @@ func _read_keyboard_mouse() -> void:
 	_write(Action.ULTIMATE, _key(KEY_Q))
 	_write(Action.PAUSE, _key(KEY_ESCAPE))
 	_write(Action.MAP, _key(KEY_TAB) or _key(KEY_M))
-	_write(Action.UI_ACCEPT, _key(KEY_ENTER) or _key(KEY_KP_ENTER) or _key(KEY_SPACE))
+	_write(Action.UI_ACCEPT, enter_down() or _key(KEY_SPACE))
 	_write(Action.UI_BACK, _key(KEY_ESCAPE) or _key(KEY_BACKSPACE))
 	_write(Action.UI_UP, up)
 	_write(Action.UI_DOWN, down)

@@ -210,7 +210,6 @@ func test_chest_gives_everyone_a_treasure_pick() -> void:
 	world.get_tree().paused = false
 	world.level_up.close()
 	GameState.pending_level_ups = 0
-	GameState.pending_treasures = 0
 	_touch(world, chest)
 	assert_eq(GameState.pending_level_ups, 0, "a chest opens only once")
 	_teardown(world)

@@ -37,6 +37,7 @@ func test_upgrade_picks_freeze_the_level_in_a_run() -> void:
 	var game := _start_run()
 	var world: World = game.get("world")
 	assert_true(world.can_process(), "level runs normally")
+	world.level_up_delay = 0.0  # past the level banner
 	GameState.pending_level_ups = 1
 	world._process(DT)  # a level-up is pending: opens the pick screen
 	assert_true(world.level_up.is_open(), "pick screen opened")

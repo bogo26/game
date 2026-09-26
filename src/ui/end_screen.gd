@@ -3,6 +3,11 @@ extends Control
 
 const CHARACTER_SELECT := "res://src/ui/character_select.tscn"
 const MAIN_MENU := "res://src/ui/main_menu.tscn"
+## Buttons ignore input this long, so a player still mashing A / Space from
+## the fight doesn't skip the results.
+const INPUT_GRACE := 0.6
+
+var _grace := INPUT_GRACE
 
 
 func _ready() -> void:
@@ -27,4 +32,16 @@ func _ready() -> void:
 	%Stats.text = "\n".join(lines)
 	%AgainButton.pressed.connect(func() -> void: get_tree().change_scene_to_file(CHARACTER_SELECT))
 	%MenuButton.pressed.connect(func() -> void: get_tree().change_scene_to_file(MAIN_MENU))
-	%AgainButton.grab_focus.call_deferred()
+	for button: Button in [%AgainButton, %MenuButton]:
+		button.disabled = true
+	UiSounds.attach(self)
+
+
+func _process(delta: float) -> void:
+	if _grace <= 0.0:
+		return
+	_grace -= delta
+	if _grace <= 0.0:
+		for button: Button in [%AgainButton, %MenuButton]:
+			button.disabled = false
+		UiSounds.focus_quietly(%AgainButton)

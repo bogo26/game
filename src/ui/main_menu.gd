@@ -26,7 +26,8 @@ func _ready() -> void:
 	%StartButton.pressed.connect(_on_start)
 	%TestRoomButton.pressed.connect(_on_test_room)
 	%QuitButton.pressed.connect(func() -> void: get_tree().quit())
-	start_button.grab_focus.call_deferred()
+	UiSounds.attach(self)
+	UiSounds.focus_quietly(start_button)
 
 
 func _process(delta: float) -> void:

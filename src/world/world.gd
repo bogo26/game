@@ -64,8 +64,13 @@ const WRATH_DAMAGE := 60.0
 @export var spawn_enemies := true
 ## Test rooms revive a wiped team automatically instead of ending the run.
 @export var auto_revive_on_wipe := true
-## Off for the stress test (the pick screen pauses the game).
+## Off for the stress test (the pick screen pauses the game). The Game turns
+## it off once a level is won or lost; unresolved rounds carry over.
 @export var level_ups_enabled := true
+## Seconds before pick rounds may open (the Game's level banner is showing).
+var level_up_delay := 0.0
+## The Game turns this off while its end-of-run banners show.
+var pause_enabled := true
 ## Part of a run (vs. the sandbox test room): no drop-in, wipes end the run,
 ## reaching the exit completes the level.
 @export var run_mode := false
@@ -105,6 +110,7 @@ var _rng := RandomNumberGenerator.new()
 var _scratch := PackedInt32Array()
 var _wiped := false
 var _wipe_timer := 0.0
+var _menu_was_down := true  # the press that opened the test room doesn't count
 ## Chests and shrines.
 var interactables: Array[Interactable] = []
 ## The team's current shrine blessing (for the HUD); heroes hold the buffs.
@@ -206,7 +212,9 @@ func _ready() -> void:
 		director.objective_target = Vector2.INF
 	director.level_completed.connect(level_completed.emit)
 	director.boss_defeated.connect(boss_defeated.emit)
-	GameState.pending_level_ups += _cmdline_int("--debug-levelups=", 0)
+	if not GameState.debug_picks_given:
+		GameState.debug_picks_given = true
+		GameState.pending_level_ups += _cmdline_int("--debug-levelups=", 0)
 
 
 func _exit_tree() -> void:
@@ -283,14 +291,18 @@ func _process(delta: float) -> void:
 	_check_wipe(dt)
 	camera.follow(hero_positions, dt)
 	reveal.tick(dt, camera.visible_rect())
-	if level_ups_enabled and GameState.pending_level_ups > 0 and not level_up.is_open() and not heroes.is_empty():
+	level_up_delay = maxf(0.0, level_up_delay - dt)
+	if level_ups_enabled and level_up_delay <= 0.0 and GameState.pending_level_ups > 0 \
+			and not level_up.is_open() and not heroes.is_empty():
 		level_up.open(heroes, upgrade_pool)
 		get_tree().paused = true
-	elif not level_up.is_open() and Engine.get_process_frames() > pause_menu.closed_at_frame + 1:
+	elif pause_enabled and not level_up.is_open() and Engine.get_process_frames() > pause_menu.closed_at_frame + 1:
 		for hero in heroes:
 			if hero.input.just_pressed(PlayerInput.Action.PAUSE):
 				pause_menu.open()
 				break
+		if heroes.is_empty() and not run_mode and _menu_pressed():
+			_on_quit_requested()  # empty test room: Esc / Start / B goes back to the menu
 	var t_sim_end := Time.get_ticks_usec()
 
 	horde.render(horde_layer)
@@ -655,7 +667,7 @@ func _apply_blasts() -> void:
 		var p := horde.blast_pos[k]
 		var r := horde.blast_radius[k]
 		for hero in heroes:
-			if hero.position.distance_to(p) <= r + Hero.RADIUS:
+			if hero.position.distance_to(p) <= r + Hero.RADIUS and grid.line_of_sight(p, hero.position):
 				hero.take_hit(horde.blast_damage[k])
 		fx.disc(p, r, Color(1.0, 0.55, 0.2, 0.7), 0.25)
 		fx.ring(p, r * 1.15, Color(1.0, 0.9, 0.5), 0.3)
@@ -887,6 +899,16 @@ func _apply_debug_upgrades(hero: Hero) -> void:
 			for u in chain:
 				if not hero.upgrade_stacks.has(u.id):
 					hero.apply_upgrade(u, false)
+
+
+## Esc on the keyboard, or Start / B on any gamepad, pressed this frame.
+func _menu_pressed() -> bool:
+	var down := Input.is_physical_key_pressed(KEY_ESCAPE)
+	for d in Input.get_connected_joypads():
+		down = down or Input.is_joy_button_pressed(d, JOY_BUTTON_START) or Input.is_joy_button_pressed(d, JOY_BUTTON_B)
+	var pressed := down and not _menu_was_down
+	_menu_was_down = down
+	return pressed
 
 
 static func _cmdline_int(prefix: String, default_value: int) -> int:

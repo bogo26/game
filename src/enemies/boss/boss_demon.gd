@@ -168,7 +168,8 @@ func _execute_attack(p: Vector2, target: Vector2) -> void:
 				_fireball(p, dir.rotated(a), 115.0)
 		Attack.SLAM:
 			for hero in world.heroes:
-				if hero.position.distance_to(p) <= SLAM_RADIUS + Hero.RADIUS:
+				if hero.position.distance_to(p) <= SLAM_RADIUS + Hero.RADIUS \
+						and world.grid.line_of_sight(p, hero.position):
 					hero.take_hit(SLAM_DAMAGE)
 			world.fx.disc(p, SLAM_RADIUS, Color(1, 0.45, 0.2, 0.55), 0.3)
 			world.fx.ring(p, SLAM_RADIUS * 1.1, Color(1, 0.8, 0.4), 0.35)

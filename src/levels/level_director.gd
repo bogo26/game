@@ -127,7 +127,15 @@ func tick(dt: float) -> void:
 func on_enemy_killed() -> void:
 	if active_room:
 		active_room.killed += 1
+		_in_room_alive = maxi(0, _in_room_alive - 1)  # recounted every 0.25 s
 		_update_objective()
+
+
+## Enemies still to beat in the active arena: not yet spawned + alive inside.
+func enemies_left() -> int:
+	if active_room == null:
+		return 0
+	return world.spawner.arena_remaining + _in_room_alive
 
 
 # --- arenas ----------------------------------------------------------------------------------
@@ -191,6 +199,8 @@ func _tick_active_room(dt: float) -> void:
 			_in_room_alive += 1
 	if world.spawner.arena_remaining <= 0 and _in_room_alive == 0:
 		_clear(room)
+	else:
+		_update_objective()
 
 
 func _clear(room: Room) -> void:
@@ -330,14 +340,14 @@ func _update_objective() -> void:
 			objective = "Destroy the nests!  %d left" % room_nests.size()
 			objective_target = _nearest(room_nests)
 		elif active_room.quota > 0:
-			objective = "Survive the arena!  %d / %d" % [mini(active_room.killed, active_room.quota), active_room.quota]
+			objective = "Defeat the horde!  %d left" % enemies_left()
 		else:
 			objective = "Clear the arena!"
 	elif exit_open:
 		objective = "Reach the exit portal"
 		objective_target = level.exit_center()
 	else:
-		var next := _nearest_idle_room()
+		var next := _next_idle_room()
 		if data.is_boss_level:
 			objective = "Enter the throne room"
 		else:
@@ -359,14 +369,39 @@ func _nearest(points: Array[Vector2]) -> Vector2:
 	return best
 
 
-func _nearest_idle_room() -> Room:
-	var from := world.camera.global_position
-	var best: Room
-	var best_d := INF
+## The idle arena the team can walk to soonest (by path, not straight line:
+## rooms behind a wall are often far away on foot).
+func _next_idle_room() -> Room:
+	var idle: Array[Room] = []
 	for room in rooms:
 		if room.state == RoomState.IDLE:
-			var d := room.center.distance_squared_to(from)
-			if d < best_d:
+			idle.append(room)
+	if idle.size() <= 1:
+		return idle[0] if not idle.is_empty() else null
+	var grid := world.grid
+	var dist := grid.walk_distances(grid.cell_of(grid.nearest_open(_team_position())))
+	var best: Room
+	var best_d := 0x7fffffff
+	for room in idle:
+		for c in room.cells:
+			var d := dist[c.y * grid.width + c.x]
+			if d >= 0 and d < best_d:
 				best_d = d
 				best = room
+	if best == null:  # nothing reachable (shouldn't happen): fall back to straight line
+		var from := _team_position()
+		for room in idle:
+			if best == null or room.center.distance_squared_to(from) < best.center.distance_squared_to(from):
+				best = room
 	return best
+
+
+## Middle of the living heroes (the camera's centre when nobody is up).
+func _team_position() -> Vector2:
+	var sum := Vector2.ZERO
+	var n := 0
+	for hero in world.heroes:
+		if not hero.is_downed():
+			sum += hero.position
+			n += 1
+	return sum / n if n > 0 else world.camera.global_position

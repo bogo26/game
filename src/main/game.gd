@@ -50,10 +50,13 @@ func _load_level() -> void:
 	if world:
 		remove_child(world)
 		world.queue_free()
+	# Never carry a pause into the new level (only an unplugged pad keeps it).
+	get_tree().paused = InputRouter.has_disconnected_player()
 	var data := run.levels[GameState.level_index]
 	world = (load(WORLD_SCENE) as PackedScene).instantiate()
 	world.level_data = data
 	world.run_mode = true
+	world.level_up_delay = BANNER_TIME  # pick rounds wait for the level banner
 	add_child(world)
 	move_child(world, 0)
 	world.level_completed.connect(_on_level_completed)
@@ -81,6 +84,8 @@ func _bank_level_stats() -> void:
 func _on_level_completed() -> void:
 	if _ending:
 		return
+	# Rounds earned from here on open after the next level's banner.
+	world.level_ups_enabled = false
 	_bank_level_stats()
 	GameState.levels_cleared += 1
 	_show_banner("LEVEL CLEAR!", "")
@@ -98,6 +103,7 @@ func _on_team_wiped() -> void:
 	if _ending:
 		return
 	_ending = true
+	_stop_interruptions()
 	_bank_level_stats()
 	_show_banner("DEFEAT", "Your party has fallen")
 	Audio.stop_music()
@@ -111,6 +117,7 @@ func _on_boss_defeated() -> void:
 	if _ending:
 		return
 	_ending = true
+	_stop_interruptions()
 	_bank_level_stats()
 	GameState.levels_cleared += 1
 	_show_banner("VICTORY!", "The Demon Lord is slain")
@@ -119,6 +126,12 @@ func _on_boss_defeated() -> void:
 	_banner_time = END_DELAY
 	await get_tree().create_timer(END_DELAY).timeout
 	_end(true)
+
+
+## The run is over: no pick screens or pause menu under the final banner.
+func _stop_interruptions() -> void:
+	world.level_ups_enabled = false
+	world.pause_enabled = false
 
 
 func _end(victory: bool) -> void:

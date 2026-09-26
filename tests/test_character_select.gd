@@ -114,3 +114,38 @@ func test_join_button_does_not_dash_in_the_test_room() -> void:
 	assert_true(InputRouter.get_player(0).just_pressed(PlayerInput.Action.MOVEMENT), "a new press dashes")
 	_key(KEY_SPACE, false)
 	InputRouter.unassign_all()
+
+
+func test_last_player_leaving_stays_in_the_lobby() -> void:
+	var select := _open()
+	select.set("menu_scene", "")  # don't actually load the menu
+	_tap(select, KEY_ENTER)  # join
+	_tap(select, KEY_ESCAPE)  # leave
+	assert_false(InputRouter.get_player(0).is_assigned(), "Esc left the lobby")
+	assert_false(select.get("went_back"), "the same press didn't also exit to the menu")
+	_tap(select, KEY_ESCAPE)
+	assert_true(select.get("went_back"), "a second Esc with nobody joined goes back to the menu")
+	_close(select)
+
+
+func test_backspace_also_goes_back_with_nobody_joined() -> void:
+	var select := _open()
+	select.set("menu_scene", "")
+	_tap(select, KEY_BACKSPACE)
+	assert_true(select.get("went_back"))
+	_close(select)
+
+
+func test_alt_enter_is_not_a_confirm_press() -> void:
+	var select := _open()
+	_key(KEY_ALT, true)
+	_key(KEY_ENTER, true)  # the fullscreen shortcut
+	_frame(select, 2)
+	_key(KEY_ALT, false)   # Alt let go first: Enter is still held
+	_frame(select, 2)
+	assert_false(InputRouter.get_player(0).is_assigned(), "Alt+Enter doesn't join")
+	_key(KEY_ENTER, false)
+	_frame(select)
+	_tap(select, KEY_ENTER)
+	assert_true(InputRouter.get_player(0).is_assigned(), "a plain Enter still joins")
+	_close(select)

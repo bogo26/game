@@ -34,6 +34,9 @@ var _views: Array[SlotView] = []
 ## Scene started when the players begin the run (tests clear it).
 var game_scene := GAME_SCENE
 var started := false
+## Scene "back" goes to with nobody joined (tests clear it), and whether it happened.
+var menu_scene := MAIN_MENU
+var went_back := false
 var _title: Label
 var _footer: Label
 var _back_prev: Dictionary = {}
@@ -115,6 +118,8 @@ func _handle_player(slot: int, p: PlayerInput) -> void:
 		p.rumble(0.3, 0.4, 0.12)
 		changed = true
 	elif p.just_pressed(PlayerInput.Action.UI_BACK):
+		# The same press must not also count as "back to the menu" below.
+		_back_prev[p.device] = true
 		InputRouter.unassign(slot)
 		changed = true
 	if changed:
@@ -127,12 +132,15 @@ func _handle_unassigned_back() -> void:
 	var devices: Array[int] = [PlayerInput.DEVICE_KEYBOARD]
 	devices.append_array(Input.get_connected_joypads())
 	for d in devices:
-		var down := Input.is_physical_key_pressed(KEY_ESCAPE) if d == PlayerInput.DEVICE_KEYBOARD \
+		var down := (Input.is_physical_key_pressed(KEY_ESCAPE) or Input.is_physical_key_pressed(KEY_BACKSPACE)) \
+			if d == PlayerInput.DEVICE_KEYBOARD \
 			else (Input.is_joy_button_pressed(d, JOY_BUTTON_B) or Input.is_joy_button_pressed(d, JOY_BUTTON_BACK))
 		var was: bool = _back_prev.get(d, false)
 		_back_prev[d] = down
 		if down and not was and InputRouter.slot_of_device(d) == -1 and InputRouter.assigned_slots().is_empty():
-			get_tree().change_scene_to_file(MAIN_MENU)
+			went_back = true
+			if menu_scene != "":
+				get_tree().change_scene_to_file(menu_scene)
 
 
 func _all_ready() -> bool:
@@ -154,7 +162,7 @@ static func _start_pressed(p: PlayerInput) -> bool:
 func _update_footer() -> void:
 	var joined := InputRouter.assigned_slots()
 	if joined.is_empty():
-		_footer.text = "Press ENTER / (A) to join  -  up to 4 players"
+		_footer.text = "Press ENTER / (A) to join  -  up to 4 players  -  ESC / (B): back to menu"
 	elif _all_ready():
 		_footer.text = "Everyone ready!  Press ENTER / (A) / START to begin"
 	elif joined.size() < 4:
@@ -233,13 +241,19 @@ func _layout() -> void:
 		v.panel.position = Vector2(MARGIN + (i % 2) * (w + MARGIN), top + (i / 2) * (h + MARGIN))
 		v.panel.size = Vector2(w, h)
 		var text_w := w - 72.0
-		var y := 46.0
 		for line in v.abilities:
-			line.position = Vector2(64, y)
 			line.custom_minimum_size = Vector2(text_w, 0)
 			line.size = Vector2(text_w, 0)
-			y += 20.0
+		_stack_abilities(v)
 		v.hint.position = Vector2(8, h - 12)
+
+
+## Ability lines one under the other, by how many lines each wraps to.
+func _stack_abilities(v: SlotView) -> void:
+	var y := 46.0
+	for line in v.abilities:
+		line.position = Vector2(64, y)
+		y += maxi(1, line.get_line_count()) * line.get_line_height() + 3.0
 
 
 func _refresh(slot: int) -> void:
@@ -283,6 +297,7 @@ func _refresh(slot: int) -> void:
 	for i in 4:
 		var a := abilities[i]
 		v.abilities[i].text = "%s %s: %s" % [SLOT_TAGS[i], a.display_name, a.description]
+	_stack_abilities(v)
 	if _is_ready[slot]:
 		v.hint.text = "READY!  %s to change" % ("ESC" if p.device == PlayerInput.DEVICE_KEYBOARD else "(B)")
 	elif p.uses_mouse or p.device == PlayerInput.DEVICE_KEYBOARD:

@@ -12,3 +12,6 @@ shots/
 .DS_Store
 Thumbs.db
 *.tmp
+
+# Python bytecode from the tools/ generators
+__pycache__/

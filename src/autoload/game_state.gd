@@ -3,6 +3,9 @@ extends Node
 ## team XP/level, and where the team is in the level sequence.
 
 const MAX_PLAYERS := 4
+## Pick rounds that don't come from a team level-up.
+const TREASURE_ROUND := 0
+const BONUS_ROUND := -1
 const PLAYER_COLORS: Array[Color] = [
 	Color("e8504a"),  # P1 red
 	Color("4c93f2"),  # P2 blue
@@ -27,10 +30,25 @@ var team_level := 1
 var xp := 0
 var level_index := 0
 var run_active := false
-## Level-ups earned but not yet resolved by the pick screen.
-var pending_level_ups := 0
-## How many of those pending picks are treasure (chest) rounds.
-var pending_treasures := 0
+## Pick rounds earned but not yet resolved by the pick screen, oldest first:
+## the team level each was earned at, or TREASURE_ROUND / BONUS_ROUND.
+var pending_rounds: Array[int] = []
+## How many pick rounds are waiting. Setting it (tests, debug) adds bonus
+## rounds or drops the newest ones.
+var pending_level_ups: int:
+	get:
+		return pending_rounds.size()
+	set(value):
+		while pending_rounds.size() < value:
+			pending_rounds.append(BONUS_ROUND)
+		if pending_rounds.size() > value:
+			pending_rounds.resize(maxi(value, 0))
+## How many of the waiting rounds are treasure (chest) rounds.
+var pending_treasures: int:
+	get:
+		return pending_rounds.count(TREASURE_ROUND)
+## --debug-levelups is granted once per run, not on every level.
+var debug_picks_given := false
 ## Run statistics (shown on the end screen).
 var run_kills := 0
 var run_time := 0.0
@@ -70,16 +88,26 @@ func xp_to_next() -> int:
 
 ## A treasure chest: one extra upgrade pick for everyone, shown first.
 func add_treasure_pick() -> void:
-	pending_level_ups += 1
-	pending_treasures += 1
+	pending_rounds.push_front(TREASURE_ROUND)
+
+
+## The next pick round (see pending_rounds); -2 when none is waiting.
+func next_round() -> int:
+	return pending_rounds[0] if not pending_rounds.is_empty() else -2
+
+
+## The next pick round was resolved.
+func pop_round() -> void:
+	if not pending_rounds.is_empty():
+		pending_rounds.remove_at(0)
 
 
 func reset_run() -> void:
 	team_level = 1
 	xp = 0
 	level_index = 0
-	pending_level_ups = 0
-	pending_treasures = 0
+	pending_rounds.clear()
+	debug_picks_given = false
 	run_kills = 0
 	run_time = 0.0
 	levels_cleared = 0
@@ -96,7 +124,7 @@ func add_xp(amount: int) -> void:
 	while xp >= needed:
 		xp -= needed
 		team_level += 1
-		pending_level_ups += 1
+		pending_rounds.append(team_level)
 		Events.team_level_up.emit(team_level)
 		needed = xp_to_next()
 	Events.xp_changed.emit(xp, needed, team_level)
