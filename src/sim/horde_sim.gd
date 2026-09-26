@@ -654,7 +654,7 @@ func query_circle(center: Vector2, radius: float, out: PackedInt32Array) -> int:
 	_scratch.clear()
 	hash.gather(center, radius + max_radius, _scratch)
 	for j in _scratch:
-		if j < count and hp[j] > 0.0:
+		if j < count and hp[j] > 0.0 and fall[j] <= 0.0:
 			var rr := radius + t_radius[type[j]]
 			if center.distance_squared_to(pos[j]) <= rr * rr:
 				out.append(j)

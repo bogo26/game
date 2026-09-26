@@ -295,3 +295,24 @@ func test_arena_rooms_own_everything_inside_their_walls() -> void:
 	assert_eq(level.spike_cells.size(), 1)
 	assert_eq(level.spike_cells[0], Vector2i(10, 2))
 	level.free()
+
+
+func test_shots_and_swings_pass_over_falling_enemies() -> void:
+	var level := _level(CHASM_ROOM)
+	var h := _horde(level)
+	h.spawn(0, Vector2(10 * T - 6.0, 3.5 * T))
+	h.update(0.0, PackedVector2Array())
+	h.push(0, Vector2(180, 0), 0)
+	for frame in 10:
+		h.update(DT, PackedVector2Array())
+		if h.is_falling(0):
+			break
+	var out := PackedInt32Array()
+	assert_eq(h.query_circle(h.pos[0], 20.0, out), 0, "area attacks skip it")
+	var shots := ProjectileSim.new()
+	shots.spawn(h.pos[0] + Vector2(-30, -6), Vector2(300, 0), 4.0, 3.0, 1.0, ProjectileSim.Team.PLAYER, 0,
+		ProjectileSim.Look.ARROW)
+	for frame in 10:
+		shots.update(DT, h, level.grid, PackedVector2Array(), PackedByteArray(), 5.0)
+	assert_eq(shots.count, 1, "the arrow flew on instead of hitting it")
+	level.free()

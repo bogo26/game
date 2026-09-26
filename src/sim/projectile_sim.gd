@@ -122,6 +122,7 @@ func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_bodies: PackedVect
 	var inv_tile := LevelGrid.INV_TILE
 	var hpos := horde.pos
 	var hhp := horde.hp
+	var hfall := horde.fall
 	var htype := horde.type
 	var huid := horde.uid
 	var hurt_half := horde.t_hurt_half_width
@@ -177,7 +178,7 @@ func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_bodies: PackedVect
 							break
 						var j := head[qy * hcols + qx]
 						while j != -1:
-							if hhp[j] > 0.0 and huid[j] != last_hit[i]:
+							if hhp[j] > 0.0 and huid[j] != last_hit[i] and hfall[j] <= 0.0:
 								# Closest point of the body box to the shot.
 								var f := hpos[j]
 								var t := htype[j]
