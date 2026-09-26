@@ -286,9 +286,9 @@ func _refresh(pk: Picker) -> void:
 	if pk.picked:
 		pk.status.text = "" if pk.chosen == null else ("PICKED!" if _round_end_left >= 0.0 else "PICKED! waiting...")
 	elif pk.hero.input.uses_mouse:
-		pk.status.text = "A/D choose, ENTER or click"
+		pk.status.text = "A/D choose, %s or click" % pk.hero.input.glyph(PlayerInput.Action.UI_ACCEPT)
 	else:
-		pk.status.text = "< > choose, (A) pick"
+		pk.status.text = "< > choose, %s pick" % pk.hero.input.glyph(PlayerInput.Action.UI_ACCEPT)
 
 
 func _on_card_input(event: InputEvent, pk: Picker, index: int) -> void:

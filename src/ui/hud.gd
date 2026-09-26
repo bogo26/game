@@ -21,6 +21,13 @@ const CAPTIONS: Array[String] = ["SPC", "MOV", "ULT"]
 const HURT_FLASH := 0.3
 const CALLOUT_TIME := 1.6
 const HEART_COLOR := Color(0.95, 0.3, 0.35)
+## The controls card (a player's four buttons) shows this long at the start of
+## a run, or until they've used their attack, special and movement ability.
+const CONTROLS_CARD_TIME := 20.0
+const CARD_SIZE := Vector2(112, 42)
+const CARD_ACTIONS: Array[PlayerInput.Action] = [PlayerInput.Action.ATTACK, PlayerInput.Action.SPECIAL,
+	PlayerInput.Action.MOVEMENT, PlayerInput.Action.ULTIMATE]
+const TIP_TIME := 6.0
 
 var world: World
 var minimap: Minimap
@@ -42,6 +49,9 @@ var _hurt_flash := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _callout_label: Label
 var _callout_left := 0.0
 var _held_label: Label
+var _card_time := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var _tip_label: Label
+var _tip_left := 0.0
 var _portraits: Dictionary = {}  # hero_id -> Texture2D
 
 
@@ -69,12 +79,14 @@ func _ready() -> void:
 	_boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint_label = _label(Color(0.75, 0.75, 0.82))
 	_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hint_label.text = "Hold TAB / BACK for the map"
 	_blessing_label = _label(Color.WHITE)
 	_blessing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_callout_label = _label(Color("ffe07a"), 16)
 	_callout_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_held_label = _label(Color("ffe07a"))
+	_tip_label = _label(Color(0.7, 0.95, 1.0))
+	_tip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	Events.hero_spawned.connect(_on_hero_spawned)
 	for i in InputRouter.MAX_PLAYERS:
 		_slot_labels.append(_label(GameState.player_color(i)))
 	minimap = Minimap.new()
@@ -103,6 +115,8 @@ func _process(delta: float) -> void:
 	_hint_left = maxf(0.0, _hint_left - delta)
 	if minimap.is_requested():
 		_hint_left = 0.0  # they found it
+	if _hint_left > 0.0:
+		_hint_label.text = "Hold %s for the map" % _glyphs_for(PlayerInput.Action.MAP)
 	_hint_label.position = Vector2(0, 21)
 	_hint_label.size = Vector2(view.x, 10)
 	_hint_label.modulate.a = clampf(_hint_left, 0.0, 1.0)
@@ -110,9 +124,24 @@ func _process(delta: float) -> void:
 	_update_slot_labels(view)
 	_update_callout(view, delta)
 	_update_held_label(bar_x)
+	_update_tip(view, delta)
+	_update_cards(delta)
 	_update_center_message(view)
 	_update_boss_label(view)
 	_canvas.queue_redraw()
+
+
+## A one-line tip under the objective for a few seconds (see World.tip()).
+func show_tip(text: String) -> void:
+	_tip_label.text = text
+	_tip_left = TIP_TIME
+
+
+## Shows a hero's controls card when they arrive in the first level of a run
+## (or the test room).
+func _on_hero_spawned(slot: int) -> void:
+	if world and Settings.tips and (not world.run_mode or GameState.level_index == 0):
+		_card_time[slot % _card_time.size()] = CONTROLS_CARD_TIME
 
 
 ## A big message in the middle of the screen for a moment.
@@ -126,6 +155,26 @@ func callout(text: String, color: Color = Color("ffe07a")) -> void:
 	_callout_label.text = text
 	_callout_label.label_settings.font_color = color
 	_callout_left = CALLOUT_TIME
+
+
+## The button for `action` on every joined player's device ("[TAB] / (Back)").
+func _glyphs_for(action: PlayerInput.Action) -> String:
+	var parts := PackedStringArray()
+	for slot in InputRouter.assigned_slots():
+		var p := InputRouter.get_player(slot)
+		if p.is_bot():
+			continue
+		var g := p.glyph(action)
+		if not parts.has(g):
+			parts.append(g)
+	if parts.is_empty():
+		parts = PackedStringArray(["[TAB]" if action == PlayerInput.Action.MAP else "?",
+			PlayerInput.device_glyph(0, action)])
+	return " / ".join(parts)
+
+
+static func _join_glyphs() -> String:
+	return "[ENTER] / %s" % PlayerInput.device_glyph(0, PlayerInput.Action.UI_ACCEPT)
 
 
 func _on_hero_damaged(slot: int, _amount: float) -> void:
@@ -158,10 +207,31 @@ func _update_slot_labels(view: Vector2) -> void:
 			label.text = "P%d %s" % [i + 1, hero.data.display_name.to_upper()]
 			label.position = origin + Vector2(20, 0)
 		elif world and world.allow_drop_in and not InputRouter.get_player(i).is_assigned():
-			label.text = "P%d  ENTER / (A) to join" % (i + 1)
+			label.text = "P%d  %s to join" % [i + 1, _join_glyphs()]
 			label.position = origin + Vector2(0, PANEL_SIZE.y - 10 if i >= 2 else 0)
 		else:
 			label.text = ""
+
+
+func _update_tip(view: Vector2, delta: float) -> void:
+	_tip_left = maxf(0.0, _tip_left - delta)
+	_tip_label.visible = _tip_left > 0.0
+	_tip_label.position = Vector2(0, 41)
+	_tip_label.size = Vector2(view.x, 10)
+	_tip_label.modulate.a = clampf(_tip_left / 0.5, 0.0, 1.0)
+
+
+func _update_cards(delta: float) -> void:
+	if world == null:
+		return
+	for hero in world.heroes:
+		var k := hero.slot % _card_time.size()
+		if _card_time[k] <= 0.0:
+			continue
+		var used := hero.used_abilities
+		if used[0] != 0 and used[1] != 0 and used[2] != 0:
+			_card_time[k] = minf(_card_time[k], 0.6)  # they've got it: fade out
+		_card_time[k] = maxf(0.0, _card_time[k] - delta)
 
 
 func _update_callout(view: Vector2, delta: float) -> void:
@@ -189,7 +259,8 @@ func _update_center_message(view: Vector2) -> void:
 		if p.is_assigned() and not p.connected:
 			lost.append("P%d" % (i + 1))
 	_center_label.text = "" if lost.is_empty() else \
-		"%s controller disconnected\nreconnect it, or press A on another controller" % ", ".join(lost)
+		"%s controller disconnected\nreconnect it, or press %s on another controller" % [
+			", ".join(lost), PlayerInput.device_glyph(0, PlayerInput.Action.UI_ACCEPT)]
 	_center_label.position = Vector2(0, view.y * 0.5 - 20)
 	_center_label.size = Vector2(view.x, 40)
 
@@ -227,6 +298,8 @@ func _draw_hud() -> void:
 		_draw_lives(bar_pos + Vector2(BAR_SIZE.x + (30 if _held_label.visible else 8), -2))
 	for hero in world.heroes:
 		_draw_player_panel(hero, _panel_origin(hero.slot, view))
+		if _card_time[hero.slot % _card_time.size()] > 0.0:
+			_draw_controls_card(hero, _panel_origin(hero.slot, view))
 	_draw_objective_arrow(view)
 	_draw_boss_bar(view)
 
@@ -285,6 +358,23 @@ func _draw_player_panel(hero: Hero, origin: Vector2) -> void:
 	for k in 3:
 		_canvas.draw_string(font, Vector2(x + (third + 2) * k, origin.y + 27), CAPTIONS[k],
 			HORIZONTAL_ALIGNMENT_CENTER, third, 8, Color(0.5, 0.5, 0.56))
+
+
+## The player's four buttons and what they do, next to their panel.
+func _draw_controls_card(hero: Hero, panel_origin: Vector2) -> void:
+	var bottom := hero.slot >= 2
+	var origin := panel_origin + Vector2(0, -CARD_SIZE.y - 2 if bottom else PANEL_SIZE.y + 2)
+	var alpha := clampf(_card_time[hero.slot % _card_time.size()] / 0.6, 0.0, 1.0)
+	_canvas.draw_rect(Rect2(origin, CARD_SIZE), Color(0.03, 0.03, 0.06, 0.75 * alpha))
+	_canvas.draw_rect(Rect2(origin, CARD_SIZE), Color(hero.color, 0.6 * alpha), false, 1.0)
+	var font := _canvas.get_theme_default_font()
+	var abilities := hero.abilities
+	for k in 4:
+		var used := hero.used_abilities[k] != 0
+		var text := "%s  %s" % [hero.input.glyph(CARD_ACTIONS[k]), abilities[k].display_name]
+		var color := Color(0.55, 0.55, 0.6, alpha) if used else Color(1, 1, 1, alpha)
+		_canvas.draw_string(font, origin + Vector2(4, 10 + k * 9), text, HORIZONTAL_ALIGNMENT_LEFT,
+			CARD_SIZE.x - 8, 8, color)
 
 
 ## Team lives as little hearts (an empty one when there are none left).

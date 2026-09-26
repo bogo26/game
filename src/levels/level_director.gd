@@ -399,6 +399,15 @@ func _check_exit(dt: float) -> void:
 			level_completed.emit()
 	else:
 		_exit_timer = 0.0
+	# Someone's in the portal: tell the others they're being waited for.
+	if inside > 0 and inside < living:
+		var missing := PackedStringArray()
+		for hero in world.heroes:
+			if not hero.is_downed() and hero.position.distance_to(center) > EXIT_RADIUS:
+				missing.append("P%d" % (hero.slot + 1))
+		objective = "Waiting for %s at the exit" % ", ".join(missing)
+	elif objective.begins_with("Waiting for"):
+		_update_objective()
 
 
 func _update_objective() -> void:

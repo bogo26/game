@@ -30,7 +30,7 @@ var _opened_at := 0
 
 
 func _ready() -> void:
-	layer = 45
+	layer = 75  # above the pause menu (70) and the Game's banners (60)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = false
 	var dim := ColorRect.new()

@@ -1003,10 +1003,30 @@ const FONT_GLYPHS: PackedByteArray = [
 ]
 const FONT_CELL := Vector2i(6, 9)
 const FONT_COLUMNS := 16
+## Button icons in the private-use range from U+E000 (see PlayerInput.glyph()),
+## 8 px tall so they sit inline with text: Xbox, PlayStation, Nintendo, mouse.
+const ICON_FIRST := 0xE000
+const FONT_ICONS := [
+	["disc", "A"], ["disc", "B"], ["disc", "X"], ["disc", "Y"], ["pill", "LB"], ["pill", "RB"],
+	["pill", "LT"], ["pill", "RT"], ["menu", ""], ["view", ""],
+	["ps_cross", ""], ["ps_circle", ""], ["ps_square", ""], ["ps_triangle", ""], ["pill", "L1"], ["pill", "R1"],
+	["pill", "L2"], ["pill", "R2"], ["menu", ""], ["view", ""],
+	["disc", "A"], ["disc", "B"], ["disc", "X"], ["disc", "Y"], ["pill", "L"], ["pill", "R"],
+	["pill", "ZL"], ["pill", "ZR"], ["disc", "+"], ["disc", "-"],
+	["mouse", "L"], ["mouse", "R"],
+]
+## 3x5 letters knocked out of the icons; each row's bits: 4 left, 2 middle, 1 right.
+const MINI_LETTERS := {
+	"A": [2, 5, 7, 5, 5], "B": [6, 5, 6, 5, 6], "X": [5, 5, 2, 5, 5], "Y": [5, 5, 2, 2, 2],
+	"L": [4, 4, 4, 4, 7], "R": [6, 5, 6, 5, 5], "T": [7, 2, 2, 2, 2], "Z": [7, 1, 2, 4, 7],
+	"1": [2, 6, 2, 2, 7], "2": [6, 1, 2, 4, 7], "+": [0, 2, 7, 2, 0], "-": [0, 0, 7, 0, 0],
+}
+const PS_TRIANGLE: Array[String] = ["...#...", "..#.#..", "..#.#..", ".#...#.", ".#...#.", "#.....#", "#######"]
+const MOUSE: Array[String] = [".###.", "#?#?#", "#?#?#", "#####", "#...#", "#...#", ".###."]
 
 
 func _gen_font() -> void:
-	var img := _img(128, 64)
+	var img := _img(128, 96)
 	var chars := PackedStringArray()
 	for index in 95:
 		var code := 32 + index
@@ -1027,16 +1047,102 @@ func _gen_font() -> void:
 		var advance := 3 if first == -1 else width + 1
 		chars.append("char id=%d x=%d y=%d width=%d height=8 xoffset=0 yoffset=0 xadvance=%d page=0 chnl=15" % [
 			code, cx + maxi(first, 0), cy, width, advance])
+	# Button icons, packed in rows under the letters.
+	var x := 0
+	var y := 6 * FONT_CELL.y + 2  # under the 6 rows of letters
+	for k in FONT_ICONS.size():
+		var icon := _font_icon(FONT_ICONS[k][0], FONT_ICONS[k][1])
+		if x + icon.get_width() > img.get_width():
+			x = 0
+			y += 10
+		img.blit_rect(icon, Rect2i(Vector2i.ZERO, icon.get_size()), Vector2i(x, y))
+		chars.append("char id=%d x=%d y=%d width=%d height=8 xoffset=0 yoffset=0 xadvance=%d page=0 chnl=15" % [
+			ICON_FIRST + k, x, y, icon.get_width(), icon.get_width() + 1])
+		x += icon.get_width() + 1
 	_save(img, "res://assets/fonts/pixel5x8.png")
 	var fnt := PackedStringArray([
 		'info face="Pixel5x8" size=8 bold=0 italic=0 charset="" unicode=1 stretchH=100 smooth=0 aa=1 padding=0,0,0,0 spacing=1,1',
-		"common lineHeight=10 base=7 scaleW=128 scaleH=64 pages=1 packed=0",
+		"common lineHeight=10 base=7 scaleW=128 scaleH=96 pages=1 packed=0",
 		'page id=0 file="pixel5x8.png"',
-		"chars count=95",
+		"chars count=%d" % chars.size(),
 	])
 	fnt.append_array(chars)
 	var file := FileAccess.open("res://assets/fonts/pixel5x8.fnt", FileAccess.WRITE)
 	file.store_string("\n".join(fnt) + "\n")
+
+
+## One button icon, white on transparent, 8 px tall.
+func _font_icon(kind: String, text: String) -> Image:
+	var width := 7
+	if kind == "pill":
+		width = 3 + 4 * text.length()
+	elif kind == "mouse":
+		width = 5
+	var icon := Image.create_empty(width, 8, false, Image.FORMAT_RGBA8)
+	var on := Color.WHITE
+	match kind:
+		"disc", "menu", "view":
+			for py in 7:
+				for px in 7:
+					if (px - 3) * (px - 3) + (py - 3) * (py - 3) <= 10:
+						icon.set_pixel(px, py, on)
+			match kind:
+				"disc":
+					_knock_letter(icon, text, 2, 1)
+				"menu":  # three lines (Start / Options)
+					for row: int in [1, 3, 5]:
+						for px in range(2, 5):
+							icon.set_pixel(px, row, Color.TRANSPARENT)
+				"view":  # a little window (Back / Create)
+					for py in range(2, 5):
+						for px in range(2, 5):
+							if px != 3 or py != 3:
+								icon.set_pixel(px, py, Color.TRANSPARENT)
+		"pill":
+			for py in 7:
+				for px in width:
+					var corner := (px == 0 or px == width - 1) and (py == 0 or py == 6)
+					if not corner:
+						icon.set_pixel(px, py, on)
+			for k in text.length():
+				_knock_letter(icon, text[k], 2 + k * 4, 1)
+		"ps_cross":
+			for k in 7:
+				icon.set_pixel(k, k, on)
+				icon.set_pixel(6 - k, k, on)
+		"ps_circle":
+			for py in 7:
+				for px in 7:
+					var d := (px - 3) * (px - 3) + (py - 3) * (py - 3)
+					if d <= 10 and d >= 5:
+						icon.set_pixel(px, py, on)
+		"ps_square":
+			for k in 7:
+				icon.set_pixel(k, 0, on)
+				icon.set_pixel(k, 6, on)
+				icon.set_pixel(0, k, on)
+				icon.set_pixel(6, k, on)
+		"ps_triangle":
+			for py in PS_TRIANGLE.size():
+				for px in PS_TRIANGLE[py].length():
+					if PS_TRIANGLE[py][px] == "#":
+						icon.set_pixel(px, py, on)
+		"mouse":
+			for py in MOUSE.size():
+				for px in MOUSE[py].length():
+					var c := MOUSE[py][px]
+					var pressed := c == "?" and ((px < 2 and text == "L") or (px > 2 and text == "R"))
+					if c == "#" or pressed:
+						icon.set_pixel(px, py, on)
+	return icon
+
+
+func _knock_letter(icon: Image, letter: String, x0: int, y0: int) -> void:
+	var rows: Array = MINI_LETTERS.get(letter, [])
+	for r in rows.size():
+		for c in 3:
+			if int(rows[r]) & (4 >> c):
+				icon.set_pixel(x0 + c, y0 + r, Color.TRANSPARENT)
 
 
 # --- boss (64x64 frames: walk0, walk1, windup, charge; feet at y=58) -------------------

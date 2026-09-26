@@ -67,6 +67,8 @@ var revive_progress := 0.0
 var tag_time := TAG_TIME
 ## Seconds left of the gold shimmer that shows a fresh revive's invulnerability.
 var revive_shield := 0.0
+## Per ability slot: 1 once it has been used (the controls card fades).
+var used_abilities := PackedByteArray([0, 0, 0, 0])
 ## Per ability slot: seconds left flashing "not ready" / "ready again" (HUD).
 var denied_time := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var ready_flash := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
@@ -262,20 +264,26 @@ func tick(delta: float) -> void:
 		var wants_attack := input.is_down(PlayerInput.Action.ATTACK) if a.hold_to_repeat \
 			else input.just_pressed(PlayerInput.Action.ATTACK)
 		if wants_attack and a.try_activate(aim_dir):
+			used_abilities[Ability.Slot.ATTACK] = 1
 			attack_performed.emit(aim_dir)
 	if input.just_pressed(PlayerInput.Action.SPECIAL):
 		if blocked or not special().try_activate(aim_dir):
 			_deny(Ability.Slot.SPECIAL)
+		else:
+			used_abilities[Ability.Slot.SPECIAL] = 1
 	if input.just_pressed(PlayerInput.Action.ULTIMATE):
 		if blocked or ult_charge < 1.0 or not ultimate().try_activate(aim_dir):
 			_deny(Ability.Slot.ULTIMATE)
 		else:
+			used_abilities[Ability.Slot.ULTIMATE] = 1
 			ult_charge = 0.0
 			_ult_announced = false
 			input.rumble(0.6, 0.9, 0.3)
 	if input.just_pressed(PlayerInput.Action.MOVEMENT) and not is_dashing():
 		if not movement().try_activate(aim_dir):
 			_deny(Ability.Slot.MOVEMENT)
+		else:
+			used_abilities[Ability.Slot.MOVEMENT] = 1
 
 	ult_charge = minf(1.0, ult_charge + ULT_PASSIVE_PER_SECOND * ult_charge_mult * delta)
 	if regen > 0.0:

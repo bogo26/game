@@ -27,6 +27,8 @@ Players pick heroes, fight through hand-built levels packed with hordes of up to
 | Pause | Start | Esc |
 | Join (character select) | A / Start | Enter / Space |
 
+**Button prompts** use each player's own device: the Pixel5x8 font has button icons in the private-use range from U+E000 (Xbox, PlayStation and Nintendo face buttons, bumpers, triggers, Start/Back, and mouse buttons), and `PlayerInput.glyph(action)` picks the set from the pad's name (PS / DualSense / DualShock → PlayStation; Nintendo / Switch / Pro Controller → Nintendo; anything else → Xbox). Keyboard players see key names like [Q]. Every prompt (character select, pick screen, HUD, tips, controls card, pause pages) uses it.
+
 Aim behaviour on gamepad:
 - Aim follows the right stick while it is held.
 - When the stick is released, aim stays where it was.
@@ -166,7 +168,7 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
   - HP is 1800 × level multiplier × player-count scaling. It is immune to stun and slow.
 - **Screens:** Main menu → Character select → Game (levels) → End screen (victory/defeat + stats) → Play again / Main menu.
   - **Main menu:** Start Run, Test Room (drop-in sandbox), Options, Quit. The main, pause and end menus use Godot focus navigation, so keyboard, any gamepad or mouse all work, with move/confirm sounds (`UiSounds`).
-  - **Character select:** 4 quadrants.
+  - **Character select:** 4 quadrants. Each shows the hero running on the spot, toughness / damage / speed as pips, a difficulty tag (Easy / Medium / Hard) and the four abilities with that player's own buttons.
     - Press A/Enter to join (holding that button doesn't also ready you up).
     - Left/right to browse the 8-hero roster.
     - A/Enter to ready, B/Esc to un-ready or leave.
@@ -174,7 +176,12 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
     - With nobody joined, B/Esc/Backspace returns to the main menu. The press that makes the last player leave doesn't count.
   - **Enter with Alt held** is the fullscreen shortcut and never counts as a confirm press, even if Alt is let go first.
   - **`Game`:** builds a `World` per level, shows "LEVEL n" and "LEVEL CLEAR!" banners, and banks stats. A team wipe means defeat; the boss's death means victory.
-  - **Pause:** Start or Esc opens it for any player: Resume, Options, and Quit to menu, which needs a second press within 3 s.
+  - **Pause:** Start or Esc opens it for any player: Resume, Controls (every player's buttons, abilities and hero blurb), Builds (every player's upgrades: elements at their highest tier, the rest with stack counts), Options, and Quit to menu, which needs a second press within 3 s. Pause screens draw above the level banners.
+  - **Learning by playing:**
+    - A **controls card** next to each player's HUD panel lists their four buttons at the start of a run (and in the test room); each line greys out once used, and the card fades once attack, special and movement have been used, or after 20 s.
+    - **Tips**, each shown once ever (remembered in `Settings.seen_tips`, off with the Tips option): a teammate is down and how to revive them, an arena's doors seal, the ultimate is ready (with the button), picks are waiting for the arena, the exit is open, and what chests and shrines do.
+    - Chests and shrines explain themselves when a hero comes within 48 px ("Bonus upgrade for everyone", a blessing's effect).
+    - At the exit, the objective says who's being waited for ("Waiting for P2 at the exit").
   - **Options** (`OptionsMenu`, from the main menu and the pause menu): volume, music, sounds, fullscreen, screen shake (off / low / full), damage numbers (all / crits only / off), reduce flashing (softer hit flashes, no invulnerability blinking, dimmer screen-wide bursts), controller rumble, player colours (default or a colour-blind friendly set: orange, sky blue, white, reddish purple), gamepad aim assist (off / ±10° / ±20°, locks onto the enemy nearest the aim within 160 px) and tips. Up/down picks a row, left/right or a click changes it (right-click goes back); volumes stop at 0% and 100%. Everything applies and saves at once.
   - **`Settings` autoload** owns `user://settings.cfg` (volumes, fullscreen, comfort options, which tips were seen). The test runner points it at a temporary file with defaults, so tests never see a player's settings. The press that closes it can't also trigger a dash. It can't be opened under the victory/defeat banner.
   - **End screen:** its buttons ignore input for 0.6 s, so a player still mashing from the fight doesn't skip the results.

@@ -64,6 +64,8 @@ const SECOND_WIND_HP := 0.5
 const SECOND_WIND_RADIUS := 100.0
 const SECOND_WIND_PUSH := 260.0
 const SECOND_WIND_STUN := 1.0
+## Chests and shrines show what they do (and give a tip) this close.
+const NOTICE_RANGE := 48.0
 ## Test rooms: seconds after a team wipe before everyone gets back up.
 const TEST_ROOM_WIPE_RESET := 3.0
 ## Barrels, urns and nests stand this far below their tile's centre.
@@ -216,6 +218,7 @@ func _ready() -> void:
 	Events.team_level_up.connect(_on_team_level_up)
 	Events.hero_damaged.connect(_on_hero_damaged)
 	Events.hero_downed.connect(func(_s: int) -> void: Audio.play(&"down"))
+	Events.hero_downed.connect(_on_hero_downed_tip)
 	Events.hero_revived.connect(func(_s: int) -> void: Audio.play(&"revive"))
 	Events.hero_low_hp.connect(_on_hero_low_hp)
 	Settings.changed.connect(_on_settings_changed)
@@ -624,15 +627,27 @@ func _spawn_props() -> void:
 			director.add_nest(horde.uid[i], prop.cell, prop.room)
 
 
-## A living hero walking up to a chest or shrine uses it.
+## A living hero walking up to a chest or shrine uses it; coming close
+## shows what it does.
 func _check_interactables() -> void:
 	for it in interactables:
 		if it.used:
 			continue
+		var near := false
 		for hero in heroes:
-			if not hero.is_downed() and hero.position.distance_to(it.position) <= Interactable.TOUCH_RANGE:
+			if hero.is_downed():
+				continue
+			var d := hero.position.distance_to(it.position)
+			near = near or d <= NOTICE_RANGE
+			if d <= Interactable.TOUCH_RANGE:
 				_use_interactable(it, hero)
 				break
+		it.near = near and not it.used
+		if near:
+			if it.kind == Interactable.Kind.CHEST:
+				tip(&"chest", "A treasure chest: touch it for a bonus upgrade for everyone")
+			else:
+				tip(&"shrine", "A shrine: touch it to bless the whole team")
 
 
 func _use_interactable(it: Interactable, hero: Hero) -> void:
@@ -887,6 +902,7 @@ func _on_hero_low_hp(_slot: int) -> void:
 func _on_ult_ready(slot: int) -> void:
 	var hero := hero_for_slot(slot)
 	if hero:
+		tip(&"ult", "Ultimate ready! Press %s" % hero.input.glyph(PlayerInput.Action.ULTIMATE))
 		Audio.play(&"ult_ready")
 		numbers.add_text(hero.position + Vector2(0, -16), "ULT!", hero.color.lightened(0.25))
 		particles.burst(hero.position + Vector2(0, -6), 14, hero.color.lightened(0.3), 70.0, 0.5, 2, Vector2.UP, PI, -30.0)
@@ -909,6 +925,8 @@ func _on_ability_denied(_slot: int, _ability_slot: int) -> void:
 
 func _on_team_level_up(_level: int) -> void:
 	Audio.play(&"level_up")
+	if picks_held():
+		tip(&"held", "Level up! Your upgrade picks wait until the arena is cleared")
 	for hero in heroes:
 		particles.burst(hero.position + Vector2(0, -6), 24, Color(1, 0.88, 0.45), 90.0, 0.8, 3, Vector2.UP, PI, -40.0, 2.0)
 
@@ -1028,11 +1046,29 @@ func can_open_pick_round() -> bool:
 func _on_arena_cleared(_room_id: int) -> void:
 	pickups.vacuum(hero_positions, _hero_active)
 	level_up_delay = maxf(level_up_delay, PICKS_AFTER_CLEAR)
+	if director.exit_open:
+		tip(&"exit", "The exit is open: everyone into the portal!")
 
 
 func _on_wave_started(wave: int, waves: int) -> void:
 	hud.callout("WAVE %d/%d" % [wave, waves], Color("ffe07a"))
 	Audio.play(&"wave")
+	if wave == 1:
+		tip(&"arena", "The doors are sealed: beat every wave to open them")
+
+
+## A one-time tip (see Settings.seen_tips); nothing if tips are off.
+func tip(id: StringName, text: String) -> void:
+	if not Settings.tips or Settings.seen_tips.has(id):
+		return
+	Settings.seen_tips[id] = true
+	Settings.save_settings()
+	hud.show_tip(text)
+
+
+func _on_hero_downed_tip(slot: int) -> void:
+	if heroes.size() > 1 and _someone_standing():
+		tip(&"revive", "P%d is down! Stand next to them to revive them" % (slot + 1))
 
 
 ## A wipe with a team life left: everyone gets back up.

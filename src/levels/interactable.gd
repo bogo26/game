@@ -23,6 +23,8 @@ var kind := Kind.CHEST
 var cell := Vector2i.ZERO
 var blessing := Blessing.FURY
 var used := false
+## A hero is close: show what it does.
+var near := false
 var _sprite: Sprite2D
 var _time := 0.0
 var _font: Font = preload("res://assets/fonts/pixel5x8.fnt")
@@ -88,6 +90,14 @@ func _draw() -> void:
 	draw_circle(Vector2.ZERO, 9.0, Color(c, 0.12 + 0.1 * pulse), true, -1.0, false)
 	draw_set_transform(Vector2.ZERO)
 	if kind == Kind.SHRINE:
-		var text := BLESSING_NAMES[blessing]
-		var width := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
-		draw_string(_font, Vector2(-roundf(width * 0.5), -22), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, c)
+		_centered(BLESSING_NAMES[blessing], -22.0, c)
+		if near:
+			_centered(BLESSING_HINTS[blessing], -13.0, Color(0.9, 0.9, 0.95))
+	elif near:
+		_centered("Bonus upgrade for everyone", -16.0, c)
+
+
+func _centered(text: String, y: float, c: Color) -> void:
+	var width := _font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+	draw_string(_font, Vector2(-roundf(width * 0.5) + 1, y + 1), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0, 0, 0, 0.8))
+	draw_string(_font, Vector2(-roundf(width * 0.5), y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, c)

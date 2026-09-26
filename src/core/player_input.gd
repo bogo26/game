@@ -115,6 +115,59 @@ func clear() -> void:
 		_repeat_fired[i] = 0
 
 
+## Controller families, for button prompts (glyph()).
+enum PadFamily { XBOX, PLAYSTATION, NINTENDO }
+## Button icons in the Pixel5x8 font (tools/gen_placeholder_art.gd FONT_ICONS),
+## per family, for each action. Keyboard players get key names and mouse icons.
+const PAD_GLYPHS := {
+	PadFamily.XBOX: {
+		Action.ATTACK: "\uE007", Action.SPECIAL: "\uE006", Action.MOVEMENT: "\uE005", Action.ULTIMATE: "\uE004",
+		Action.PAUSE: "\uE008", Action.MAP: "\uE009", Action.UI_ACCEPT: "\uE000", Action.UI_BACK: "\uE001",
+	},
+	PadFamily.PLAYSTATION: {
+		Action.ATTACK: "\uE011", Action.SPECIAL: "\uE010", Action.MOVEMENT: "\uE00F", Action.ULTIMATE: "\uE00E",
+		Action.PAUSE: "\uE012", Action.MAP: "\uE013", Action.UI_ACCEPT: "\uE00A", Action.UI_BACK: "\uE00B",
+	},
+	PadFamily.NINTENDO: {
+		# SDL maps buttons by position: the bottom one (A on Xbox) is B on a Switch pad.
+		Action.ATTACK: "\uE01B", Action.SPECIAL: "\uE01A", Action.MOVEMENT: "\uE019", Action.ULTIMATE: "\uE018",
+		Action.PAUSE: "\uE01C", Action.MAP: "\uE01D", Action.UI_ACCEPT: "\uE015", Action.UI_BACK: "\uE014",
+	},
+}
+const KEY_GLYPHS := {
+	Action.ATTACK: "\uE01E", Action.SPECIAL: "\uE01F", Action.MOVEMENT: "[SPACE]", Action.ULTIMATE: "[Q]",
+	Action.PAUSE: "[ESC]", Action.MAP: "[TAB]", Action.UI_ACCEPT: "[ENTER]", Action.UI_BACK: "[ESC]",
+}
+
+
+## Which family a controller belongs to, from its name.
+static func pad_family(joy_name: String) -> PadFamily:
+	var n := joy_name.to_lower()
+	for word in ["playstation", "dualsense", "dualshock", "ps3", "ps4", "ps5", "sony"]:
+		if n.contains(word):
+			return PadFamily.PLAYSTATION
+	for word in ["nintendo", "switch", "pro controller", "joy-con", "joycon"]:
+		if n.contains(word):
+			return PadFamily.NINTENDO
+	return PadFamily.XBOX
+
+
+## The button (icon) or key this player presses for `action`.
+func glyph(action: Action) -> String:
+	if device == DEVICE_KEYBOARD:
+		return KEY_GLYPHS.get(action, "?")
+	var family := pad_family(Input.get_joy_name(device)) if device >= 0 else PadFamily.XBOX
+	return PAD_GLYPHS[family].get(action, "?")
+
+
+## Glyph for a device that hasn't joined yet (join prompts).
+static func device_glyph(p_device: int, action: Action) -> String:
+	if p_device == DEVICE_KEYBOARD:
+		return KEY_GLYPHS.get(action, "?")
+	var family := pad_family(Input.get_joy_name(p_device)) if p_device >= 0 else PadFamily.XBOX
+	return PAD_GLYPHS[family].get(action, "?")
+
+
 ## Called once per frame by the InputRouter, before any player is polled.
 static func update_enter_latch() -> void:
 	if not (Input.is_physical_key_pressed(KEY_ENTER) or Input.is_physical_key_pressed(KEY_KP_ENTER)):

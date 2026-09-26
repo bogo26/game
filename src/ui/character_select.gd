@@ -14,7 +14,17 @@ const GAME_SCENE := "res://src/main/game.tscn"
 const MAIN_MENU := "res://src/ui/main_menu.tscn"
 const MARGIN := 6.0
 const TITLE_HEIGHT := 22.0
-const SLOT_TAGS: Array[String] = ["ATK", "SPC", "MOV", "ULT"]
+## The four ability slots' buttons, in order.
+const SLOT_ACTIONS: Array[PlayerInput.Action] = [PlayerInput.Action.ATTACK, PlayerInput.Action.SPECIAL,
+	PlayerInput.Action.MOVEMENT, PlayerInput.Action.ULTIMATE]
+## Damage rating (1-5 pips) and how hard each hero is to play well.
+const HERO_TRAITS := {
+	&"knight": [3, "Easy"], &"ranger": [4, "Easy"], &"mage": [4, "Medium"], &"cleric": [2, "Medium"],
+	&"berserker": [4, "Easy"], &"rogue": [4, "Hard"], &"engineer": [5, "Medium"], &"necromancer": [4, "Hard"],
+}
+const DIFFICULTY_COLORS := {"Easy": Color(0.45, 0.95, 0.5), "Medium": Color(1.0, 0.85, 0.35), "Hard": Color(1.0, 0.45, 0.4)}
+const PIP_ON := Color(0.95, 0.9, 0.7)
+const PIP_OFF := Color(0.3, 0.3, 0.38)
 
 
 class SlotView:
@@ -24,6 +34,8 @@ class SlotView:
 	var name_label: Label
 	var role_label: Label
 	var arrows: Label
+	var pips: Control
+	var difficulty: Label
 	var abilities: Array[Label] = []
 	var hint: Label
 
@@ -41,6 +53,7 @@ var _title: Label
 var _footer: Label
 var _back_prev: Dictionary = {}
 var _hero_cache: Dictionary = {}
+var _time := 0.0
 
 
 func _ready() -> void:
@@ -81,6 +94,17 @@ func _process(delta: float) -> void:
 			_handle_player(i, p)
 	_handle_unassigned_back()
 	_update_footer()
+	_animate_portraits(delta)
+
+
+## Joined players' heroes run on the spot (run frames 2-5).
+func _animate_portraits(delta: float) -> void:
+	_time += delta
+	var frame := 2 + int(_time * 8.0) % 4
+	for v in _views:
+		var atlas := v.portrait.texture as AtlasTexture
+		if atlas and v.portrait.visible:
+			atlas.region = Rect2(frame * 16, 0, 16, 16)
 
 
 func _on_join_requested(device: int) -> void:
@@ -161,14 +185,29 @@ static func _start_pressed(p: PlayerInput) -> bool:
 
 func _update_footer() -> void:
 	var joined := InputRouter.assigned_slots()
+	var join := _join_prompt()
 	if joined.is_empty():
-		_footer.text = "Press ENTER / (A) to join  -  up to 4 players  -  ESC / (B): back to menu"
+		_footer.text = "Press %s to join  -  up to 4 players  -  [ESC] / %s: back to menu" % [
+			join, PlayerInput.device_glyph(0, PlayerInput.Action.UI_BACK)]
 	elif _all_ready():
-		_footer.text = "Everyone ready!  Press ENTER / (A) / START to begin"
+		_footer.text = "Everyone ready!  Press %s to begin" % join
 	elif joined.size() < 4:
-		_footer.text = "More players: press ENTER / (A) to join  -  ready up with ENTER / (A)"
+		_footer.text = "More players: press %s to join" % join
 	else:
 		_footer.text = "Waiting for everyone to ready up"
+
+
+## "[ENTER] / (A)" with the join button of every kind of pad plugged in.
+static func _join_prompt() -> String:
+	var parts := PackedStringArray(["[ENTER]"])
+	var pads := Input.get_connected_joypads()
+	if pads.is_empty():
+		pads = [0]
+	for d in pads:
+		var g := PlayerInput.device_glyph(d, PlayerInput.Action.UI_ACCEPT)
+		if not parts.has(g):
+			parts.append(g)
+	return " / ".join(parts)
 
 
 func _start_run(joined: Array[int]) -> void:
@@ -217,6 +256,14 @@ func _build_slot(slot: int) -> SlotView:
 	v.role_label = _label("", 8, color)
 	v.role_label.position = Vector2(64, 34)
 	v.panel.add_child(v.role_label)
+	v.pips = Control.new()
+	v.pips.position = Vector2(8, 78)
+	v.pips.size = Vector2(52, 28)
+	v.pips.draw.connect(_draw_pips.bind(slot))
+	v.panel.add_child(v.pips)
+	v.difficulty = _label("", 8, Color.WHITE)
+	v.difficulty.position = Vector2(8, 106)
+	v.panel.add_child(v.difficulty)
 	for i in 4:
 		var line := _label("", 8, Color(0.82, 0.82, 0.88))
 		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -253,7 +300,7 @@ func _stack_abilities(v: SlotView) -> void:
 	var y := 46.0
 	for line in v.abilities:
 		line.position = Vector2(64, y)
-		y += maxi(1, line.get_line_count()) * line.get_line_height() + 3.0
+		y += maxi(1, line.get_line_count()) * line.get_line_height() + 2.0
 
 
 func _refresh(slot: int) -> void:
@@ -266,13 +313,13 @@ func _refresh(slot: int) -> void:
 	if joined and _is_ready[slot]:
 		bg = Color(color, 0.18).blend(Color(0.08, 0.075, 0.12, 0.9))
 	v.panel.add_theme_stylebox_override("panel", _box(bg, border, 2 if _is_ready[slot] else 1))
-	for child in [v.portrait, v.name_label, v.role_label, v.arrows]:
+	for child in [v.portrait, v.name_label, v.role_label, v.arrows, v.pips, v.difficulty]:
 		(child as CanvasItem).visible = joined
 	for line in v.abilities:
 		line.visible = joined
 	if not joined:
 		v.header.text = "P%d" % (slot + 1)
-		v.hint.text = "Press ENTER / (A) to join"
+		v.hint.text = "Press %s to join" % _join_prompt()
 		return
 	var hero_id := ROSTER[_choice[slot]]
 	v.header.text = "P%d  %s   %d/%d" % [slot + 1, InputRouter.device_name(p.device), _choice[slot] + 1, ROSTER.size()]
@@ -292,18 +339,42 @@ func _refresh(slot: int) -> void:
 		return
 	v.portrait.modulate = Color.WHITE
 	v.name_label.text = data.display_name.to_upper()
-	v.role_label.text = "%s   HP %d" % [data.role, int(data.max_hp)]
+	v.role_label.text = data.role
+	var traits: Array = HERO_TRAITS.get(hero_id, [3, "Medium"])
+	v.difficulty.text = traits[1]
+	v.difficulty.label_settings.font_color = DIFFICULTY_COLORS.get(traits[1], Color.WHITE)
+	v.pips.queue_redraw()
 	var abilities := data.abilities()
 	for i in 4:
 		var a := abilities[i]
-		v.abilities[i].text = "%s %s: %s" % [SLOT_TAGS[i], a.display_name, a.description]
+		v.abilities[i].text = "%s %s: %s" % [p.glyph(SLOT_ACTIONS[i]), a.display_name, a.description]
 	_stack_abilities(v)
+	var accept := p.glyph(PlayerInput.Action.UI_ACCEPT)
+	var back := p.glyph(PlayerInput.Action.UI_BACK)
 	if _is_ready[slot]:
-		v.hint.text = "READY!  %s to change" % ("ESC" if p.device == PlayerInput.DEVICE_KEYBOARD else "(B)")
+		v.hint.text = "READY!  %s to change" % back
 	elif p.uses_mouse or p.device == PlayerInput.DEVICE_KEYBOARD:
-		v.hint.text = "A/D browse   ENTER ready   ESC leave"
+		v.hint.text = "A/D browse   %s ready   %s leave" % [accept, back]
 	else:
-		v.hint.text = "< > browse   (A) ready   (B) leave"
+		v.hint.text = "< > browse   %s ready   %s leave" % [accept, back]
+
+
+## Toughness, damage and speed as 1-5 pips under the portrait.
+func _draw_pips(slot: int) -> void:
+	var v := _views[slot]
+	var data := _hero(ROSTER[_choice[slot]])
+	if data == null:
+		return
+	var toughness := clampi(1 + int((data.max_hp * (1.0 + data.armor * 0.15) - 75.0) / 20.0), 1, 5)
+	var traits: Array = HERO_TRAITS.get(data.id, [3, "Medium"])
+	var speed := clampi(roundi((data.move_speed - 80.0) / 5.0), 1, 5)
+	var rows := [["HP", toughness], ["DMG", int(traits[0])], ["SPD", speed]]
+	var font := v.pips.get_theme_default_font()
+	for r in rows.size():
+		var y := r * 9.0
+		v.pips.draw_string(font, Vector2(0, y + 7), rows[r][0], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.62, 0.62, 0.7))
+		for k in 5:
+			v.pips.draw_rect(Rect2(22 + k * 6, y + 2, 4, 4), PIP_ON if k < int(rows[r][1]) else PIP_OFF)
 
 
 static func _label(text: String, size: int, color: Color) -> Label:
