@@ -21,6 +21,8 @@ script = ExtResource("3_level")
 [node name="GroundFx" type="Node2D" parent="."]
 script = ExtResource("7_fx")
 
+[node name="Props" type="Node2D" parent="."]
+
 [node name="PickupLayer" type="MultiMeshInstance2D" parent="."]
 script = ExtResource("6_layer")
 

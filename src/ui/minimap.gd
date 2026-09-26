@@ -15,7 +15,7 @@ const MAX_SCALE := 4.0
 ## Share of the screen the map may cover.
 const MAX_SCREEN_FRACTION := Vector2(0.88, 0.8)
 
-const COLOR_BACKGROUND := Color(0.03, 0.03, 0.06, 0.84)
+const COLOR_BACKGROUND := Color(0.03, 0.03, 0.06, 0.92)
 const COLOR_BORDER := Color(1, 1, 1, 0.25)
 const COLOR_WALL := Color(0.22, 0.21, 0.3)
 const COLOR_FLOOR := Color(0.45, 0.46, 0.58)
@@ -231,6 +231,15 @@ func _draw_points_of_interest(s: float) -> void:
 			var c := to_map(p)
 			draw_line(c - Vector2(arm, arm), c + Vector2(arm, arm), COLOR_NEST, 1.5)
 			draw_line(c - Vector2(arm, -arm), c + Vector2(arm, -arm), COLOR_NEST, 1.5)
+	var box := Vector2(2.0 + s * 0.5, 2.0 + s * 0.5).floor()
+	for it in world.interactables:
+		if not world.reveal.is_seen_at(it.position):
+			continue
+		var c := to_map(it.position)
+		if it.kind == Interactable.Kind.CHEST:
+			draw_rect(Rect2((c - box * 0.5).floor(), box), COLOR_USED if it.used else COLOR_CHEST)
+		else:
+			_diamond(c, box.x * 0.7 + 1.0, COLOR_USED if it.used else COLOR_SHRINE)
 	var exit := level.exit_center()
 	if exit.is_finite() and (world.director.exit_open or world.reveal.is_seen_at(exit)):
 		var r := 2.0 + s * 0.75
@@ -268,6 +277,8 @@ func _draw_legend(font: Font, pos: Vector2) -> void:
 	x = _legend_item(font, x, y, COLOR_EXIT, "Exit", 2)
 	x = _legend_item(font, x, y, COLOR_ARENA, "Arena", 0)
 	x = _legend_item(font, x, y, COLOR_NEST, "Nest", 3)
+	x = _legend_item(font, x, y, COLOR_CHEST, "Chest", 0)
+	x = _legend_item(font, x, y, COLOR_SHRINE, "Shrine", 2)
 
 
 ## Draws an icon (0 square, 1 ring, 2 diamond, 3 cross) and a label;

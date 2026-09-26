@@ -29,6 +29,8 @@ var level_index := 0
 var run_active := false
 ## Level-ups earned but not yet resolved by the pick screen.
 var pending_level_ups := 0
+## How many of those pending picks are treasure (chest) rounds.
+var pending_treasures := 0
 ## Run statistics (shown on the end screen).
 var run_kills := 0
 var run_time := 0.0
@@ -66,11 +68,18 @@ func xp_to_next() -> int:
 	return XpCurve.xp_to_next(team_level, player_count())
 
 
+## A treasure chest: one extra upgrade pick for everyone, shown first.
+func add_treasure_pick() -> void:
+	pending_level_ups += 1
+	pending_treasures += 1
+
+
 func reset_run() -> void:
 	team_level = 1
 	xp = 0
 	level_index = 0
 	pending_level_ups = 0
+	pending_treasures = 0
 	run_kills = 0
 	run_time = 0.0
 	levels_cleared = 0

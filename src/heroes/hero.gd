@@ -33,6 +33,8 @@ var input: PlayerInput
 var world: World
 
 var state: State = State.ALIVE
+## Shrine blessings: buff hook -> [factor, seconds left].
+var blessings: Dictionary = {}
 var stats := Stats.new()
 ## Upgrade id -> times taken this run.
 var upgrade_stacks: Dictionary = {}
@@ -191,6 +193,7 @@ func muzzle_position() -> Vector2:
 
 func tick(delta: float) -> void:
 	invulnerable_time = maxf(0.0, invulnerable_time - delta)
+	_tick_blessings(delta)
 	if state == State.DOWNED:
 		velocity = Vector2.ZERO
 		_update_visuals(delta)
@@ -237,12 +240,29 @@ func _speed_factor() -> float:
 	return buff_product(&"move_speed_factor") * terrain
 
 
-## Product of a buff hook (e.g. &"damage_factor") over all four abilities.
+## Product of a buff hook (e.g. &"damage_factor") over all four abilities,
+## times any shrine blessing on that hook.
 func buff_product(hook: StringName) -> float:
 	var f := 1.0
 	for ability in abilities:
 		f *= float(ability.call(hook))
+	if blessings.has(hook):
+		f *= float(blessings[hook][0])
 	return f
+
+
+## Multiplies a buff hook by `factor` for `seconds` (replaces the same hook).
+func bless(hook: StringName, factor: float, seconds: float) -> void:
+	blessings[hook] = [factor, seconds]
+
+
+func _tick_blessings(delta: float) -> void:
+	for hook: StringName in blessings.keys():
+		var left := float(blessings[hook][1]) - delta
+		if left <= 0.0:
+			blessings.erase(hook)
+		else:
+			blessings[hook][1] = left
 
 
 func buff_sum(hook: StringName) -> float:
@@ -401,6 +421,9 @@ func _draw() -> void:
 		ring_color = color.lerp(Color.WHITE, 0.5 + 0.5 * sin(_anim_time * 10.0))
 	draw_set_transform(Vector2(0, 1), 0.0, Vector2(1.0, 0.5))
 	draw_circle(Vector2.ZERO, 7.0, Color(0, 0, 0, 0.35), true, -1.0, false)
+	if not blessings.is_empty() and world and state == State.ALIVE:
+		var glow := world.blessing_color
+		draw_arc(Vector2.ZERO, 9.0 + sin(_anim_time * 6.0), 0.0, TAU, 20, Color(glow, 0.7), 1.0, false)
 	draw_arc(Vector2.ZERO, 7.0, 0.0, TAU, 20, ring_color, 1.0, false)
 	draw_set_transform(Vector2.ZERO)
 	if state == State.DOWNED:

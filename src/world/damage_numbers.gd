@@ -33,6 +33,12 @@ func add_crit(p: Vector2, amount: float) -> void:
 	_push(p, "%d!" % int(round(amount)), CRIT_COLOR, 16, true)
 
 
+## A word that floats up like a number (TREASURE!, FURY...): big, and
+## never pushed out.
+func add_text(p: Vector2, text: String, color: Color) -> void:
+	_push(p, text, color, 16, true)
+
+
 func count() -> int:
 	return _age.size()
 

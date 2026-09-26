@@ -52,6 +52,9 @@ const BLAST_DELAY := 0.05
 const BARREL_KNOCKBACK := 220.0
 const URN_GEMS := 3
 const URN_HEART_CHANCE := 0.15
+## Shrine blessings last this long; Wrath hits everything on screen.
+const BLESSING_TIME := 30.0
+const WRATH_DAMAGE := 60.0
 
 @export var level_data: LevelData
 ## Test rooms let players join mid-game by pressing A / Enter.
@@ -100,6 +103,12 @@ var _rng := RandomNumberGenerator.new()
 var _scratch := PackedInt32Array()
 var _wiped := false
 var _wipe_timer := 0.0
+## Chests and shrines.
+var interactables: Array[Interactable] = []
+## The team's current shrine blessing (for the HUD); heroes hold the buffs.
+var blessing_name := ""
+var blessing_left := 0.0
+var blessing_color := Color.WHITE
 ## Barrel blasts waiting to go off: [position, radius, damage, slot, delay].
 var _pending_blasts: Array[Array] = []
 ## Recent enemy deaths (Raise Dead): positions and times.
@@ -110,6 +119,7 @@ const MAX_CORPSES := 96
 
 @onready var level: Level = $Level
 @onready var ground_fx: FxLayer = $GroundFx
+@onready var props_root: Node2D = $Props
 @onready var entities: Node2D = $Entities
 @onready var fx: FxLayer = $Fx
 @onready var camera: SharedCamera = $Camera
@@ -234,6 +244,8 @@ func _process(delta: float) -> void:
 	PerfMonitor.record(&"minions", Time.get_ticks_usec() - t_minions)
 	_apply_leash()
 	_update_revives(dt)
+	_check_interactables()
+	blessing_left = maxf(0.0, blessing_left - dt)
 	_snapshot_heroes()
 	var t_heroes := Time.get_ticks_usec()
 
@@ -481,10 +493,16 @@ func _apply_contact_damage() -> void:
 
 
 ## Barrels, urns and nests from the layout become (stationary) horde entries
-## that block their tile until destroyed.
+## that block their tile until destroyed; chests and shrines are nodes.
 func _spawn_props() -> void:
 	for prop in level.props:
-		if prop.kind not in [&"barrel", &"urn", &"nest"]:
+		if prop.kind in [&"chest", &"shrine"]:
+			var it := Interactable.new()
+			var blessing := _rng.randi_range(0, Interactable.Blessing.size() - 1) as Interactable.Blessing
+			it.setup(Interactable.Kind.CHEST if prop.kind == &"chest" else Interactable.Kind.SHRINE, prop.cell, blessing)
+			props_root.add_child(it)
+			interactables.append(it)
+			grid.set_blocker(prop.cell.x, prop.cell.y, true)
 			continue
 		var t := horde.type_index(prop.kind)
 		if t < 0:
@@ -496,6 +514,61 @@ func _spawn_props() -> void:
 		grid.set_blocker(prop.cell.x, prop.cell.y, true)
 		if prop.kind == &"nest":
 			director.add_nest(horde.uid[i], prop.cell, prop.room)
+
+
+## A living hero walking up to a chest or shrine uses it.
+func _check_interactables() -> void:
+	for it in interactables:
+		if it.used:
+			continue
+		for hero in heroes:
+			if not hero.is_downed() and hero.position.distance_to(it.position) <= Interactable.TOUCH_RANGE:
+				_use_interactable(it, hero)
+				break
+
+
+func _use_interactable(it: Interactable, hero: Hero) -> void:
+	it.use()
+	var p := it.position + Vector2(0, -10)
+	var c := it.color()
+	if it.kind == Interactable.Kind.CHEST:
+		GameState.add_treasure_pick()  # the pick screen opens this frame
+		Audio.play(&"chest")
+		particles.burst(p, 30, c, 120.0, 0.8, 2, Vector2.UP, PI, 160.0)
+		numbers.add_text(p - Vector2(0, 6), "TREASURE!", c)
+		return
+	Audio.play(&"shrine")
+	numbers.add_text(p - Vector2(0, 6), Interactable.BLESSING_NAMES[it.blessing] + "!", c)
+	fx.ring(it.position, 40.0, c, 0.5)
+	for h in heroes:
+		particles.burst(h.position + Vector2(0, -6), 16, c, 80.0, 0.7, 2, Vector2.UP, PI, -30.0)
+	match it.blessing:
+		Interactable.Blessing.FURY:
+			for h in heroes:
+				h.bless(&"damage_factor", 1.5, BLESSING_TIME)
+		Interactable.Blessing.HASTE:
+			for h in heroes:
+				h.bless(&"move_speed_factor", 1.3, BLESSING_TIME)
+				h.bless(&"attack_speed_factor", 1.3, BLESSING_TIME)
+		Interactable.Blessing.LIFE:
+			revive_all(1.0)
+			heal_heroes(Vector2.ZERO, INF, 1.0)
+		Interactable.Blessing.WRATH:
+			var view := camera.visible_rect()
+			var struck := 0
+			for i in horde.count:
+				if struck < 14 and horde.hp[i] > 0.0 and horde.is_mobile(i) and view.has_point(horde.pos[i]):
+					var top := horde.pos[i] - Vector2(0, horde.t_hurt_height[horde.type[i]])
+					fx.line(top - Vector2(_rng.randf_range(-6, 6), 60), top, c, 0.15)
+					struck += 1
+			damage_enemies_in_rect(view, WRATH_DAMAGE * spawner.effective_hp_multiplier(), view.get_center(),
+				90.0, hero.slot)
+			shake(5.0)
+			Audio.play(&"explosion")
+	if it.blessing in [Interactable.Blessing.FURY, Interactable.Blessing.HASTE]:
+		blessing_name = Interactable.BLESSING_NAMES[it.blessing]
+		blessing_left = BLESSING_TIME
+		blessing_color = c
 
 
 ## A barrel or urn broke: free its tile, then blow up or scatter loot.

@@ -34,6 +34,8 @@ func _data(layout: String, quotas: Array[int] = [0, 0, 0]) -> LevelData:
 	return d
 
 
+## Enemy spawning stays on (nests need it); the test layouts have no
+## corridor spawns (corridor_spawn_rate 0), so only nests and arenas spawn.
 func _make_world(data: LevelData, run_mode: bool = false) -> World:
 	InputRouter.unassign_all()
 	GameState.clear_players()
@@ -43,7 +45,6 @@ func _make_world(data: LevelData, run_mode: bool = false) -> World:
 	var world: World = (load(WORLD_SCENE) as PackedScene).instantiate()
 	world.level_data = data
 	world.run_mode = run_mode
-	world.spawn_enemies = false
 	world.level_ups_enabled = false
 	(Engine.get_main_loop() as SceneTree).root.add_child(world)
 	world.bots = null
@@ -164,4 +165,85 @@ func test_destroying_the_nests_clears_their_arena() -> void:
 			break
 	assert_eq(room.state, LevelDirector.RoomState.CLEARED, "cleared once nests and spawns are dead")
 	assert_eq(director.nests.size(), 0)
+	_teardown(world)
+
+
+# --- chests and shrines ------------------------------------------------------------------
+
+const SHRINE_ROOM := """
+####################
+#P.......C.........#
+#..................#
+#.......A..........#
+#..................#
+####################
+"""
+
+
+func _touch(world: World, it: Interactable) -> void:
+	# Walk into it from below: stops against the blocked tile, close enough to use.
+	var hero := world.heroes[0]
+	hero.position = it.position + Vector2(0, 16)
+	for f in 20:
+		hero.input.move = Vector2.UP
+		world._process(DT)
+	hero.input.move = Vector2.ZERO
+
+
+func _find(world: World, kind: Interactable.Kind) -> Interactable:
+	for it in world.interactables:
+		if it.kind == kind:
+			return it
+	return null
+
+
+func test_chest_gives_everyone_a_treasure_pick() -> void:
+	var world := _make_world(_data(SHRINE_ROOM))
+	world.level_ups_enabled = true
+	var chest := _find(world, Interactable.Kind.CHEST)
+	assert_true(world.grid.is_solid(chest.cell.x, chest.cell.y), "chests block their tile")
+	_touch(world, chest)
+	assert_true(chest.used, "walked up and opened it")
+	assert_true(world.level_up.is_open(), "pick screen opened")
+	assert_eq(world.level_up._title.text, "TREASURE!  PICK AN UPGRADE")
+	assert_eq(GameState.pending_treasures, 1)
+	world.get_tree().paused = false
+	world.level_up.close()
+	GameState.pending_level_ups = 0
+	GameState.pending_treasures = 0
+	_touch(world, chest)
+	assert_eq(GameState.pending_level_ups, 0, "a chest opens only once")
+	_teardown(world)
+
+
+func test_shrine_blessings() -> void:
+	var world := _make_world(_data(SHRINE_ROOM))
+	var shrine := _find(world, Interactable.Kind.SHRINE)
+	var hero := world.heroes[0]
+	shrine.blessing = Interactable.Blessing.FURY
+	_touch(world, shrine)
+	assert_true(shrine.used)
+	assert_near(hero.buff_product(&"damage_factor"), 1.5, 0.001, "Fury: +50% damage")
+	assert_eq(world.blessing_name, "FURY")
+	for f in int(World.BLESSING_TIME / DT) + 5:
+		hero.tick(DT)
+	assert_near(hero.buff_product(&"damage_factor"), 1.0, 0.001, "wears off")
+	_touch(world, shrine)
+	assert_near(hero.buff_product(&"damage_factor"), 1.0, 0.001, "a shrine blesses only once")
+	# Life: heals and revives.
+	hero.hp = 1.0
+	var life := Interactable.new()
+	life.setup(Interactable.Kind.SHRINE, Vector2i(3, 2), Interactable.Blessing.LIFE)
+	world._use_interactable(life, hero)
+	assert_near(hero.hp, hero.max_hp, 0.001, "Life: full heal")
+	life.free()
+	# Wrath: everything on screen takes a beating.
+	var horde := world.horde
+	var near := horde.spawn(horde.type_index(&"brute"), hero.position + Vector2(60, 0))
+	var wrath := Interactable.new()
+	wrath.setup(Interactable.Kind.SHRINE, Vector2i(3, 2), Interactable.Blessing.WRATH)
+	var hp0 := horde.hp[near]
+	world._use_interactable(wrath, hero)
+	assert_true(horde.hp[near] < hp0, "Wrath: on-screen enemies are struck")
+	wrath.free()
 	_teardown(world)

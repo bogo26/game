@@ -232,7 +232,7 @@ func nest_positions(room_id: int = -1) -> Array[Vector2]:
 
 
 func _tick_nests(dt: float) -> void:
-	if nests.is_empty():
+	if nests.is_empty() or not world.spawner.enabled:
 		return
 	var horde := world.horde
 	var spawner := world.spawner

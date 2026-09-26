@@ -3,11 +3,13 @@ extends Node
 ##   ./tools/dev.sh stress [--seconds=20] [--warmup=4] [--enemies=300]
 ##       [--projectiles=400] [--fullscreen | --size=3840x2160] [--vsync=on]
 ##       [--max-fps=120] [--log-slow] [--heroes=necromancer,engineer,...] [--ult-spam]
+##       [--level=level_2]   (a level from src/levels/data; default: the fixed stress room)
 ## Four bot heroes fire constantly while the spawner keeps the horde at the
 ## cap. After a warm-up it measures frame times and exits with code 0 when the
 ## targets from docs/DESIGN.md are met, 1 otherwise.
 
 const WORLD_SCENE := "res://src/world/world.tscn"
+const STRESS_ROOM := "res://src/levels/data/stress_room.tres"
 const TARGET_AVG_MS := 6.0
 const TARGET_P99_MS := 8.3
 const TARGET_SIM_MS := 3.0
@@ -23,6 +25,7 @@ var _ult_spam := false
 var _log_slow := false
 var _last_usec := 0
 var _slow_frames: PackedStringArray = []
+var _level := STRESS_ROOM
 
 
 func _ready() -> void:
@@ -55,6 +58,8 @@ func _ready() -> void:
 				GameState.slots[i].hero_id = StringName(ids[i])
 		elif arg == "--ult-spam":
 			_ult_spam = true
+		elif arg.begins_with("--level="):
+			_level = "res://src/levels/data/%s.tres" % value
 
 	DisplayServer.window_set_vsync_mode(
 		DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
@@ -65,6 +70,7 @@ func _ready() -> void:
 	RenderingServer.viewport_set_measure_render_time(get_viewport().get_viewport_rid(), true)
 
 	_world = (load(WORLD_SCENE) as PackedScene).instantiate()
+	_world.level_data = load(_level)  # the stress room by default: results stay comparable
 	_world.bot_count = 4
 	_world.allow_drop_in = false
 	_world.level_ups_enabled = false

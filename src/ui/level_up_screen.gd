@@ -35,6 +35,7 @@ var _pickers: Array[Picker] = []
 var _root: Control
 var _title: Label
 var _open := false
+var _treasure_round := false
 
 
 func _ready() -> void:
@@ -85,6 +86,8 @@ func _process(delta: float) -> void:
 			all_done = false
 	if all_done:
 		GameState.pending_level_ups = maxi(0, GameState.pending_level_ups - 1)
+		if _treasure_round:
+			GameState.pending_treasures = maxi(0, GameState.pending_treasures - 1)
 		if GameState.pending_level_ups > 0:
 			_start_round()
 		else:
@@ -94,8 +97,12 @@ func _process(delta: float) -> void:
 func _start_round() -> void:
 	_clear_panels()
 	var view := _root.get_viewport_rect().size
-	var level := GameState.team_level - GameState.pending_level_ups + 1
-	_title.text = "LEVEL %d!  PICK AN UPGRADE" % level
+	_treasure_round = GameState.pending_treasures > 0
+	if _treasure_round:
+		_title.text = "TREASURE!  PICK AN UPGRADE"
+	else:
+		var level := GameState.team_level - (GameState.pending_level_ups - GameState.pending_treasures) + 1
+		_title.text = "LEVEL %d!  PICK AN UPGRADE" % level
 	_title.position = Vector2(0, 2)
 	_title.size = Vector2(view.x, TITLE_HEIGHT)
 	var rects := _layout(_heroes.size(), view)

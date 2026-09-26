@@ -47,6 +47,29 @@ func test_every_level_is_connected_and_complete() -> void:
 				if not g.is_solid(x, y):
 					floor_cells += 1
 		assert_eq(seen.size(), floor_cells, "%s: all floor reachable" % data.display_name)
+		# With its doors shut an arena is sealed: walking from inside never
+		# leaves it (so the fight can't leak out and the room outline is right).
+		for room: int in level.room_cells:
+			var doors: Array = level.room_doors.get(room, [])
+			var inside: Vector2i = Vector2i(-1, -1)
+			for c: Vector2i in level.room_cells[room]:
+				if not g.is_solid(c.x, c.y):
+					inside = c
+					break
+			var reached := {inside: true}
+			var todo: Array[Vector2i] = [inside]
+			var leaked := false
+			while not todo.is_empty():
+				var c: Vector2i = todo.pop_back()
+				for d: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+					var n := c + d
+					if reached.has(n) or g.is_solid(n.x, n.y) or n in doors:
+						continue
+					reached[n] = true
+					todo.append(n)
+					if level.room_of_cell[n.y * g.width + n.x] != room:
+						leaked = true
+			assert_false(leaked, "%s: arena %d is sealed by its doors" % [data.display_name, room])
 		level.free()
 
 

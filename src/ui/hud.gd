@@ -28,6 +28,7 @@ var _objective_label: Label
 var _center_label: Label
 var _boss_label: Label
 var _hint_label: Label
+var _blessing_label: Label
 var _hint_left := MAP_HINT_TIME
 var _slot_labels: Array[Label] = []
 var _portraits: Dictionary = {}  # hero_id -> Texture2D
@@ -58,6 +59,8 @@ func _ready() -> void:
 	_hint_label = _label(Color(0.75, 0.75, 0.82))
 	_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_hint_label.text = "Hold TAB / BACK for the map"
+	_blessing_label = _label(Color.WHITE)
+	_blessing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	for i in InputRouter.MAX_PLAYERS:
 		_slot_labels.append(_label(GameState.player_color(i)))
 	minimap = Minimap.new()
@@ -86,6 +89,7 @@ func _process(delta: float) -> void:
 	_hint_label.position = Vector2(0, 21)
 	_hint_label.size = Vector2(view.x, 10)
 	_hint_label.modulate.a = clampf(_hint_left, 0.0, 1.0)
+	_update_blessing_label(view)
 	_update_slot_labels(view)
 	_update_center_message(view)
 	_update_boss_label(view)
@@ -135,6 +139,16 @@ func _update_center_message(view: Vector2) -> void:
 		"%s controller disconnected\nreconnect it, or press A on another controller" % ", ".join(lost)
 	_center_label.position = Vector2(0, view.y * 0.5 - 20)
 	_center_label.size = Vector2(view.x, 40)
+
+
+func _update_blessing_label(view: Vector2) -> void:
+	var left := world.blessing_left if world else 0.0
+	_blessing_label.text = "" if left <= 0.0 else "%s  %ds" % [world.blessing_name, ceili(left)]
+	_blessing_label.label_settings.font_color = world.blessing_color if world else Color.WHITE
+	_blessing_label.position = Vector2(0, 31 if _hint_left > 0.0 else 21)
+	_blessing_label.size = Vector2(view.x, 10)
+	# Blink in the last few seconds.
+	_blessing_label.visible = left > 5.0 or int(left * 4.0) % 2 == 0
 
 
 func _update_boss_label(view: Vector2) -> void:
