@@ -2,7 +2,7 @@
 # Developer helper.
 #   ./tools/dev.sh import            re-import assets / rebuild class cache
 #   ./tools/dev.sh test [--filter=x] run the headless test suite
-#   ./tools/dev.sh run [scene] [...] run the game (or a specific scene)
+#   ./tools/dev.sh run [scene] [...] run the game (or a scene); re-imports first if needed
 #   ./tools/dev.sh editor            open the Godot editor
 #   ./tools/dev.sh stress [...]      run the horde stress test
 #   ./tools/dev.sh export [mac|win]  export release builds into build/ (needs export templates)
@@ -28,29 +28,62 @@ find_godot() {
 }
 
 GODOT_BIN="$(find_godot)"
+
+# Godot keeps the script class list and imported assets in .godot/, which
+# isn't in git, and only the editor (or --import) refreshes them. A game run
+# on a stale .godot fails with "Could not find type ..." after a pull that
+# adds a class_name script, and can't load new art. So run and stress
+# re-import when class names or assets changed since the last import (an
+# import with nothing to do still takes seconds, so not on every run).
+STAMP="$ROOT/.godot/dev_import_stamp"
+
+class_list() {
+  (cd "$ROOT" && grep -rHE '^(class_name|extends) ' --include='*.gd' \
+    --exclude-dir=.godot --exclude-dir=.git --exclude-dir=build . || true) | LC_ALL=C sort | cksum
+}
+
+write_stamp() {
+  mkdir -p "$ROOT/.godot"
+  class_list > "$STAMP"
+}
+
+import_if_stale() {
+  if [[ -f "$STAMP" && "$(class_list)" == "$(cat "$STAMP")" \
+      && -z "$(find "$ROOT/assets" -newer "$STAMP" -type f 2>/dev/null | head -n 1 || true)" ]]; then
+    return 0
+  fi
+  echo "Scripts or assets changed since the last import: re-importing the project..." >&2
+  if "$GODOT_BIN" --headless --path "$ROOT" --import >/dev/null 2>&1; then
+    write_stamp
+  fi
+}
+
 cmd="${1:-run}"
 shift || true
 
 case "$cmd" in
   import)
     "$GODOT_BIN" --headless --path "$ROOT" --import
+    write_stamp
     ;;
   test)
-    "$GODOT_BIN" --headless --path "$ROOT" --import >/dev/null 2>&1 || true
+    "$GODOT_BIN" --headless --path "$ROOT" --import >/dev/null 2>&1 && write_stamp || true
     "$GODOT_BIN" --headless --path "$ROOT" -s res://tests/run_tests.gd -- "$@"
     ;;
   run)
+    import_if_stale
     "$GODOT_BIN" --path "$ROOT" "$@"
     ;;
   editor)
     "$GODOT_BIN" --path "$ROOT" --editor "$@"
     ;;
   stress)
+    import_if_stale
     "$GODOT_BIN" --path "$ROOT" res://tools/stress_test.tscn -- "$@"
     ;;
   export)
     target="${1:-all}"
-    "$GODOT_BIN" --headless --path "$ROOT" --import >/dev/null 2>&1 || true
+    "$GODOT_BIN" --headless --path "$ROOT" --import >/dev/null 2>&1 && write_stamp || true
     status=0
     if [[ "$target" == "all" || "$target" == "mac" ]]; then
       mkdir -p "$ROOT/build/macos"

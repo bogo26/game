@@ -20,6 +20,7 @@ python3 tools/gen_levels.py                                     # rebuild the ru
 ```
 
 - `tools/dev.sh` looks for Godot in `/Applications`, `~/Applications` and `~/Downloads`. Set `GODOT=/path/to/Godot` to override.
+- Godot keeps the list of script classes and the imported art in `.godot/`, which isn't in git, and only the editor (or `--import`) refreshes it. After a pull that adds scripts or art, `./tools/dev.sh run` and `stress` re-import once before starting. If you launch the game another way and get `Could not find type ...` errors or a black screen, run `./tools/dev.sh import` (or open the project in the editor) once.
 - On Windows, run the same commands from Git Bash, or call Godot directly:
 
 ```bash
