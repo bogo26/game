@@ -23,6 +23,7 @@ Players pick heroes, fight through hand-built levels packed with hordes of up to
 | Special | LT | RMB |
 | Movement ability (dash/bash) | RB (or A) | Space (or Shift) |
 | Ultimate | LB (or Y) | Q |
+| Map (hold) | Back / Select | Tab (or M) |
 | Pause | Start | Esc |
 | Join (character select) | A / Start | Enter / Space |
 
@@ -100,7 +101,7 @@ Spawn director:
 
 - **Authoring:**
   - Levels are ASCII layouts in `LevelData` resources; the legend is in `level_data.gd`.
-  - `tools/gen_levels.py` builds the run's layouts from rooms and corridors and writes `src/levels/data/level_*.tres` / `boss.tres` with each level's difficulty settings.
+  - `tools/gen_levels.py` builds the run's layouts from shaped rooms, halls, terrain and props, and writes `src/levels/data/level_*.tres` / `boss.tres` with each level's difficulty settings and theme (see Map features).
   - The sandbox `test_room.tres` is hand-written.
 - **Rendering:** `Level` turns a layout into a `TileMapLayer` for rendering and a `LevelGrid` for collision and pathfinding.
 - **Run order:** `src/levels/run_config.tres` lists Crypt Entrance → Flooded Halls → Bone Pits → Demon's Throne (boss). Each level sets:
@@ -108,7 +109,7 @@ Spawn director:
   - an HP multiplier (1.0 / 1.35 / 1.8 / 2.2)
   - corridor pressure
   - arena quotas
-  - a floor tint
+  - a theme (tile sheet and decorations) and an optional tint
 - **`LevelDirector` runs the objectives:**
   - An **arena room** (digit tiles) activates when a living hero is 36+ px inside it. Stragglers are pulled in with the leader, every door touching the room turns solid, and the spawner switches to arena mode.
   - The room is cleared once its quota has spawned and nothing is left alive in it. Quotas are ×(1 + 0.4 per extra player).
@@ -141,6 +142,39 @@ Spawn director:
 - **Shared camera:** follows the middle of the group with fixed zoom, and players can't leave the screen. The leash blocks the player who is running away rather than dragging the others along.
 - **Disconnects:** if an assigned controller is unplugged, the game pauses until it is reconnected, or until another controller presses A and takes over that player.
 - **Bots** (`BotDriver`) follow the current objective with A* over the level grid and use their abilities. The test suite has four god-mode bots finish every level including the boss, and `./tools/dev.sh run res://src/main/game.tscn -- --bots=4 --level=4` shows a bot boss fight.
+
+## Map features
+
+What makes the levels play differently, beyond their shapes:
+
+| Layout char | Feature | How it plays |
+|---|---|---|
+| `~` | Water | Everyone walks at 60% speed. Bots avoid it when they can. |
+| `:` | Chasm (lava on the throne level) | Can't be walked on. Shots and line of sight cross it. An enemy shoved toward it harder than 30 px/s goes over the edge and dies. The last hero to hit or push it gets the kill, and its XP lands on the nearest floor. |
+| `^` | Spike trap | Retracted, then warning, then up, on a 3 s cycle, firing in diagonal waves. When the spikes shoot up they stab everyone on them: heroes take 14, enemies 24 × the level's enemy HP multiplier. |
+| `b` | Explosive barrel | Breaks in one hit, then blows up 0.05 s later: 40 × HP multiplier with big knockback. It breaks other barrels (chains) and never hurts heroes. |
+| `u` | Urn | Breaks in one hit and scatters 6 XP (sometimes a heart). |
+| `N` | Nest | Spawns 2 enemies from the level's mix every ~2.6 s while a hero is within 230 px. Arena nests sleep until the fight starts, and an arena with nests clears only once they're destroyed ("Destroy the nests!"). |
+| `C` | Treasure chest | Touch it: the whole team gets an extra upgrade round ("TREASURE!"). |
+| `A` | Shrine | Touch it for a team blessing, shown on the shrine: Fury (+50% damage, 30 s), Haste (+30% move and attack speed, 30 s), Life (full heal, revive everyone) or Wrath (smite everything on screen). |
+
+- **Implementation.** Barrels, urns and nests are stationary `HordeSim` entries (`EnemyData` behaviours `OBJECT` / `NEST`), so every attack already hits them. They block walking on their tile (`LevelGrid.set_blocker`) until destroyed, but not shots. Objects aren't enemies: they give no kill credit, corpses or XP gems, don't count toward the spawner's cap, and bots and minions don't target them. Chests and shrines are `Interactable` nodes.
+- **Terrain.** `LevelGrid` keeps `solid` (walking: walls, closed doors, chasms, props) apart from `shot_solid` (projectiles and sight: walls and closed doors). It also stores terrain per tile and logs walkability changes, so the bots' A* only updates the cells that changed.
+- **Arena rooms.** Each arena is found by flood fill from its digit tiles, so everything inside its walls belongs to it: water, traps, chasms and props. The level test checks that shutting an arena's doors seals it.
+- **Themes.** Each level names a tile sheet (`assets/tiles/tiles_<theme>.png`: crypt, flooded, bones, throne). Water and chasm/lava tiles are animated. The level is decorated from a per-tile hash:
+  - floor clutter per theme
+  - cobwebs in room corners
+  - banners, chains and cracks on walls
+  - wall torches with an additive, flickering light (`TorchLights`)
+- **Layouts** come from `tools/gen_levels.py`:
+  - Shapes: rectangles, octagons, discs, organic caves and rings around pits.
+  - Halls stop at the first tile of the room they run into, so they meet round rooms at the edge.
+  - Walls are added around everything, and corridor floor touching an arena becomes its doors.
+- **Minimap.** Hold Tab / M (Back on a gamepad). The level keeps running.
+  - It shows only the tiles that have been on screen (`MapReveal`).
+  - Arenas are coloured by state: idle, active or cleared.
+  - It marks locked doors, the exit, the objective, nests, chests, shrines, the boss, enemies, heroes and the camera view.
+  - Seen tiles live in a 1 px-per-tile image that is repainted only where something changed.
 
 ## Technical architecture
 
@@ -256,6 +290,7 @@ docs/         this document
 | 7 | Heroes 5–8: Berserker, Rogue, Engineer, Necromancer + summons | done |
 | 8 | Art & juice: pixel-art pack, particles, shake, SFX/music | done (generated art; 0x72 pack swap pending your OK) |
 | 9 | Export: macOS + Windows builds | presets + icon ready; needs export templates installed to build |
+| 10 | Map features: minimap, terrain (water, chasms, spikes), barrels / urns / nests, chests and shrines, level themes + decor, redesigned levels | done |
 
 ## Performance results
 

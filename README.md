@@ -15,6 +15,8 @@ Design, controls, heroes and architecture: [docs/DESIGN.md](docs/DESIGN.md).
 ./tools/dev.sh editor   # open in the Godot editor
 ./tools/dev.sh test     # headless test suite
 ./tools/dev.sh stress --fullscreen --max-fps=120 --seconds=60   # horde perf test
+./tools/dev.sh stress --level=level_3 --seconds=20              # ...on a real level
+python3 tools/gen_levels.py                                     # rebuild the run's layouts
 ```
 
 - `tools/dev.sh` looks for Godot in `/Applications`, `~/Applications` and `~/Downloads`. Set `GODOT=/path/to/Godot` to override.
@@ -45,18 +47,31 @@ The macOS build runs on your own Mac; other people have to right-click → Open 
 | Special | LT | RMB |
 | Dash / bash | RB (or A) | Space (or Shift) |
 | Ultimate | LB (or Y) | Q |
+| Map (hold) | Back / Select | Tab (or M) |
 | Pause | Start | Esc |
 
 ## Playing
 
 1. `./tools/dev.sh run`, then pick **Start Run**.
 2. Every player presses **A** (gamepad) or **Enter** (keyboard) to join. Browse heroes with left/right and press A/Enter to ready up.
-3. Fight through 3 levels: clear the lockdown arena rooms, then reach the exit portal.
+3. Fight through 3 levels: clear the lockdown arena rooms, then reach the exit portal. Hold **Tab** / **Back** for the map.
 4. Beat the Demon Lord in the throne room.
 
-**Test Room** on the main menu is a drop-in sandbox with an endless horde.
+Things to use in the levels:
+- **Barrels** explode and chain; they hurt enemies, never heroes.
+- **Urns** drop XP.
+- **Chasms** can't be walked on, but shots fly over them, and enemies knocked in fall.
+- **Water** slows everyone.
+- **Spike traps** fire in waves and stab whoever stands on them, enemies included.
+- **Nests** spawn enemies until destroyed.
+- **Chests** give the whole team a bonus upgrade.
+- **Shrines** bless the team: Fury, Haste, Life or Wrath.
+
+**Test Room** on the main menu is a drop-in sandbox with an endless horde and one of everything.
 
 ## Status
+
+Milestone 10 (map features) is done: minimap, terrain, props, chests, shrines, level themes and redesigned levels.
 
 Milestone 9 (exports) is prepared:
 - macOS + Windows presets, an app icon and `./tools/dev.sh export`.
