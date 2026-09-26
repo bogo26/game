@@ -69,6 +69,7 @@ func _press(hero: Hero, action: PlayerInput.Action) -> void:
 func test_low_hp_warns_once_per_crossing() -> void:
 	var world := _make_world()
 	var hero := world.heroes[0]
+	hero.invulnerable_time = 0.0  # past the spawn protection
 	var n := _count(Events.hero_low_hp, func() -> void:
 		hero.take_hit(hero.max_hp * 0.75)  # to ~25%
 		hero.invulnerable_time = 0.0

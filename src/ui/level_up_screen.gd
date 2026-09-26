@@ -34,6 +34,9 @@ class Picker:
 
 
 var pool: UpgradePool
+## Whether another queued round may follow the one just finished (the World
+## holds level rounds back during arena fights). Default: always.
+var may_continue: Callable = func() -> bool: return true
 var _heroes: Array[Hero] = []
 var _pickers: Array[Picker] = []
 var _root: Control
@@ -99,7 +102,7 @@ func _process(delta: float) -> void:
 		return
 	_round_end_left = -1.0
 	GameState.pop_round()
-	if GameState.pending_level_ups > 0:
+	if GameState.pending_level_ups > 0 and may_continue.call():
 		_start_round()
 	else:
 		close()
@@ -125,7 +128,7 @@ func _start_round() -> void:
 	for i in _heroes.size():
 		var pk := Picker.new()
 		pk.hero = _heroes[i]
-		pk.offers = pool.roll_offers(pk.hero.hero_id, pk.hero.upgrade_stacks, CARD_COUNT)
+		pk.offers = pool.roll_offers(pk.hero.hero_id, pk.hero.upgrade_stacks, CARD_COUNT, _heroes.size() == 1)
 		pk.picked = pk.offers.is_empty()
 		_build_panel(pk, rects[i])
 		_pickers.append(pk)

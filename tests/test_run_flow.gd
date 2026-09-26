@@ -182,7 +182,7 @@ func test_arena_objective_counts_enemies_left() -> void:
 	var room := director.room_by_id(2)
 	director._activate(room, world.heroes[0])
 	assert_eq(director.enemies_left(), 7, "nothing spawned yet: the whole quota")
-	assert_eq(director.objective, "Defeat the horde!  7 left")
+	assert_eq(director.objective, "Wave 1/2  -  7 left")
 	var t := world.horde.type_index(&"swarmer")
 	for k in 3:  # the spawner lets three in
 		world.horde.spawn(t, LevelGrid.cell_center(room.cells[k * 3]), 1.0)
@@ -191,7 +191,7 @@ func test_arena_objective_counts_enemies_left() -> void:
 	director._tick_active_room(DT)
 	assert_eq(director.enemies_left(), 7, "3 inside + 4 still to come")
 	director.on_enemy_killed()
-	assert_eq(director.objective, "Defeat the horde!  6 left")
+	assert_eq(director.objective, "Wave 1/2  -  6 left")
 	_teardown(world)
 
 
@@ -200,6 +200,7 @@ func test_arena_objective_counts_enemies_left() -> void:
 func test_blasts_do_not_hurt_through_walls() -> void:
 	var world := _make_world(_data(WALLED))
 	var hero := world.heroes[0]
+	hero.invulnerable_time = 0.0  # past the spawn protection
 	hero.position = LevelGrid.cell_center(Vector2i(4, 1))
 	var blast := LevelGrid.cell_center(Vector2i(6, 1))
 	world.horde.blast_pos.append(blast)

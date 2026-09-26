@@ -32,6 +32,8 @@ const RARITY_NAMES: Array[String] = ["Common", "Rare", "Epic"]
 @export var tier := 0
 ## Extra offer weight (next tiers of a chain the hero already started).
 @export var weight_bonus := 1.0
+## Only useful with teammates (e.g. faster revives): never offered solo.
+@export var team_only := false
 
 
 func weight() -> float:

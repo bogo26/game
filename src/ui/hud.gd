@@ -1,7 +1,9 @@
 class_name Hud
 extends CanvasLayer
 ## In-game HUD:
-## - top centre: team XP bar, level, and the current objective
+## - top centre: team XP bar, level (with "+2" when pick rounds are waiting
+##   for an arena fight to end), team lives, and the current objective
+## - big callouts in the middle (WAVE 2/3, SECOND WIND!)
 ## - corners: one panel per player (P1 top-left, P2 top-right, P3 bottom-left,
 ##   P4 bottom-right) with portrait, HP, special/movement cooldowns and the
 ##   ultimate meter; empty slots show a join prompt in drop-in mode
@@ -17,6 +19,8 @@ const MAP_HINT_TIME := 8.0
 const CAPTIONS: Array[String] = ["SPC", "MOV", "ULT"]
 ## A player's panel flashes this long when they get hit.
 const HURT_FLASH := 0.3
+const CALLOUT_TIME := 1.6
+const HEART_COLOR := Color(0.95, 0.3, 0.35)
 
 var world: World
 var minimap: Minimap
@@ -35,6 +39,9 @@ var _blessing_label: Label
 var _hint_left := MAP_HINT_TIME
 var _slot_labels: Array[Label] = []
 var _hurt_flash := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var _callout_label: Label
+var _callout_left := 0.0
+var _held_label: Label
 var _portraits: Dictionary = {}  # hero_id -> Texture2D
 
 
@@ -65,6 +72,9 @@ func _ready() -> void:
 	_hint_label.text = "Hold TAB / BACK for the map"
 	_blessing_label = _label(Color.WHITE)
 	_blessing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_callout_label = _label(Color("ffe07a"), 16)
+	_callout_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_held_label = _label(Color("ffe07a"))
 	for i in InputRouter.MAX_PLAYERS:
 		_slot_labels.append(_label(GameState.player_color(i)))
 	minimap = Minimap.new()
@@ -98,9 +108,18 @@ func _process(delta: float) -> void:
 	_hint_label.modulate.a = clampf(_hint_left, 0.0, 1.0)
 	_update_blessing_label(view)
 	_update_slot_labels(view)
+	_update_callout(view, delta)
+	_update_held_label(bar_x)
 	_update_center_message(view)
 	_update_boss_label(view)
 	_canvas.queue_redraw()
+
+
+## A big message in the middle of the screen for a moment.
+func callout(text: String, color: Color = Color("ffe07a")) -> void:
+	_callout_label.text = text
+	_callout_label.label_settings.font_color = color
+	_callout_left = CALLOUT_TIME
 
 
 func _on_hero_damaged(slot: int, _amount: float) -> void:
@@ -137,6 +156,24 @@ func _update_slot_labels(view: Vector2) -> void:
 			label.position = origin + Vector2(0, PANEL_SIZE.y - 10 if i >= 2 else 0)
 		else:
 			label.text = ""
+
+
+func _update_callout(view: Vector2, delta: float) -> void:
+	_callout_left = maxf(0.0, _callout_left - delta)
+	_callout_label.visible = _callout_left > 0.0
+	_callout_label.position = Vector2(0, roundf(view.y * 0.28))
+	_callout_label.size = Vector2(view.x, 20)
+	_callout_label.modulate.a = clampf(_callout_left / 0.4, 0.0, 1.0)
+
+
+## "+2" after the level while pick rounds wait for the arena fight to end.
+func _update_held_label(bar_x: float) -> void:
+	var held := world != null and world.picks_held() and GameState.pending_level_ups > 0
+	_held_label.visible = held
+	if held:
+		_held_label.text = "+%d" % GameState.pending_level_ups
+		_held_label.position = Vector2(bar_x + BAR_SIZE.x + 6, 1)
+		_held_label.modulate.a = 0.6 + 0.4 * sin(_time * 6.0)
 
 
 func _update_center_message(view: Vector2) -> void:
@@ -180,6 +217,8 @@ func _draw_hud() -> void:
 		Color("5ab0f0").lerp(Color.WHITE, _flash / 0.6))
 	if world == null:
 		return
+	if world.run_mode:
+		_draw_lives(bar_pos + Vector2(BAR_SIZE.x + (30 if _held_label.visible else 8), -2))
 	for hero in world.heroes:
 		_draw_player_panel(hero, _panel_origin(hero.slot, view))
 	_draw_objective_arrow(view)
@@ -240,6 +279,22 @@ func _draw_player_panel(hero: Hero, origin: Vector2) -> void:
 	for k in 3:
 		_canvas.draw_string(font, Vector2(x + (third + 2) * k, origin.y + 27), CAPTIONS[k],
 			HORIZONTAL_ALIGNMENT_CENTER, third, 8, Color(0.5, 0.5, 0.56))
+
+
+## Team lives as little hearts (an empty one when there are none left).
+func _draw_lives(at: Vector2) -> void:
+	var lives := GameState.team_lives
+	for k in maxi(lives, 1):
+		_heart(at + Vector2(k * 8, 0), HEART_COLOR if lives > 0 else Color(0.35, 0.3, 0.35))
+
+
+func _heart(at: Vector2, color: Color) -> void:
+	var o := at.round()
+	_canvas.draw_rect(Rect2(o + Vector2(0, 1), Vector2(2, 2)), color)
+	_canvas.draw_rect(Rect2(o + Vector2(3, 1), Vector2(2, 2)), color)
+	_canvas.draw_rect(Rect2(o + Vector2(0, 2), Vector2(5, 2)), color)
+	_canvas.draw_rect(Rect2(o + Vector2(1, 4), Vector2(3, 1)), color)
+	_canvas.draw_rect(Rect2(o + Vector2(2, 5), Vector2(1, 1)), color)
 
 
 func _bar(pos: Vector2, width: float, height: float, ratio: float, color: Color) -> void:

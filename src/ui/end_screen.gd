@@ -24,6 +24,7 @@ func _ready() -> void:
 		"Enemies slain    %d" % GameState.run_kills,
 		"Team level       %d" % GameState.team_level,
 		"Time             %d:%02d" % [minutes, seconds],
+		"Second Winds     %d" % GameState.lives_used,
 		"",
 	])
 	for s in GameState.slots:

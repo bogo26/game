@@ -144,6 +144,10 @@ ELEMENTS = [
 ELEMENT_TIERS = {1: (RARE, 1.0), 2: (RARE, 2.5), 3: (EPIC, 8.0)}
 
 
+# Only useful with teammates: never offered to a solo player.
+TEAM_ONLY = {"guardian_angel"}
+
+
 def q(s):
     return '"%s"' % s.replace("\\", "\\\\").replace('"', '\\"')
 
@@ -177,6 +181,8 @@ def main():
         out.append("effects = PackedStringArray(%s)" % ", ".join(q(e) for e in effects))
         if "requires" in extra:
             out.append('requires = &"%s"' % extra["requires"])
+        if uid in TEAM_ONLY:
+            out.append("team_only = true")
         if "element" in extra:
             out.append('element = &"%s"' % extra["element"])
             out.append("tier = %d" % extra["tier"])

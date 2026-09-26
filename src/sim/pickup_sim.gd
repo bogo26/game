@@ -2,13 +2,17 @@ class_name PickupSim
 extends RefCounted
 ## XP gems and hearts as packed arrays. Items sit still until a hero comes
 ## within pickup range, then home in and are collected on contact. When full,
-## new drops merge into existing gems so XP is never lost.
+## new drops merge into existing gems so XP is never lost. Hearts only go to a
+## hurt hero (the most hurt one in range). vacuum() pulls every gem on the
+## level to the team (arena cleared, exit open).
 
 const CAPACITY := 600
 const FX_ROW := 8  # pickups are row 1 of the fx atlas (8 columns)
 const COLLECT_DISTANCE := 6.0
 const HOMING_ACCEL := 900.0
 const HOMING_MAX_SPEED := 420.0
+## Vacuumed gems start this fast.
+const VACUUM_SPEED := 160.0
 
 enum Kind { XP, HEART }
 ## Look: 0 small gem, 1 medium, 2 large, 3 heart.
@@ -70,9 +74,38 @@ static func look_of(p_kind: int, p_value: int) -> int:
 	return 0
 
 
-## `hero_positions` / `hero_radii` (pickup range) / `hero_active` per hero.
+## Sends every XP gem flying to the nearest active hero.
+func vacuum(hero_positions: PackedVector2Array, hero_active: PackedByteArray) -> void:
+	for i in count:
+		if kind[i] != Kind.XP:
+			continue
+		var best := -1
+		var best_d := INF
+		for h in hero_positions.size():
+			if hero_active[h] != 0:
+				var d := pos[i].distance_squared_to(hero_positions[h])
+				if d < best_d:
+					best_d = d
+					best = h
+		if best >= 0:
+			target[i] = best
+			speed[i] = maxf(speed[i], VACUUM_SPEED)
+
+
+## XP in gems still lying around (banked when a level ends).
+func total_xp() -> int:
+	var total := 0
+	for i in count:
+		if kind[i] == Kind.XP:
+			total += value[i]
+	return total
+
+
+## `hero_positions` / `hero_radii` (pickup range) / `hero_active` per hero;
+## `hero_need`: the share of HP each hero is missing (hearts go to the most
+## hurt hero in range, and never to one at full HP).
 func update(dt: float, hero_positions: PackedVector2Array, hero_ranges: PackedFloat32Array,
-		hero_active: PackedByteArray) -> void:
+		hero_active: PackedByteArray, hero_need: PackedFloat32Array = PackedFloat32Array()) -> void:
 	collected.clear()
 	var P := pos
 	var hero_count := hero_positions.size()
@@ -86,13 +119,19 @@ func update(dt: float, hero_positions: PackedVector2Array, hero_ranges: PackedFl
 			target[i] = -1
 			speed[i] = 0.0
 		if tgt == -1:
+			var heart := kind[i] == Kind.HEART and not hero_need.is_empty()
+			var most_need := 0.0
 			for h in hero_count:
 				if hero_active[h] != 0:
 					var range_px := hero_ranges[h]
 					if p.distance_squared_to(hero_positions[h]) <= range_px * range_px:
-						tgt = h
-						target[i] = h
-						break
+						if not heart:
+							tgt = h
+							break
+						if hero_need[h] > most_need:
+							most_need = hero_need[h]
+							tgt = h
+			target[i] = tgt
 		if tgt >= 0:
 			var to := hero_positions[tgt] - p
 			var dist := to.length()

@@ -39,11 +39,13 @@ func _init(p_library: UpgradeLibrary = null, seed_value: int = -1) -> void:
 
 
 ## Up to `count` different upgrades this hero can still take, weighted by rarity.
-func roll_offers(hero_id: StringName, stacks: Dictionary, count: int = 3) -> Array[UpgradeData]:
+func roll_offers(hero_id: StringName, stacks: Dictionary, count: int = 3, solo: bool = false) -> Array[UpgradeData]:
 	var candidates: Array[UpgradeData] = []
 	for u in library.upgrades:
 		if u.hero_id != &"" and u.hero_id != hero_id:
 			continue
+		if solo and u.team_only:
+			continue  # nobody to revive
 		if int(stacks.get(u.id, 0)) >= u.max_stacks:
 			continue
 		if u.requires != &"" and int(stacks.get(u.requires, 0)) == 0:

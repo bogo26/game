@@ -58,7 +58,7 @@ Backlog ideas for 9+: Alchemist (thrown flasks), Monk (dash-strike combos), Bard
 Downed state:
 - At 0 HP a hero is downed.
 - A teammate standing nearby for 3 s revives them at 30% HP.
-- If everyone is downed, the run is over.
+- **Team lives:** the team has 1 life per level (hearts next to the XP bar). If everyone is downed and a life is left, it's spent on a **Second Wind**: everyone gets back up at 50% HP with 2 s of invulnerability, enemies within 100 px of each hero are shoved away and stunned for 1 s, and enemy shots on screen vanish. With no life left, the run is over. The end screen counts the Second Winds used.
 - Friendly fire is off.
 
 ## Enemies
@@ -77,12 +77,15 @@ Spawn director:
 - Alive cap by player count: 150 / 200 / 250 / 300.
 - Recycles enemies left more than ~1.5 screens behind.
 - Enemy HP scales by player count: ×(1 + 0.35 × (n − 1)).
-- Heroes get 0.5 s of i-frames after a contact hit.
+- Heroes get 0.5 s of i-frames after a contact hit, 1.5 s when a level starts (or they drop in), and 0.75 s when play resumes after picking upgrades or the pause menu.
+- **Boss and nests** don't come in bigger numbers with more players, so their HP scales on its own curve: ×(0.6 + 0.45 × (n − 1)), i.e. 0.6 solo up to 1.95 for four (ordinary enemies stay at ×(1 + 0.35 × (n − 1))).
 
 ## Progression — pick 1 of 3
 
 - Enemies drop XP gems. XP is shared by the team.
 - On a team level-up the game pauses and **every player picks their own card at the same time** in their own screen quadrant, with their own controller. Play resumes when everyone has picked.
+- **Picks wait for arena fights to end:** while an arena fight is on, level-up rounds queue (the HUD shows "+2" next to the level) and open back to back 1 s after the arena is cleared. In corridors, from chests and during the boss fight they open at once.
+- Upgrades that only help with teammates (Guardian Angel) are never offered to a solo player (`UpgradeData.team_only`).
 - Upgrades are either stat modifiers (flat or %) or ability modifiers. They're written as short effect lines in `UpgradeData.effects`:
   - `stat damage pct 0.1`
   - `stat max_hp flat 20`
@@ -135,7 +138,9 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
   - a theme (tile sheet and decorations) and an optional tint
 - **`LevelDirector` runs the objectives:**
   - An **arena room** (digit tiles) activates when a living hero is 36+ px inside it. Stragglers are pulled in with the leader, every door touching the room turns solid, and the spawner switches to arena mode.
-  - The room is cleared once its quota has spawned and nothing is left alive in it. Quotas are ×(1 + 0.4 per extra player). The objective shows the enemies left: the part of the quota not yet spawned plus those alive inside.
+  - The quota comes in **waves**: 2 (45% / 55%) up to 60 enemies, 3 (30% / 33% / 37%) above. The next wave comes once 25% or less of the current one is left (or after 12 s), after a 2 s breather, with a "WAVE 2/3" callout and a horn.
+  - The room is cleared once its last wave has spawned and nothing is left alive in it. Quotas are ×(1 + 0.4 per extra player). The objective shows the wave and the enemies left: not yet spawned (this wave and later ones), in portals, and alive inside.
+  - **Clearing an arena** (and so opening the exit) pulls every XP gem on the level to the nearest hero. Gems still lying around when a level ends are banked as XP, and each hero's ultimate charge carries over to the next level.
   - Clearing opens the doors, drops a heart, and returns the spawner to the corridor trickle.
   - The **exit portal** opens when every arena is cleared. The level completes after all living heroes stand in it for 1 s.
   - The **boss level's** throne room spawns the Demon Lord instead of waves. Its death ends the run in victory.
@@ -369,7 +374,7 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - **Hostile = hot pink** (`FxLayer.DANGER`): every enemy projectile uses it (spit and boss fireballs are pink orbs with a white core and a dark outline) and throbs in the shader, and so does every enemy warning. Heroes' own telegraphs (the Mage's Meteor) are dashed and in the caster's colour. The Cleric's orb is pale gold.
   - **Exploders:** a lit fuse shows as a filling circle exactly as big as the blast, with a hiss; it follows the fuse and vanishes if the exploder dies first.
   - **Heroes** have a 1 px outline in their player colour (`hero_outline.gdshader`), so two players on the same hero, or the dark Rogue and Necromancer on dark floors, are easy to find. A "P1" tag shows over each hero for 3 s at level start, after a revive and while downed. Reticles are drawn above everything (`HeroOverlay`).
-  - Hearts are drawn above the horde and marked on the minimap; shrine blessings ring heroes in pale gold rather than a player-like colour.
+  - Hearts are drawn above the horde and marked on the minimap; shrine blessings ring heroes in pale gold rather than a player-like colour. A heart heals 25% of max HP and only goes to a hurt hero: the most hurt one in range, never one at full HP. Holy Dash also heals the Cleric for half as much, so it works solo.
   - Lines 1 px wide are drawn as line primitives: with vertex snapping on, a 1 px quad at an angle collapses to nothing.
 - **Feedback** (feel every hit, never miss a downed friend):
   - **Getting hit:** rumble scaled to the share of HP lost, the player's HUD panel flashes red, and hits of 15%+ of max HP shake the screen and show a big red number. Heroes' numbers are never pushed out by the horde's. Each player's hurt sound has its own pitch.

@@ -1,7 +1,9 @@
 class_name LevelDirector
 extends RefCounted
 ## Runs a level's objectives: arena rooms lock when the team walks in and
-## spawn waves until their quota is beaten (and their nests are destroyed),
+## spawn their quota in 2-3 waves (the next one comes, after a breather, once
+## most of the current one is beaten), until it's cleared (and their nests are
+## destroyed),
 ## the exit portal opens once every arena is cleared, and the boss level's
 ## throne room starts the boss fight. Wakes up nests (spawners) when heroes
 ## come near. Also keeps the objective text/target the HUD shows.
@@ -9,6 +11,10 @@ extends RefCounted
 signal level_completed
 signal boss_defeated
 signal objective_changed(text: String)
+## A wave of the active arena started (1-based) - for the HUD callout.
+signal wave_started(wave: int, waves: int)
+## An arena room was cleared (the World vacuums up the XP).
+signal arena_cleared(room_id: int)
 
 enum RoomState { IDLE, ACTIVE, CLEARED }
 
@@ -24,6 +30,15 @@ const NEST_RANGE := 230.0
 const NEST_INTERVAL := 2.6
 const NEST_BATCH := 2
 const NEST_POSE_TIME := 0.4
+## Arena quotas above this come in 3 waves, others in 2; shares of the quota.
+const THREE_WAVES_FROM := 61
+const WAVE_SHARES_2: Array[float] = [0.45, 0.55]
+const WAVE_SHARES_3: Array[float] = [0.3, 0.33, 0.37]
+## The next wave comes once this share of the current one is left (or after
+## WAVE_MAX_TIME), after a WAVE_BREATHER pause.
+const WAVE_NEXT_SHARE := 0.25
+const WAVE_MAX_TIME := 12.0
+const WAVE_BREATHER := 2.0
 
 
 class Nest:
@@ -42,6 +57,12 @@ class Room:
 	var killed := 0
 	var state := RoomState.IDLE
 	var center := Vector2.ZERO
+	## Enemies per wave (sums to the quota), the current wave, seconds since
+	## it started, and the pause left before the next one (> 0 while waiting).
+	var waves := PackedInt32Array()
+	var wave := 0
+	var wave_time := 0.0
+	var breather := 0.0
 
 
 var world: World
@@ -91,7 +112,7 @@ func setup(p_world: World) -> void:
 	spawner.corridor_cap_fraction = data.corridor_cap_fraction
 	spawner.spawn_rate = data.corridor_spawn_rate
 	spawner.mode = SpawnDirector.Mode.CORRIDOR if data.corridor_spawn_rate > 0.0 else SpawnDirector.Mode.OFF
-	boss_hp_multiplier = spawner.effective_hp_multiplier()
+	boss_hp_multiplier = spawner.unique_hp_multiplier()
 	_update_objective()
 
 
@@ -131,12 +152,29 @@ func on_enemy_killed() -> void:
 		_update_objective()
 
 
-## Enemies still to beat in the active arena: not yet spawned (or still in a
-## spawn portal) + alive inside.
+## Enemies still to beat in the active arena: not yet spawned (this wave and
+## the ones after it, or still in a spawn portal) + alive inside.
 func enemies_left() -> int:
 	if active_room == null:
 		return 0
-	return world.spawner.arena_remaining + world.spawner.pending_count() + _in_room_alive
+	var later := 0
+	for k in range(active_room.wave + 1, active_room.waves.size()):
+		later += active_room.waves[k]
+	return world.spawner.arena_remaining + world.spawner.pending_count() + _in_room_alive + later
+
+
+## Splits an arena quota into waves (see THREE_WAVES_FROM).
+static func split_waves(quota: int) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	if quota <= 0:
+		return out
+	var shares := WAVE_SHARES_3 if quota >= THREE_WAVES_FROM else WAVE_SHARES_2
+	var given := 0
+	for k in shares.size():
+		var n := quota - given if k == shares.size() - 1 else int(round(quota * shares[k]))
+		out.append(n)
+		given += n
+	return out
 
 
 # --- arenas ----------------------------------------------------------------------------------
@@ -180,8 +218,19 @@ func _activate(room: Room, leader: Hero) -> void:
 		world.spawner.mode = SpawnDirector.Mode.OFF
 		Audio.play_music(&"boss")
 	else:
-		world.spawner.start_arena(room.cells, room.quota, data.arena_spawn_rate)
+		room.waves = split_waves(room.quota)
+		room.wave = 0
+		room.wave_time = 0.0
+		room.breather = 0.0
+		world.spawner.start_arena(room.cells, room.waves[0] if not room.waves.is_empty() else 0,
+			data.arena_spawn_rate)
+		_announce_wave(room)
 	_update_objective()
+
+
+func _announce_wave(room: Room) -> void:
+	if room.waves.size() > 1:
+		wave_started.emit(room.wave + 1, room.waves.size())
 
 
 func _tick_active_room(dt: float) -> void:
@@ -190,6 +239,11 @@ func _tick_active_room(dt: float) -> void:
 		if boss == null or not is_instance_valid(boss):
 			_clear(room)
 		return
+	room.wave_time += dt
+	if room.breather > 0.0:
+		room.breather -= dt
+		if room.breather <= 0.0:
+			_next_wave(room)
 	_check_timer -= dt
 	if _check_timer > 0.0:
 		return
@@ -199,10 +253,25 @@ func _tick_active_room(dt: float) -> void:
 	for i in horde.count:
 		if horde.hp[i] > 0.0 and not horde.is_object(i) and level.room_at_position(horde.pos[i]) == room.id:
 			_in_room_alive += 1
-	if world.spawner.arena_remaining <= 0 and world.spawner.pending_count() == 0 and _in_room_alive == 0:
+	var spawner := world.spawner
+	var wave_out := spawner.arena_remaining <= 0 and spawner.pending_count() == 0
+	var more_waves := room.wave < room.waves.size() - 1
+	if more_waves:
+		if wave_out and room.breather <= 0.0 and (_in_room_alive <= int(room.waves[room.wave] * WAVE_NEXT_SHARE)
+				or room.wave_time >= WAVE_MAX_TIME):
+			room.breather = WAVE_BREATHER
+	elif wave_out and _in_room_alive == 0:
 		_clear(room)
-	else:
-		_update_objective()
+		return
+	_update_objective()
+
+
+func _next_wave(room: Room) -> void:
+	room.wave += 1
+	room.wave_time = 0.0
+	world.spawner.arena_remaining += room.waves[room.wave]
+	_announce_wave(room)
+	_update_objective()
 
 
 func _clear(room: Room) -> void:
@@ -217,6 +286,7 @@ func _clear(room: Room) -> void:
 	if arenas_cleared() == rooms.size() and not data.is_boss_level:
 		exit_open = true
 		Audio.play(&"portal")
+	arena_cleared.emit(room.id)
 	_update_objective()
 
 
@@ -340,6 +410,8 @@ func _update_objective() -> void:
 		elif not room_nests.is_empty():
 			objective = "Destroy the nests!  %d left" % room_nests.size()
 			objective_target = _nearest(room_nests)
+		elif active_room.waves.size() > 1:
+			objective = "Wave %d/%d  -  %d left" % [active_room.wave + 1, active_room.waves.size(), enemies_left()]
 		elif active_room.quota > 0:
 			objective = "Defeat the horde!  %d left" % enemies_left()
 		else:

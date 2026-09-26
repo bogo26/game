@@ -53,6 +53,7 @@ func _load_level() -> void:
 	# Never carry a pause into the new level (only an unplugged pad keeps it).
 	get_tree().paused = InputRouter.has_disconnected_player()
 	var data := run.levels[GameState.level_index]
+	GameState.team_lives = GameState.LIVES_PER_LEVEL
 	world = (load(WORLD_SCENE) as PackedScene).instantiate()
 	world.level_data = data
 	world.run_mode = true
@@ -77,6 +78,15 @@ func _show_banner(title: String, subtitle: String) -> void:
 	_banner_time = BANNER_TIME
 
 
+## What the team keeps going into the next level: ultimate charge, and the XP
+## in gems nobody picked up.
+func _carry_over() -> void:
+	for hero in world.heroes:
+		GameState.slots[hero.slot].ult_charge = hero.ult_charge
+	GameState.add_xp(world.pickups.total_xp())
+	world.pickups.clear()
+
+
 func _bank_level_stats() -> void:
 	GameState.run_kills += world.kills
 	GameState.run_time += world.elapsed
@@ -87,6 +97,7 @@ func _on_level_completed() -> void:
 		return
 	# Rounds earned from here on open after the next level's banner.
 	world.level_ups_enabled = false
+	_carry_over()
 	_bank_level_stats()
 	GameState.levels_cleared += 1
 	_show_banner("LEVEL CLEAR!", "")

@@ -134,17 +134,17 @@ func test_arena_enemies_step_out_of_portals() -> void:
 	var director := world.director
 	director._activate(director.room_by_id(1), world.heroes[0])
 	var view := world.camera.visible_rect()
-	spawner.tick(0.5, view, world.hero_positions)  # budget for all six
-	assert_eq(portals[0], 6, "a portal opens for every arena spawn")
+	spawner.tick(0.5, view, world.hero_positions)  # budget for the whole first wave
+	assert_eq(portals[0], 3, "a portal opens for every spawn of the first wave (3 of 6)")
 	assert_eq(world.horde.enemy_count(), 0, "nobody has stepped out yet")
-	assert_eq(director.enemies_left(), 6, "enemies in portals still count")
+	assert_eq(director.enemies_left(), 6, "enemies in portals (and the next wave) still count")
 	director._check_timer = 0.0
 	director._tick_active_room(DT)
 	assert_eq(director.room_by_id(1).state, LevelDirector.RoomState.ACTIVE,
 		"the arena doesn't clear while enemies are still in portals")
 	for f in int(SpawnDirector.PORTAL_TIME / DT) + 2:
 		spawner.tick(DT, view, world.hero_positions)
-	assert_eq(world.horde.enemy_count(), 6, "after the portal time they're all out")
+	assert_eq(world.horde.enemy_count(), 3, "after the portal time they're all out")
 	assert_eq(spawner.pending_count(), 0)
 	_teardown(world)
 

@@ -130,6 +130,7 @@ func setup(p_slot: int, p_hero_id: StringName, p_world: World) -> void:
 		abilities.append(ability)
 	_refresh_stats()
 	hp = max_hp
+	ult_charge = GameState.slots[slot].ult_charge  # carried over from the last level
 	# Re-apply upgrades taken earlier in the run (levels rebuild heroes).
 	var library := UpgradePool.shared_library()
 	for id in GameState.slots[slot].upgrades:

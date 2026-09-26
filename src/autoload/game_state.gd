@@ -6,6 +6,8 @@ const MAX_PLAYERS := 4
 ## Pick rounds that don't come from a team level-up.
 const TREASURE_ROUND := 0
 const BONUS_ROUND := -1
+## Team lives at the start of every level.
+const LIVES_PER_LEVEL := 1
 const PLAYER_COLORS: Array[Color] = [
 	Color("e8504a"),  # P1 red
 	Color("4c93f2"),  # P2 blue
@@ -20,6 +22,8 @@ class PlayerSlot:
 	var ready := false
 	## Upgrade ids taken this run, in order (re-applied on every level).
 	var upgrades: Array[StringName] = []
+	## Ultimate charge carried from one level to the next.
+	var ult_charge := 0.0
 
 	func _init(p_slot: int) -> void:
 		slot = p_slot
@@ -49,6 +53,11 @@ var pending_treasures: int:
 		return pending_rounds.count(TREASURE_ROUND)
 ## --debug-levelups is granted once per run, not on every level.
 var debug_picks_given := false
+## Team lives left this level: a wipe with one left is a Second Wind (everyone
+## gets back up) instead of the end of the run. Refilled every level.
+var team_lives := 0
+## Second Winds used this run (end screen).
+var lives_used := 0
 ## Run statistics (shown on the end screen).
 var run_kills := 0
 var run_time := 0.0
@@ -108,6 +117,8 @@ func reset_run() -> void:
 	level_index = 0
 	pending_rounds.clear()
 	debug_picks_given = false
+	team_lives = LIVES_PER_LEVEL
+	lives_used = 0
 	run_kills = 0
 	run_time = 0.0
 	levels_cleared = 0
@@ -115,6 +126,7 @@ func reset_run() -> void:
 	run_active = true
 	for s in slots:
 		s.upgrades.clear()
+		s.ult_charge = 0.0
 	Events.xp_changed.emit(xp, xp_to_next(), team_level)
 
 
@@ -135,3 +147,4 @@ func clear_players() -> void:
 		s.hero_id = &""
 		s.ready = false
 		s.upgrades.clear()
+		s.ult_charge = 0.0

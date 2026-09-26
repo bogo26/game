@@ -126,6 +126,9 @@ func _tick_active(delta: float) -> void:
 				horde.apply_mark(j, mark_time)
 	var heal_amount := heal_allies + mod(&"heal_allies")
 	if heal_amount > 0.0:
+		if not _healed.has(hero.slot):  # the dasher gets half (so it works solo too)
+			_healed[hero.slot] = true
+			hero.heal(heal_amount * 0.5)
 		for ally in w.heroes:
 			if ally != hero and not _healed.has(ally.slot) and ally.position.distance_to(hero.position) < 18.0:
 				_healed[ally.slot] = true

@@ -11,6 +11,8 @@ extends Node2D
 signal team_wiped
 signal level_completed
 signal boss_defeated
+## A wipe spent a team life: everyone got back up.
+signal second_wind
 ## The pause menu's "Quit to menu" in a run (the Game handles it).
 signal quit_requested
 
@@ -49,6 +51,19 @@ const BIG_HIT_SHARE := 0.15
 const HURT_PITCH: Array[float] = [1.0, 1.15, 0.88, 1.3]
 ## World time runs at this speed during a slow-motion moment.
 const SLOWMO_SCALE := 0.35
+## Heroes can't be hurt for this long when a level starts or they drop in...
+const SPAWN_PROTECTION := 1.5
+## ...or when play resumes after picking upgrades or the pause menu.
+const RESUME_GRACE := 0.75
+## Pick rounds held during an arena fight open this long after it's cleared
+## (the vacuumed XP lands first).
+const PICKS_AFTER_CLEAR := 1.0
+## Second Wind: everyone back up at this share of HP, enemies around each hero
+## shoved away and stunned, enemy shots on screen gone.
+const SECOND_WIND_HP := 0.5
+const SECOND_WIND_RADIUS := 100.0
+const SECOND_WIND_PUSH := 260.0
+const SECOND_WIND_STUN := 1.0
 ## Test rooms: seconds after a team wipe before everyone gets back up.
 const TEST_ROOM_WIPE_RESET := 3.0
 ## Barrels, urns and nests stand this far below their tile's centre.
@@ -112,6 +127,7 @@ var _hero_bodies := PackedVector2Array()
 var _hero_targetable := PackedByteArray()
 var _hero_ranges := PackedFloat32Array()
 var _hero_active := PackedByteArray()
+var _hero_need := PackedFloat32Array()
 var _rng := RandomNumberGenerator.new()
 var _scratch := PackedInt32Array()
 var _wiped := false
@@ -165,6 +181,8 @@ func _ready() -> void:
 	if not GameState.run_active:
 		GameState.reset_run()
 	level_up.closed.connect(_on_level_up_closed)
+	level_up.may_continue = can_open_pick_round
+	pause_menu.closed.connect(_grant_grace.bind(RESUME_GRACE))
 	hud.setup(self)
 	pause_menu.quit_requested.connect(_on_quit_requested)
 	level.build(level_data)
@@ -235,6 +253,8 @@ func _ready() -> void:
 		director.objective_target = Vector2.INF
 	director.level_completed.connect(level_completed.emit)
 	director.boss_defeated.connect(boss_defeated.emit)
+	director.arena_cleared.connect(_on_arena_cleared)
+	director.wave_started.connect(_on_wave_started)
 	if not GameState.debug_picks_given:
 		GameState.debug_picks_given = true
 		GameState.pending_level_ups += _cmdline_int("--debug-levelups=", 0)
@@ -253,6 +273,7 @@ func spawn_hero(slot: int) -> Hero:
 	hero.position = grid.nearest_open(anchor + SPAWN_OFFSETS[slot])
 	entities.add_child(hero)
 	heroes.append(hero)
+	hero.invulnerable_time = SPAWN_PROTECTION
 	_apply_debug_upgrades(hero)
 	spawner.set_player_count(heroes.size())
 	Events.hero_spawned.emit(slot)
@@ -317,13 +338,13 @@ func _process(delta: float) -> void:
 	elements.tick(dt)
 	PerfMonitor.record(&"elements", elements_usec + Time.get_ticks_usec() - t_elements)
 	_apply_ult_charge()
-	pickups.update(dt, hero_positions, _hero_ranges, _hero_active)
+	pickups.update(dt, hero_positions, _hero_ranges, _hero_active, _hero_need)
 	_apply_pickups()
 	_check_wipe(dt)
 	camera.follow(hero_positions, dt)
 	reveal.tick(dt, camera.visible_rect())
 	level_up_delay = maxf(0.0, level_up_delay - dt)
-	if level_ups_enabled and level_up_delay <= 0.0 and GameState.pending_level_ups > 0 \
+	if level_ups_enabled and level_up_delay <= 0.0 and can_open_pick_round() \
 			and not level_up.is_open() and not heroes.is_empty():
 		level_up.open(heroes, upgrade_pool)
 		get_tree().paused = true
@@ -503,6 +524,7 @@ func _snapshot_heroes() -> void:
 	_hero_targetable.resize(n)
 	_hero_ranges.resize(n)
 	_hero_active.resize(n)
+	_hero_need.resize(n)
 	target_positions.clear()
 	for i in n:
 		var hero := heroes[i]
@@ -511,6 +533,7 @@ func _snapshot_heroes() -> void:
 		_hero_targetable[i] = 1 if hero.is_targetable() else 0
 		_hero_ranges[i] = hero.pickup_range
 		_hero_active[i] = 0 if hero.is_downed() else 1
+		_hero_need[i] = 1.0 - hero.hp / hero.max_hp if hero.max_hp > 0.0 else 0.0
 		if not hero.is_downed():
 			target_positions.append(hero.position)
 
@@ -550,6 +573,9 @@ func _check_wipe(dt: float) -> void:
 		if not hero.is_downed():
 			all_down = false
 			break
+	if all_down and not _wiped and run_mode and GameState.team_lives > 0:
+		_second_wind()
+		return
 	if all_down and not _wiped:
 		_wiped = true
 		_wipe_timer = TEST_ROOM_WIPE_RESET
@@ -587,7 +613,7 @@ func _spawn_props() -> void:
 		var t := horde.type_index(prop.kind)
 		if t < 0:
 			continue
-		var hp_scale := spawner.effective_hp_multiplier() if prop.kind == &"nest" else 1.0
+		var hp_scale := spawner.unique_hp_multiplier() if prop.kind == &"nest" else 1.0
 		var i := horde.spawn(t, LevelGrid.cell_center(prop.cell) + PROP_FEET, hp_scale)
 		if i < 0:
 			continue
@@ -968,6 +994,52 @@ func _on_device_changed(_slot: int) -> void:
 
 func _on_level_up_closed() -> void:
 	get_tree().paused = InputRouter.has_disconnected_player()
+	_grant_grace(RESUME_GRACE)
+
+
+## A moment of invulnerability for every living hero.
+func _grant_grace(seconds: float) -> void:
+	for hero in heroes:
+		if not hero.is_downed():
+			hero.invulnerable_time = maxf(hero.invulnerable_time, seconds)
+
+
+## Pick rounds wait while an arena fight is on (except chests' treasure
+## rounds); in corridors and the boss fight they open right away.
+func picks_held() -> bool:
+	return director.active_room != null and not level_data.is_boss_level
+
+
+func can_open_pick_round() -> bool:
+	if GameState.pending_level_ups <= 0:
+		return false
+	return not picks_held() or GameState.next_round() == GameState.TREASURE_ROUND
+
+
+func _on_arena_cleared(_room_id: int) -> void:
+	pickups.vacuum(hero_positions, _hero_active)
+	level_up_delay = maxf(level_up_delay, PICKS_AFTER_CLEAR)
+
+
+func _on_wave_started(wave: int, waves: int) -> void:
+	hud.callout("WAVE %d/%d" % [wave, waves], Color("ffe07a"))
+	Audio.play(&"wave")
+
+
+## A wipe with a team life left: everyone gets back up.
+func _second_wind() -> void:
+	GameState.team_lives -= 1
+	GameState.lives_used += 1
+	revive_all(SECOND_WIND_HP)
+	for hero in heroes:
+		damage_enemies_in_circle(hero.position, SECOND_WIND_RADIUS, 0.0, SECOND_WIND_PUSH, -1, SECOND_WIND_STUN)
+		fx.ring(hero.position, SECOND_WIND_RADIUS, Color(1, 0.95, 0.6), 0.6)
+		particles.burst(hero.position + Vector2(0, -6), 24, Color(1, 0.9, 0.5), 110.0, 0.7, 3, Vector2.UP, PI, -40.0)
+	projectiles.clear_enemy_shots(camera.visible_rect().grow(32.0))
+	hud.callout("SECOND WIND!", Color(1, 0.9, 0.5))
+	Audio.play(&"shrine")
+	shake(4.0)
+	second_wind.emit()
 
 
 func _on_quit_requested() -> void:

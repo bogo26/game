@@ -5,6 +5,8 @@ extends CanvasLayer
 ## takes a second press, so a run isn't thrown away by accident.
 
 signal quit_requested
+## The menu closed and play resumes.
+signal closed
 
 const QUIT_TEXT := "Quit to menu"
 const QUIT_CONFIRM_TEXT := "Press again to quit"
@@ -61,6 +63,7 @@ func close() -> void:
 	closed_at_frame = Engine.get_process_frames()
 	InputRouter.swallow_presses()
 	get_tree().paused = InputRouter.has_disconnected_player()
+	closed.emit()
 
 
 func _on_quit_pressed() -> void:

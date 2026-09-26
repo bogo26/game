@@ -152,6 +152,7 @@ rarity = 0
 max_stacks = 2
 hero_id = &""
 effects = PackedStringArray("stat revive_speed pct 0.5", "stat max_hp flat 10")
+team_only = true
 
 [sub_resource type="Resource" id="Resource_glass_cannon"]
 script = ExtResource("2_upgrade")

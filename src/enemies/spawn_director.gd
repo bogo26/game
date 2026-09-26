@@ -10,6 +10,12 @@ extends RefCounted
 
 const ALIVE_CAP_BY_PLAYERS: Array[int] = [150, 150, 200, 250, 300]
 const HP_SCALE_PER_EXTRA_PLAYER := 0.35
+## One-of-a-kind enemies (the boss, nests) don't come in bigger numbers with
+## more players, so they scale on their own curve: 0.6 solo, then +0.45 per
+## extra player (a solo player faces about the same boss HP per hero as a
+## team does).
+const FIXED_HP_SOLO := 0.6
+const FIXED_HP_PER_EXTRA_PLAYER := 0.45
 const SPAWN_MARGIN_MIN := 20.0
 const SPAWN_MARGIN_MAX := 90.0
 const RECYCLE_INTERVAL := 0.5
@@ -44,6 +50,8 @@ var alive_cap := 150
 ## Enemies per second while below the cap.
 var spawn_rate := 30.0
 var hp_multiplier := 1.0
+## HP scale for one-of-a-kind enemies (see FIXED_HP_SOLO).
+var fixed_hp_multiplier := FIXED_HP_SOLO
 ## Per-level difficulty on top of the player-count scaling.
 var level_hp_multiplier := 1.0
 ## Relative spawn weight per enemy type index.
@@ -74,10 +82,16 @@ func effective_hp_multiplier() -> float:
 	return hp_multiplier * level_hp_multiplier
 
 
+## HP multiplier for the boss and nests.
+func unique_hp_multiplier() -> float:
+	return fixed_hp_multiplier * level_hp_multiplier
+
+
 func set_player_count(players: int) -> void:
 	var n := clampi(players, 1, 4)
 	alive_cap = ALIVE_CAP_BY_PLAYERS[n]
 	hp_multiplier = 1.0 + HP_SCALE_PER_EXTRA_PLAYER * float(n - 1)
+	fixed_hp_multiplier = FIXED_HP_SOLO + FIXED_HP_PER_EXTRA_PLAYER * float(n - 1)
 
 
 func set_weight(type_id: StringName, weight: float) -> void:

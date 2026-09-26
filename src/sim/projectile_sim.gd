@@ -120,6 +120,22 @@ func clear() -> void:
 	count = 0
 
 
+## Removes every enemy shot inside `area` (a Second Wind clears the screen).
+func clear_enemy_shots(area: Rect2) -> void:
+	var P := pos
+	var V := vel
+	var L := life
+	var i := 0
+	while i < count:
+		if team[i] == Team.ENEMY and area.has_point(P[i]):
+			_remove_at(i, P, V, L)
+		else:
+			i += 1
+	pos = P
+	vel = V
+	life = L
+
+
 ## Enemy shots hit heroes within `hero_radius` of `hero_bodies` (the middle
 ## of each hero's sprite, not the feet) whose `hero_targetable` flag is set.
 func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_bodies: PackedVector2Array,
