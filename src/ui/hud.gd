@@ -34,6 +34,8 @@ func setup(p_world: World) -> void:
 
 func _ready() -> void:
 	layer = 10
+	# Keeps updating while the level is paused (e.g. the controller-disconnected notice).
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_canvas = Control.new()
 	_canvas.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE

@@ -106,6 +106,10 @@ const MAX_CORPSES := 96
 
 
 func _ready() -> void:
+	# Explicit: in a run the World lives under the Game node, which processes
+	# always (banners, timers). Inheriting that would keep the level running
+	# while players pick upgrades or the pause menu is open.
+	process_mode = Node.PROCESS_MODE_PAUSABLE
 	if not GameState.run_active:
 		GameState.reset_run()
 	level_up.closed.connect(_on_level_up_closed)
@@ -572,6 +576,8 @@ func _apply_pickups() -> void:
 
 
 func _on_join_requested(device: int) -> void:
+	if get_tree().paused:
+		return  # no drop-ins while picking upgrades or paused
 	var slot := InputRouter.free_slot()
 	if slot == -1:
 		return
