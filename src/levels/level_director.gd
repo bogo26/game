@@ -1,9 +1,10 @@
 class_name LevelDirector
 extends RefCounted
 ## Runs a level's objectives: arena rooms lock when the team walks in and
-## spawn waves until their quota is beaten, the exit portal opens once every
-## arena is cleared, and the boss level's throne room starts the boss fight.
-## Also keeps the objective text/target the HUD shows.
+## spawn waves until their quota is beaten (and their nests are destroyed),
+## the exit portal opens once every arena is cleared, and the boss level's
+## throne room starts the boss fight. Wakes up nests (spawners) when heroes
+## come near. Also keeps the objective text/target the HUD shows.
 
 signal level_completed
 signal boss_defeated
@@ -17,6 +18,20 @@ const EXIT_HOLD_TIME := 1.0
 ## Heroes must be this far inside an arena (from its doors) to trigger it.
 const ACTIVATE_DEPTH := 36.0
 const QUOTA_PER_EXTRA_PLAYER := 0.4
+## Nests wake up when a living hero is this close...
+const NEST_RANGE := 230.0
+## ...and then spawn NEST_BATCH enemies about this often.
+const NEST_INTERVAL := 2.6
+const NEST_BATCH := 2
+const NEST_POSE_TIME := 0.4
+
+
+class Nest:
+	var uid := 0
+	var cell := Vector2i.ZERO
+	var room := 0
+	var index := -1
+	var timer := 1.0
 
 
 class Room:
@@ -38,6 +53,8 @@ var exit_open := false
 var completed := false
 var boss: BossDemon
 var boss_hp_multiplier := 1.0
+## Nests still standing (destroyed ones drop out on the next tick).
+var nests: Array[Nest] = []
 var objective := ""
 ## Where the objective is (for the HUD's off-screen arrow); INF when none.
 var objective_target := Vector2.INF
@@ -98,6 +115,7 @@ func tick(dt: float) -> void:
 		return
 	if boss:
 		boss.tick(dt)
+	_tick_nests(dt)
 	if active_room:
 		_tick_active_room(dt)
 	else:
@@ -169,7 +187,7 @@ func _tick_active_room(dt: float) -> void:
 	_in_room_alive = 0
 	var horde := world.horde
 	for i in horde.count:
-		if horde.hp[i] > 0.0 and level.room_at_position(horde.pos[i]) == room.id:
+		if horde.hp[i] > 0.0 and not horde.is_object(i) and level.room_at_position(horde.pos[i]) == room.id:
 			_in_room_alive += 1
 	if world.spawner.arena_remaining <= 0 and _in_room_alive == 0:
 		_clear(room)
@@ -188,6 +206,73 @@ func _clear(room: Room) -> void:
 		exit_open = true
 		Audio.play(&"portal")
 	_update_objective()
+
+
+# --- nests ------------------------------------------------------------------------------------
+
+func add_nest(uid: int, cell: Vector2i, room: int) -> void:
+	var nest := Nest.new()
+	nest.uid = uid
+	nest.cell = cell
+	nest.room = room
+	nest.timer = randf_range(0.5, 1.5)
+	nests.append(nest)
+	_update_objective()
+
+
+## Nest positions still standing, optionally only those in one arena room.
+func nest_positions(room_id: int = -1) -> Array[Vector2]:
+	var out: Array[Vector2] = []
+	var horde := world.horde
+	for nest in nests:
+		var i := horde.index_of_uid(nest.uid, nest.index)
+		if i != -1 and horde.hp[i] > 0.0 and (room_id == -1 or nest.room == room_id):
+			out.append(horde.pos[i])
+	return out
+
+
+func _tick_nests(dt: float) -> void:
+	if nests.is_empty():
+		return
+	var horde := world.horde
+	var spawner := world.spawner
+	var k := 0
+	while k < nests.size():
+		var nest := nests[k]
+		var i := horde.index_of_uid(nest.uid, nest.index)
+		if i == -1 or horde.hp[i] <= 0.0:
+			nests.remove_at(k)  # destroyed
+			_update_objective()
+			continue
+		k += 1
+		nest.index = i
+		horde.action[i] = maxf(0.0, horde.action[i] - dt)  # spawning pose
+		# Nests inside an arena sleep until that arena's fight starts.
+		if nest.room != 0 and (room_by_id(nest.room) == null or room_by_id(nest.room).state != RoomState.ACTIVE):
+			continue
+		var p := horde.pos[i]
+		if not _hero_within(p, NEST_RANGE):
+			continue
+		nest.timer -= dt
+		if nest.timer > 0.0:
+			continue
+		nest.timer = NEST_INTERVAL * randf_range(0.85, 1.15)
+		if horde.enemy_count() >= spawner.alive_cap:
+			continue
+		for n in NEST_BATCH:
+			var spot := world.grid.nearest_open(p + Vector2.from_angle(randf() * TAU) * randf_range(12.0, 20.0))
+			horde.spawn(spawner.pick_type(), spot, spawner.effective_hp_multiplier())
+			world.fx.ring(spot, 7.0, Color(0.9, 0.3, 0.6), 0.3)
+		horde.action[i] = NEST_POSE_TIME
+		if world.camera.visible_rect().has_point(p):
+			Audio.play(&"nest")
+
+
+func _hero_within(p: Vector2, distance: float) -> bool:
+	for hero in world.heroes:
+		if not hero.is_downed() and hero.position.distance_squared_to(p) <= distance * distance:
+			return true
+	return false
 
 
 # --- boss ------------------------------------------------------------------------------------
@@ -238,10 +323,16 @@ func _check_exit(dt: float) -> void:
 func _update_objective() -> void:
 	objective_target = Vector2.INF
 	if active_room:
+		var room_nests := nest_positions(active_room.id)
 		if data.is_boss_level:
 			objective = "Defeat the Demon Lord!"
-		else:
+		elif not room_nests.is_empty():
+			objective = "Destroy the nests!  %d left" % room_nests.size()
+			objective_target = _nearest(room_nests)
+		elif active_room.quota > 0:
 			objective = "Survive the arena!  %d / %d" % [mini(active_room.killed, active_room.quota), active_room.quota]
+		else:
+			objective = "Clear the arena!"
 	elif exit_open:
 		objective = "Reach the exit portal"
 		objective_target = level.exit_center()
@@ -254,6 +345,18 @@ func _update_objective() -> void:
 		if next:
 			objective_target = next.center
 	objective_changed.emit(objective)
+
+
+func _nearest(points: Array[Vector2]) -> Vector2:
+	var from := world.camera.global_position
+	var best := Vector2.INF
+	var best_d := INF
+	for q in points:
+		var d := q.distance_squared_to(from)
+		if d < best_d:
+			best_d = d
+			best = q
+	return best
 
 
 func _nearest_idle_room() -> Room:

@@ -8,6 +8,14 @@ enum Behavior {
 	RANGED,    ## keeps distance and fires projectiles when in line of sight
 	EXPLODER,  ## rushes in, stops to telegraph, then explodes
 	BOSS,      ## body only: a boss controller node moves it and drives attacks
+	OBJECT,    ## breakable scenery (barrels, urns): not an enemy, never moves
+	NEST,      ## stationary spawner the LevelDirector wakes up; counts as an enemy
+}
+## What a breakable object does when destroyed.
+enum OnDeath {
+	NONE,
+	EXPLODE,  ## blasts enemies (and other objects) in explosion_radius
+	LOOT,     ## scatters loot_xp worth of XP gems, sometimes a heart
 }
 
 @export var id: StringName = &"swarmer"
@@ -34,6 +42,10 @@ enum Behavior {
 @export var explosion_damage := 22.0
 @export var fuse_time := 0.7
 
+@export_group("Breakables")
+@export var on_death := OnDeath.NONE
+@export var loot_xp := 0
+
 @export_group("Visuals")
 ## Row in assets/sprites/enemies/horde_atlas.png (8 cells per row).
 @export var atlas_row := 0
@@ -43,4 +55,4 @@ enum Behavior {
 
 ## Doesn't walk on its own: moved by a controller (boss) or fixed in place.
 func is_static() -> bool:
-	return behavior == Behavior.BOSS
+	return behavior == Behavior.BOSS or behavior == Behavior.OBJECT or behavior == Behavior.NEST

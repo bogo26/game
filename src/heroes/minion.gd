@@ -102,7 +102,7 @@ func _validate_target() -> void:
 		_target = -1
 	if _target == -1 and _retarget_in <= 0.0:
 		_retarget_in = RETARGET_INTERVAL
-		_target = horde.nearest(position, attack_range)
+		_target = horde.nearest(position, attack_range, false)
 		_target_uid = horde.uid[_target] if _target >= 0 else -1
 
 

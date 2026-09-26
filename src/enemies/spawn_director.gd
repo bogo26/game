@@ -96,7 +96,8 @@ func tick(dt: float, view: Rect2, hero_positions: PackedVector2Array) -> void:
 	if mode == Mode.CORRIDOR:
 		cap = int(alive_cap * corridor_cap_fraction)
 	var attempts := 0
-	while _budget >= 1.0 and horde.alive_count() < cap and attempts < 24:
+	var alive := horde.enemy_count()
+	while _budget >= 1.0 and alive < cap and attempts < 24:
 		if mode == Mode.ARENA and arena_remaining <= 0:
 			break
 		attempts += 1
@@ -105,6 +106,7 @@ func tick(dt: float, view: Rect2, hero_positions: PackedVector2Array) -> void:
 		if not p.is_finite():
 			continue
 		horde.spawn(pick_type(), p, effective_hp_multiplier())
+		alive += 1
 		_budget -= 1.0
 		if mode == Mode.ARENA:
 			arena_remaining -= 1
@@ -189,7 +191,7 @@ func _is_good_cell(p: Vector2) -> bool:
 func _recycle(view: Rect2, hero_positions: PackedVector2Array) -> void:
 	var keep := view.grow(maxf(view.size.x, view.size.y))
 	for i in horde.count:
-		if horde.hp[i] > 0.0 and not keep.has_point(horde.pos[i]):
+		if horde.hp[i] > 0.0 and horde.is_mobile(i) and not keep.has_point(horde.pos[i]):
 			var p := find_spawn_point(view, hero_positions)
 			if p.is_finite():
 				horde.relocate(i, p)

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"nest"
+max_hp = 90.0
+speed = 0.0
+radius = 9.0
+hurt_size = Vector2(20, 14)
+contact_damage = 0.0
+xp = 15
+knockback_taken = 0.0
+behavior = 5
+atlas_row = 7
+walk_frames = 4
+anim_fps = 4.0

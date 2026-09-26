@@ -23,6 +23,9 @@ const ENEMY_TYPES: Array[String] = [
 	"res://src/enemies/data/spitter.tres",
 	"res://src/enemies/data/exploder.tres",
 	"res://src/enemies/data/boss_demon.tres",
+	"res://src/enemies/data/barrel.tres",
+	"res://src/enemies/data/urn.tres",
+	"res://src/enemies/data/nest.tres",
 ]
 const HORDE_ATLAS := preload("res://assets/sprites/enemies/horde_atlas.png")
 const FX_ATLAS := preload("res://assets/sprites/fx/fx_atlas.png")
@@ -33,6 +36,7 @@ const HEART_DROP_CHANCE := 0.004
 const ENEMY_COLORS := {
 	&"swarmer": Color(0.42, 0.75, 0.3), &"brute": Color(0.6, 0.45, 0.68), &"spitter": Color(0.68, 0.35, 0.85),
 	&"exploder": Color(1.0, 0.55, 0.2), &"boss_demon": Color(0.9, 0.25, 0.2),
+	&"barrel": Color(0.75, 0.3, 0.2), &"urn": Color(0.69, 0.48, 0.29), &"nest": Color(0.55, 0.2, 0.35),
 }
 const MAX_SPARKS_PER_FRAME := 40
 const MAX_PUFFS_PER_FRAME := 30
@@ -41,6 +45,13 @@ const CRIT_COLOR := Color(1.0, 0.72, 0.15)
 const REVIVE_DECAY := 0.5
 ## Test rooms: seconds after a team wipe before everyone gets back up.
 const TEST_ROOM_WIPE_RESET := 3.0
+## Barrels, urns and nests stand this far below their tile's centre.
+const PROP_FEET := Vector2(0, 5)
+## Delay before a barrel goes off, so chains ripple instead of popping at once.
+const BLAST_DELAY := 0.05
+const BARREL_KNOCKBACK := 220.0
+const URN_GEMS := 3
+const URN_HEART_CHANCE := 0.15
 
 @export var level_data: LevelData
 ## Test rooms let players join mid-game by pressing A / Enter.
@@ -89,6 +100,8 @@ var _rng := RandomNumberGenerator.new()
 var _scratch := PackedInt32Array()
 var _wiped := false
 var _wipe_timer := 0.0
+## Barrel blasts waiting to go off: [position, radius, damage, slot, delay].
+var _pending_blasts: Array[Array] = []
 ## Recent enemy deaths (Raise Dead): positions and times.
 var _corpse_pos := PackedVector2Array()
 var _corpse_time := PackedFloat32Array()
@@ -171,8 +184,9 @@ func _ready() -> void:
 	Events.player_device_lost.connect(_on_device_changed)
 	Events.player_device_restored.connect(_on_device_changed)
 	_snapshot_heroes()
-	flow.compute_now(target_positions)
 	director.setup(self)
+	_spawn_props()
+	flow.compute_now(target_positions)
 	if not run_mode:
 		director.exit_open = false  # the sandbox never ends
 		director.objective = "Test room: endless horde  (Start/Esc: menu)"
@@ -236,6 +250,7 @@ func _process(delta: float) -> void:
 	projectiles.update(dt, horde, grid, _hero_bodies, _hero_targetable, Hero.HURT_RADIUS)
 	_apply_projectile_hits()
 	_update_zones(dt)
+	_update_barrel_blasts(dt)
 	var t_projectiles := Time.get_ticks_usec()
 
 	_emit_hit_effects()
@@ -465,6 +480,63 @@ func _apply_contact_damage() -> void:
 				hero.take_hit(dmg)
 
 
+## Barrels, urns and nests from the layout become (stationary) horde entries
+## that block their tile until destroyed.
+func _spawn_props() -> void:
+	for prop in level.props:
+		if prop.kind not in [&"barrel", &"urn", &"nest"]:
+			continue
+		var t := horde.type_index(prop.kind)
+		if t < 0:
+			continue
+		var hp_scale := spawner.effective_hp_multiplier() if prop.kind == &"nest" else 1.0
+		var i := horde.spawn(t, LevelGrid.cell_center(prop.cell) + PROP_FEET, hp_scale)
+		if i < 0:
+			continue
+		grid.set_blocker(prop.cell.x, prop.cell.y, true)
+		if prop.kind == &"nest":
+			director.add_nest(horde.uid[i], prop.cell, prop.room)
+
+
+## A barrel or urn broke: free its tile, then blow up or scatter loot.
+func _break_object(p: Vector2, t: int, killer: int) -> void:
+	var cell := grid.cell_of(p)
+	grid.set_blocker(cell.x, cell.y, false)
+	var data := horde.types[t]
+	particles.burst(p - Vector2(0, 6), 10, _enemy_color(t), 90.0, 0.5, 2, Vector2.UP, PI * 1.6, 120.0)
+	match data.on_death:
+		EnemyData.OnDeath.EXPLODE:
+			_pending_blasts.append([p, data.explosion_radius,
+				data.explosion_damage * spawner.effective_hp_multiplier(), killer, BLAST_DELAY])
+		EnemyData.OnDeath.LOOT:
+			Audio.play(&"break")
+			for g in URN_GEMS:
+				var offset := Vector2.from_angle(_rng.randf() * TAU) * _rng.randf_range(3.0, 9.0)
+				pickups.spawn(p + offset, PickupSim.Kind.XP, maxi(1, data.loot_xp / URN_GEMS))
+			if _rng.randf() < URN_HEART_CHANCE:
+				pickups.spawn(p + Vector2(0, 3), PickupSim.Kind.HEART, 1)
+
+
+func _update_barrel_blasts(dt: float) -> void:
+	var i := 0
+	while i < _pending_blasts.size():
+		var blast := _pending_blasts[i]
+		blast[4] = float(blast[4]) - dt
+		if float(blast[4]) > 0.0:
+			i += 1
+			continue
+		_pending_blasts.remove_at(i)
+		var p: Vector2 = blast[0]
+		var r: float = blast[1]
+		# Hurts enemies, nests and other barrels (chains), never heroes.
+		damage_enemies_in_circle(p, r, blast[2], BARREL_KNOCKBACK, blast[3])
+		fx.disc(p, r, Color(1.0, 0.6, 0.25, 0.65), 0.25)
+		fx.ring(p, r * 1.1, Color(1.0, 0.9, 0.5), 0.3)
+		particles.burst(p, 22, Color(1.0, 0.55, 0.2), 150.0, 0.55, 4, Vector2.ZERO, TAU, 0.0, 3.0)
+		shake(3.0)
+		Audio.play(&"explosion")
+
+
 func _update_spikes(dt: float) -> void:
 	if spikes.is_empty():
 		return
@@ -551,6 +623,8 @@ func _emit_hit_effects() -> void:
 		horde.shots_fired = 0
 	var crits := 0
 	for k in n:
+		if horde.t_behavior[horde.hit_type[k]] == EnemyData.Behavior.OBJECT:
+			continue  # breaking it is feedback enough
 		var p := horde.hit_pos[k]
 		var amount := horde.hit_amount[k]
 		if horde.hit_crit[k] != 0:
@@ -593,13 +667,23 @@ func _process_kills() -> void:
 	for k in n:
 		var p := horde.kill_pos[k]
 		var t := horde.kill_type[k]
+		var killer := horde.kill_slot[k]
+		var behavior := horde.t_behavior[t]
+		if behavior == EnemyData.Behavior.OBJECT:
+			_break_object(p, t, killer)  # scenery: no kill, corpse or XP gem
+			continue
+		if behavior == EnemyData.Behavior.NEST:
+			var cell := grid.cell_of(p)
+			grid.set_blocker(cell.x, cell.y, false)
+			particles.burst(p - Vector2(0, 7), 24, _enemy_color(t), 120.0, 0.7, 3, Vector2.UP, PI * 1.5, 160.0)
+			shake(2.5)
+			Audio.play(&"nest_break")
 		var in_chasm := grid.terrain_at(p) == LevelGrid.Terrain.CHASM
 		if k < MAX_PUFFS_PER_FRAME:
 			var body := p - Vector2(0, horde.t_hurt_height[t] * 0.5)
 			particles.burst(body, 6, _enemy_color(t), 60.0, 0.45, 3, Vector2.ZERO, TAU, 30.0)
-		var killer := horde.kill_slot[k]
 		kills += 1
-		if not in_chasm:
+		if not in_chasm and horde.t_static[t] == 0:
 			_corpse_pos.append(p)
 			_corpse_time.append(elapsed)
 			if _corpse_pos.size() > MAX_CORPSES:

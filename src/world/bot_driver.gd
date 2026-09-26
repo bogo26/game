@@ -25,6 +25,7 @@ var _time := 0.0
 var _fire_budget: Dictionary = {}  # slot -> float
 var _astar := AStarGrid2D.new()
 var _astar_version := -1
+var _astar_changes := -1  # how far into grid.changes the A* grid is up to date
 
 
 func _init(p_world: World, seed_value: int = 7) -> void:
@@ -61,7 +62,7 @@ func tick(delta: float) -> void:
 			path.remove_at(0)
 		_paths[slot] = path  # packed arrays are copy-on-write: store the pruned path
 		input.move = (path[0] - hero.position).normalized() if not path.is_empty() else Vector2.ZERO
-		var enemy := world.horde.nearest(hero.position, 160.0)
+		var enemy := world.horde.nearest(hero.position, 160.0, false)
 		if enemy != -1:
 			input.aim = (world.horde.pos[enemy] - hero.position).normalized()
 		else:
@@ -102,18 +103,30 @@ func _sync_astar() -> void:
 	if _astar_version == grid.version:
 		return
 	_astar_version = grid.version
+	if _astar_changes >= 0 and _astar_changes <= grid.changes.size():
+		# Doors and broken props: only the cells that changed.
+		for k in range(_astar_changes, grid.changes.size()):
+			var i := grid.changes[k]
+			var cell := Vector2i(i % grid.width, i / grid.width)
+			_astar.set_point_solid(cell, grid.solid[i] != 0)
+		_astar_changes = grid.changes.size()
+		return
 	_astar.region = Rect2i(0, 0, grid.width, grid.height)
 	_astar.cell_size = Vector2(LevelGrid.TILE, LevelGrid.TILE)
 	_astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
 	_astar.update()  # no-op unless the region changed, so set every cell below
 	for y in grid.height:
 		for x in grid.width:
-			_astar.set_point_solid(Vector2i(x, y), grid.is_solid(x, y))
+			var cell := Vector2i(x, y)
+			_astar.set_point_solid(cell, grid.is_solid(x, y))
+			# Wading is slow: prefer dry paths.
+			_astar.set_point_weight_scale(cell, 2.5 if grid.terrain[y * grid.width + x] == LevelGrid.Terrain.WATER else 1.0)
+	_astar_changes = grid.changes.size()
 
 
 func _fire(hero: Hero, delta: float) -> void:
 	var budget: float = _fire_budget.get(hero.slot, 0.0) + fire_rate * delta
-	var target := world.horde.nearest(hero.position, 200.0)
+	var target := world.horde.nearest(hero.position, 200.0, false)
 	while budget >= 1.0 and world.projectiles.count < projectile_cap:
 		budget -= 1.0
 		var dir := Vector2.from_angle(_rng.randf() * TAU)

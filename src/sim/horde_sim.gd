@@ -248,6 +248,21 @@ func is_mobile(i: int) -> bool:
 	return t_static[type[i]] == 0
 
 
+## Breakable scenery (barrels, urns): hittable, but not an enemy.
+func is_object(i: int) -> bool:
+	return t_behavior[type[i]] == EnemyData.Behavior.OBJECT
+
+
+## Alive entries minus objects and nests: what the spawner's cap counts.
+func enemy_count() -> int:
+	var props := 0
+	for t in _type_count.size():
+		var b := t_behavior[t]
+		if b == EnemyData.Behavior.OBJECT or b == EnemyData.Behavior.NEST:
+			props += _type_count[t]
+	return maxi(0, alive_count() - props)
+
+
 func alive_count() -> int:
 	return count - _dead_pending
 
@@ -387,6 +402,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	var blast_radius_t := t_blast_radius
 	var blast_damage_t := t_blast_damage
 	var fuse_t := t_fuse
+	var static_t := t_static
 	var head := hash.head
 	var nxt := hash.next
 	var hcols := hash.cols
@@ -435,8 +451,9 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 		var mk := MK[i]
 		if mk > 0.0:
 			MK[i] = mk - dt
-		if behavior_t[t] == EnemyData.Behavior.BOSS:
-			continue  # moved by its controller (BossDemon)
+		if static_t[t] != 0:
+			AN[i] += dt  # boss (moved by BossDemon), objects and nests stay put
+			continue
 		var desired := Vector2.ZERO
 		var st := STN[i]
 		if st > 0.0:
@@ -660,14 +677,16 @@ func query_arc(center: Vector2, dir: Vector2, radius: float, half_angle: float, 
 	return out.size()
 
 
-## Nearest alive enemy within max_distance, or -1.
-func nearest(center: Vector2, max_distance: float) -> int:
+## Nearest alive enemy within max_distance, or -1. Objects (barrels, urns)
+## count only with `include_objects`.
+func nearest(center: Vector2, max_distance: float, include_objects: bool = true) -> int:
 	_scratch.clear()
 	hash.gather(center, max_distance, _scratch)
 	var best := -1
 	var best_d2 := max_distance * max_distance
 	for j in _scratch:
-		if j < count and hp[j] > 0.0 and fall[j] <= 0.0:
+		if j < count and hp[j] > 0.0 and fall[j] <= 0.0 \
+				and (include_objects or t_behavior[type[j]] != EnemyData.Behavior.OBJECT):
 			var d2 := center.distance_squared_to(pos[j])
 			if d2 < best_d2:
 				best_d2 = d2
@@ -735,6 +754,8 @@ func render(layer: InstanceLayer) -> void:
 		var beh := t_behavior[t]
 		if beh == EnemyData.Behavior.EXPLODER and state[i] == 1:
 			frame += 4 + int(AN[i] * 12.0) % 2
+		elif beh == EnemyData.Behavior.NEST and action[i] > 0.0:
+			frame += 4 + int(AN[i] * 10.0) % 2  # spawning (LevelDirector sets the pose timer)
 		elif beh == EnemyData.Behavior.RANGED and action[i] > t_cooldown[t] - SHOT_POSE_TIME:
 			frame += 4
 		elif STN[i] <= 0.0:

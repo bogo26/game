@@ -25,6 +25,9 @@ var shot_solid := PackedByteArray()
 var terrain := PackedByteArray()
 ## Bumped on every change so cached data (flow fields) knows to refresh.
 var version := 0
+## Cell indices whose walkability changed, in order (consumers that mirror
+## the grid, like the bots' A*, catch up from where they last read).
+var changes := PackedInt32Array()
 
 
 func _init(p_width: int = 0, p_height: int = 0) -> void:
@@ -40,6 +43,7 @@ func resize(p_width: int, p_height: int) -> void:
 	shot_solid.resize(width * height)
 	terrain = PackedByteArray()
 	terrain.resize(width * height)
+	changes.clear()
 	version += 1
 
 
@@ -62,7 +66,19 @@ func set_solid(x: int, y: int, value: bool) -> void:
 	if in_bounds(x, y):
 		solid[y * width + x] = 1 if value else 0
 		shot_solid[y * width + x] = 1 if value else 0
-		version += 1
+		_changed(y * width + x)
+
+
+## Props standing on a tile (barrels, nests, chests): block walking only.
+func set_blocker(x: int, y: int, value: bool) -> void:
+	if in_bounds(x, y):
+		solid[y * width + x] = 1 if value else 0
+		_changed(y * width + x)
+
+
+func _changed(i: int) -> void:
+	changes.append(i)
+	version += 1
 
 
 ## A chasm: can't be walked on, but shots and sight cross it.
@@ -72,7 +88,7 @@ func set_chasm(x: int, y: int) -> void:
 		solid[i] = 1
 		shot_solid[i] = 0
 		terrain[i] = Terrain.CHASM
-		version += 1
+		_changed(i)
 
 
 ## Walkable terrain (floor, water, spikes).

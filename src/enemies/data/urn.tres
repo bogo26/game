@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"urn"
+max_hp = 1.0
+speed = 0.0
+radius = 5.0
+hurt_size = Vector2(12, 13)
+contact_damage = 0.0
+xp = 0
+knockback_taken = 0.0
+behavior = 4
+on_death = 2
+loot_xp = 6
+atlas_row = 6
+walk_frames = 1

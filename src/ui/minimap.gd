@@ -225,6 +225,12 @@ func _draw_enemies(s: float) -> void:
 
 func _draw_points_of_interest(s: float) -> void:
 	var level := world.level
+	var arm := 1.5 + s * 0.5
+	for p in world.director.nest_positions():
+		if world.reveal.is_seen_at(p):
+			var c := to_map(p)
+			draw_line(c - Vector2(arm, arm), c + Vector2(arm, arm), COLOR_NEST, 1.5)
+			draw_line(c - Vector2(arm, -arm), c + Vector2(arm, -arm), COLOR_NEST, 1.5)
 	var exit := level.exit_center()
 	if exit.is_finite() and (world.director.exit_open or world.reveal.is_seen_at(exit)):
 		var r := 2.0 + s * 0.75
@@ -261,9 +267,11 @@ func _draw_legend(font: Font, pos: Vector2) -> void:
 	x = _legend_item(font, x, y, COLOR_OBJECTIVE, "Objective", 1)
 	x = _legend_item(font, x, y, COLOR_EXIT, "Exit", 2)
 	x = _legend_item(font, x, y, COLOR_ARENA, "Arena", 0)
+	x = _legend_item(font, x, y, COLOR_NEST, "Nest", 3)
 
 
-## Draws an icon (0 square, 1 ring, 2 diamond) and a label; returns the next x.
+## Draws an icon (0 square, 1 ring, 2 diamond, 3 cross) and a label;
+## returns the next x.
 func _legend_item(font: Font, x: float, y: float, color: Color, text: String, icon: int) -> float:
 	var center := Vector2(x + 3, y - 3)
 	match icon:
@@ -273,6 +281,9 @@ func _legend_item(font: Font, x: float, y: float, color: Color, text: String, ic
 			draw_arc(center, 3.0, 0.0, TAU, 12, color, 1.0)
 		2:
 			_diamond(center, 3.0, color)
+		3:
+			draw_line(center - Vector2(2.5, 2.5), center + Vector2(2.5, 2.5), color, 1.5)
+			draw_line(center - Vector2(2.5, -2.5), center + Vector2(2.5, -2.5), color, 1.5)
 	draw_string(font, Vector2(x + 9, y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.75, 0.75, 0.8))
 	return x + 9 + font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x + 10
 
