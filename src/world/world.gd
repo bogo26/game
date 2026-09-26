@@ -43,6 +43,12 @@ const MAX_PUFFS_PER_FRAME := 30
 const NUMBER_THRESHOLD := 12.0
 const CRIT_COLOR := Color(1.0, 0.72, 0.15)
 const REVIVE_DECAY := 0.5
+## Hits taking at least this share of a hero's max HP shake the screen.
+const BIG_HIT_SHARE := 0.15
+## Hurt sound pitch per player, so you can tell who got hit.
+const HURT_PITCH: Array[float] = [1.0, 1.15, 0.88, 1.3]
+## World time runs at this speed during a slow-motion moment.
+const SLOWMO_SCALE := 0.35
 ## Test rooms: seconds after a team wipe before everyone gets back up.
 const TEST_ROOM_WIPE_RESET := 3.0
 ## Barrels, urns and nests stand this far below their tile's centre.
@@ -111,6 +117,9 @@ var _scratch := PackedInt32Array()
 var _wiped := false
 var _wipe_timer := 0.0
 var _menu_was_down := true  # the press that opened the test room doesn't count
+## Hitstop: seconds the world stays frozen, then seconds in slow motion.
+var _freeze_left := 0.0
+var _slowmo_left := 0.0
 ## Chests and shrines.
 var interactables: Array[Interactable] = []
 ## The team's current shrine blessing (for the HUD); heroes hold the buffs.
@@ -190,6 +199,10 @@ func _ready() -> void:
 	Events.hero_damaged.connect(_on_hero_damaged)
 	Events.hero_downed.connect(func(_s: int) -> void: Audio.play(&"down"))
 	Events.hero_revived.connect(func(_s: int) -> void: Audio.play(&"revive"))
+	Events.hero_low_hp.connect(_on_hero_low_hp)
+	Events.ult_ready.connect(_on_ult_ready)
+	Events.ability_ready.connect(_on_ability_ready)
+	Events.ability_denied.connect(_on_ability_denied)
 	if not run_mode:
 		Audio.play_music(&"dungeon")
 
@@ -255,6 +268,12 @@ func hero_for_slot(slot: int) -> Hero:
 
 func _process(delta: float) -> void:
 	var dt := minf(delta, MAX_DELTA)
+	if _freeze_left > 0.0:
+		_freeze_left -= delta  # hitstop: the whole world holds still
+		return
+	if _slowmo_left > 0.0:
+		_slowmo_left -= delta
+		dt *= SLOWMO_SCALE
 	var t_start := Time.get_ticks_usec()
 
 	if bots:
@@ -464,6 +483,17 @@ func shake(strength: float) -> void:
 	camera.add_shake(strength)
 
 
+## Freezes the world for `freeze` seconds, then plays `slowmo` seconds in slow
+## motion (big moments only: four players share the screen).
+func hitstop(freeze: float, slowmo: float = 0.0) -> void:
+	_freeze_left = maxf(_freeze_left, freeze)
+	_slowmo_left = maxf(_slowmo_left, slowmo)
+
+
+func is_frozen() -> bool:
+	return _freeze_left > 0.0
+
+
 # --- per-frame steps -----------------------------------------------------------------------------
 
 func _snapshot_heroes() -> void:
@@ -497,8 +527,19 @@ func _update_revives(dt: float) -> void:
 				speed = maxf(speed, other.revive_speed)
 		if speed > 0.0:
 			hero.add_revive_progress(dt * speed)
+			if hero.is_downed():  # a rising tone while it fills
+				Audio.play(&"revive_tick", -3.0, 0.8 + 0.7 * hero.revive_progress / Hero.REVIVE_TIME)
 		else:
 			hero.revive_progress = maxf(0.0, hero.revive_progress - dt * REVIVE_DECAY)
+			if _someone_standing():
+				Audio.play(&"help")  # at most every few seconds (Audio intervals)
+
+
+func _someone_standing() -> bool:
+	for hero in heroes:
+		if not hero.is_downed():
+			return true
+	return false
 
 
 func _check_wipe(dt: float) -> void:
@@ -794,11 +835,41 @@ func _emit_hit_effects() -> void:
 
 
 func _on_hero_damaged(slot: int, amount: float) -> void:
-	Audio.play(&"hurt")
+	Audio.play(&"hurt", 0.0, HURT_PITCH[slot % HURT_PITCH.size()])
 	var hero := hero_for_slot(slot)
 	if hero:
-		particles.burst(hero.position + Vector2(0, -6), 6, Color(1, 0.25, 0.2), 70.0, 0.35, 2)
-		numbers.add(hero.position + Vector2(0, -8), amount, Color(1, 0.35, 0.3))
+		var big := amount >= hero.max_hp * BIG_HIT_SHARE
+		particles.burst(hero.position + Vector2(0, -6), 10 if big else 6, Color(1, 0.25, 0.2), 70.0, 0.35, 2)
+		numbers.add_hero_damage(hero.position + Vector2(0, -8), amount, big)
+		if big:
+			shake(2.0)
+
+
+func _on_hero_low_hp(_slot: int) -> void:
+	Audio.play(&"heartbeat")
+
+
+func _on_ult_ready(slot: int) -> void:
+	var hero := hero_for_slot(slot)
+	if hero:
+		Audio.play(&"ult_ready")
+		numbers.add_text(hero.position + Vector2(0, -16), "ULT!", hero.color.lightened(0.25))
+		particles.burst(hero.position + Vector2(0, -6), 14, hero.color.lightened(0.3), 70.0, 0.5, 2, Vector2.UP, PI, -30.0)
+
+
+func _on_ability_ready(slot: int, ability_slot: int) -> void:
+	var hero := hero_for_slot(slot)
+	if hero == null or hero.is_downed():
+		return
+	# A quick ring in the player's colour; the special also ticks.
+	var special := ability_slot == Ability.Slot.SPECIAL
+	fx.ring(hero.position + Vector2(0, -6), 12.0 if special else 9.0, hero.color.lightened(0.3), 0.3)
+	if special:
+		Audio.play(&"ready")
+
+
+func _on_ability_denied(_slot: int, _ability_slot: int) -> void:
+	Audio.play(&"denied")
 
 
 func _on_team_level_up(_level: int) -> void:

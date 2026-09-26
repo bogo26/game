@@ -8,6 +8,7 @@ const MAX_NUMBERS := 40
 const LIFETIME := 0.7
 const RISE := 18.0
 const CRIT_COLOR := Color(1.0, 0.72, 0.15)
+const HURT_COLOR := Color(1.0, 0.35, 0.3)
 
 var _pos := PackedVector2Array()
 var _text := PackedStringArray()
@@ -37,6 +38,12 @@ func add_crit(p: Vector2, amount: float) -> void:
 ## never pushed out.
 func add_text(p: Vector2, text: String, color: Color) -> void:
 	_push(p, text, color, 16, true)
+
+
+## Damage a hero took: red, never pushed out by the horde's numbers; big
+## when it's a big chunk of their health.
+func add_hero_damage(p: Vector2, amount: float, big: bool) -> void:
+	_push(p, str(int(round(amount))), HURT_COLOR, 16 if big else 8, true)
 
 
 func count() -> int:

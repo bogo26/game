@@ -371,6 +371,13 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - **Heroes** have a 1 px outline in their player colour (`hero_outline.gdshader`), so two players on the same hero, or the dark Rogue and Necromancer on dark floors, are easy to find. A "P1" tag shows over each hero for 3 s at level start, after a revive and while downed. Reticles are drawn above everything (`HeroOverlay`).
   - Hearts are drawn above the horde and marked on the minimap; shrine blessings ring heroes in pale gold rather than a player-like colour.
   - Lines 1 px wide are drawn as line primitives: with vertex snapping on, a 1 px quad at an angle collapses to nothing.
+- **Feedback** (feel every hit, never miss a downed friend):
+  - **Getting hit:** rumble scaled to the share of HP lost, the player's HUD panel flashes red, and hits of 15%+ of max HP shake the screen and show a big red number. Heroes' numbers are never pushed out by the horde's. Each player's hurt sound has its own pitch.
+  - **Low HP (≤ 30%):** the hero's outline and HUD panel pulse red; crossing the line plays a heartbeat (at most every 3 s) and a rumble.
+  - **Invulnerability looks different by cause:** blink after a hit, bright while dashing, a gold shimmer after a revive.
+  - **Abilities:** the special and movement ability ping (a ring, plus a tick for the special) and flash their HUD bar when they come back; a press that can't do anything (on cooldown, no ult charge, channelling) flashes the bar red with a soft blip. The ultimate announces itself once per charge: a chime, a rumble and "ULT!".
+  - **Downed:** a pulsing "!" and "P1" over the body, a dashed circle showing where to stand, and the revive progress as a ring; a rising tone while someone revives, and a "help" ping (at most every 3 s) while nobody does. The HUD's "DOWN! revive me" blinks.
+  - **Hitstop** (a world-level freeze, the HUD keeps running): 0.08 s on a boss phase change; 0.3 s then 0.6 s of slow motion on the boss's death. Ordinary hits never freeze the game.
 - **Damage numbers:** one node draws up to 40 numbers.
   - **Crits** always get a gold double-size number with "!" (e.g. `14!`), a gold star burst and a "tink" sound. Ordinary numbers can never push them off screen.
   - Ordinary hits get a white number from 12 damage up (double size from 40).
@@ -380,11 +387,11 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - white hit flash in the shader
   - frozen tint
   - pixel-snapped screen shake
-- **Audio:** `tools/gen_audio.gd` renders 48 SFX and 3 music loops (menu, dungeon, boss) with a small synth and sequencer into `assets/audio`.
+- **Audio:** `tools/gen_audio.gd` renders 58 SFX and 3 music loops (menu, dungeon, boss) with a small synth and sequencer into `assets/audio`.
 - **`Audio` autoload:**
-  - Plays SFX through a 24-voice pool on an `SFX` bus.
+  - Plays SFX through a 24-voice pool on an `SFX` bus. Six voices are reserved for cues players must not miss (down, revive, ult, level-up, heartbeat, help, boss wind-up and death, stings...), so a flood of hits can't cut them off.
   - Each sound has a minimum repeat interval (e.g. kills every 50 ms), so a horde never drowns everything out.
-  - Loops music on a `Music` bus.
+  - Loops music on a `Music` bus and crossfades between tracks (0.6 s). The boss track starts when the throne room's fight does; victory and defeat have their own stings.
   - Volumes are set in the pause menu and saved to `user://settings.cfg`.
 - **Sound hooks:**
   - Every ability plays a sound by type; ultimates add a swell.

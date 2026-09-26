@@ -178,6 +178,7 @@ func _activate(room: Room, leader: Hero) -> void:
 	if data.is_boss_level and not level.boss_spawns.is_empty():
 		_spawn_boss(level.boss_spawns[0])
 		world.spawner.mode = SpawnDirector.Mode.OFF
+		Audio.play_music(&"boss")
 	else:
 		world.spawner.start_arena(room.cells, room.quota, data.arena_spawn_rate)
 	_update_objective()

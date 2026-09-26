@@ -142,6 +142,7 @@ func _update_phase() -> void:
 		new_phase = Phase.TWO
 	if new_phase != phase:
 		phase = new_phase
+		world.hitstop(0.08)
 		world.shake(5.0)
 		world.fx.ring(position, 50.0, Color(1, 0.3, 0.2), 0.5)
 		Audio.play(&"roar")
@@ -290,7 +291,9 @@ func _update_sprite() -> void:
 
 func _die() -> void:
 	_dead = true
+	world.hitstop(0.3, 0.6)
 	world.shake(6.0)
+	Audio.play(&"boss_death")
 	for k in 6:
 		world.fx.disc(position + Vector2(_rng.randf_range(-20, 20), _rng.randf_range(-30, 0)), 24.0,
 			Color(1, 0.5, 0.2, 0.7), 0.5 + k * 0.1)

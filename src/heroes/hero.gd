@@ -29,6 +29,14 @@ const OUTLINE_SHADER := preload("res://assets/shaders/hero_outline.gdshader")
 const TAG_TIME := 3.0
 ## Ring shown while a shrine blessing lasts (not a player colour).
 const BLESSING_RING := Color(1.0, 0.94, 0.66)
+## At or below this share of max HP a hero is "low": outline and HUD pulse
+## red, and a heartbeat plays as they cross it.
+const LOW_HP_FRACTION := 0.3
+const LOW_HP_COLOR := Color(1.0, 0.16, 0.2)
+## How long the HUD flashes a bar after a press it couldn't act on / when an
+## ability comes back.
+const DENIED_TIME := 0.25
+const READY_FLASH_TIME := 0.3
 
 var slot := 0
 var hero_id: StringName = &"knight"
@@ -57,6 +65,11 @@ var ult_charge := 0.0
 var revive_progress := 0.0
 ## Seconds left showing the "P1" tag (HeroOverlay).
 var tag_time := TAG_TIME
+## Seconds left of the gold shimmer that shows a fresh revive's invulnerability.
+var revive_shield := 0.0
+## Per ability slot: seconds left flashing "not ready" / "ready again" (HUD).
+var denied_time := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
+var ready_flash := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 ## XP gems within this distance home in on the hero.
 var pickup_range := 28.0
 ## Ignores all damage (stress test, debug).
@@ -81,6 +94,10 @@ var air_height := 0.0
 var _dash_velocity := Vector2.ZERO
 var _anim_time := 0.0
 var _hurt_flash := 0.0
+var _low_hp := false
+var _ult_announced := false
+## Special and movement were ready last frame (to notice them coming back).
+var _was_ready := PackedByteArray([1, 1])
 var _rng := RandomNumberGenerator.new()
 
 @onready var sprite: Sprite2D = $Sprite
@@ -214,6 +231,10 @@ func muzzle_position() -> Vector2:
 func tick(delta: float) -> void:
 	invulnerable_time = maxf(0.0, invulnerable_time - delta)
 	tag_time = maxf(0.0, tag_time - delta)
+	revive_shield = maxf(0.0, revive_shield - delta)
+	for k in 4:
+		denied_time[k] = maxf(0.0, denied_time[k] - delta)
+		ready_flash[k] = maxf(0.0, ready_flash[k] - delta)
 	_tick_blessings(delta)
 	if state == State.DOWNED:
 		velocity = Vector2.ZERO
@@ -241,19 +262,60 @@ func tick(delta: float) -> void:
 			else input.just_pressed(PlayerInput.Action.ATTACK)
 		if wants_attack and a.try_activate(aim_dir):
 			attack_performed.emit(aim_dir)
-		if input.just_pressed(PlayerInput.Action.SPECIAL):
-			special().try_activate(aim_dir)
-		if input.just_pressed(PlayerInput.Action.ULTIMATE) and ult_charge >= 1.0:
-			if ultimate().try_activate(aim_dir):
-				ult_charge = 0.0
-				input.rumble(0.6, 0.9, 0.3)
+	if input.just_pressed(PlayerInput.Action.SPECIAL):
+		if blocked or not special().try_activate(aim_dir):
+			_deny(Ability.Slot.SPECIAL)
+	if input.just_pressed(PlayerInput.Action.ULTIMATE):
+		if blocked or ult_charge < 1.0 or not ultimate().try_activate(aim_dir):
+			_deny(Ability.Slot.ULTIMATE)
+		else:
+			ult_charge = 0.0
+			_ult_announced = false
+			input.rumble(0.6, 0.9, 0.3)
 	if input.just_pressed(PlayerInput.Action.MOVEMENT) and not is_dashing():
-		movement().try_activate(aim_dir)
+		if not movement().try_activate(aim_dir):
+			_deny(Ability.Slot.MOVEMENT)
 
 	ult_charge = minf(1.0, ult_charge + ULT_PASSIVE_PER_SECOND * ult_charge_mult * delta)
 	if regen > 0.0:
 		heal(regen * delta)
+	_check_readiness()
+	_update_low_hp()
 	_update_visuals(delta)
+
+
+## A press that couldn't do anything: the HUD bar flashes and a soft blip plays.
+func _deny(ability_slot: Ability.Slot) -> void:
+	denied_time[ability_slot] = DENIED_TIME
+	Events.ability_denied.emit(slot, ability_slot)
+
+
+## Notices the special and movement coming off cooldown and the ultimate
+## becoming usable (each announced once).
+func _check_readiness() -> void:
+	for k in 2:
+		var ability_slot := Ability.Slot.SPECIAL if k == 0 else Ability.Slot.MOVEMENT
+		var ready := abilities[ability_slot].can_activate()
+		if ready and _was_ready[k] == 0:
+			ready_flash[ability_slot] = READY_FLASH_TIME
+			Events.ability_ready.emit(slot, ability_slot)
+		_was_ready[k] = 1 if ready else 0
+	if ult_charge >= 1.0 and not _ult_announced:
+		_ult_announced = true
+		input.rumble(0.2, 0.35, 0.15)
+		Events.ult_ready.emit(slot)
+
+
+func is_low_hp() -> bool:
+	return _low_hp
+
+
+func _update_low_hp() -> void:
+	var low := state == State.ALIVE and hp <= max_hp * LOW_HP_FRACTION
+	if low and not _low_hp:
+		input.rumble(0.5, 0.25, 0.2)
+		Events.hero_low_hp.emit(slot)
+	_low_hp = low
 
 
 func _speed_factor() -> float:
@@ -363,9 +425,13 @@ func take_hit(amount: float) -> bool:
 	invulnerable_time = HIT_IFRAMES
 	_hurt_flash = 0.12
 	Events.hero_damaged.emit(slot, dmg)
-	input.rumble(0.4, 0.6, 0.12)
+	# The harder the hit, the harder the rumble.
+	var share := clampf(dmg / maxf(max_hp, 1.0), 0.0, 1.0)
+	input.rumble(minf(1.0, 0.25 + share * 2.0), minf(1.0, 0.35 + share * 2.5), 0.1 + share * 0.4)
 	if hp <= 0.0:
 		go_down()
+	else:
+		_update_low_hp()
 	return true
 
 
@@ -377,6 +443,7 @@ func heal(amount: float) -> void:
 func go_down() -> void:
 	hp = 0.0
 	state = State.DOWNED
+	_low_hp = false
 	revive_progress = 0.0
 	dash_time_left = 0.0
 	velocity = Vector2.ZERO
@@ -401,8 +468,10 @@ func revive(hp_fraction: float) -> void:
 	hp = maxf(1.0, max_hp * hp_fraction)
 	revive_progress = 0.0
 	invulnerable_time = REVIVE_IFRAMES
+	revive_shield = REVIVE_IFRAMES
 	tag_time = TAG_TIME
 	Events.hero_revived.emit(slot)
+	_update_low_hp()
 
 
 # --- rendering -------------------------------------------------------------------------------
@@ -425,14 +494,25 @@ func _update_visuals(delta: float) -> void:
 	if state == State.ALIVE and absf(aim_dir.x) > 0.05:
 		sprite.flip_h = aim_dir.x < 0.0
 	_hurt_flash = maxf(0.0, _hurt_flash - delta)
+	# Each kind of invulnerability looks different: hit (blink), dash
+	# (bright), fresh revive (gold shimmer).
 	if _hurt_flash > 0.0:
 		sprite.modulate = Color(2.0, 0.6, 0.6)
 	elif is_dashing():
 		sprite.modulate = Color(1.6, 1.6, 1.6)
+	elif state == State.ALIVE and revive_shield > 0.0:
+		var shimmer := 0.5 + 0.5 * sin(_anim_time * 14.0)
+		sprite.modulate = Color(1.2, 1.12, 0.8).lerp(Color(1.7, 1.5, 0.85), shimmer)
 	elif state == State.ALIVE and invulnerable_time > 0.0:
 		sprite.modulate = Color(1, 1, 1, 0.55 if int(invulnerable_time * 20.0) % 2 == 0 else 1.0)
 	else:
 		sprite.modulate = Color.WHITE
+	var outline := color
+	if _low_hp:
+		outline = color.lerp(LOW_HP_COLOR, 0.5 + 0.5 * sin(_anim_time * 9.0))
+	var mat := sprite.material as ShaderMaterial
+	if mat:
+		mat.set_shader_parameter("outline_color", outline)
 	queue_redraw()
 
 
@@ -448,11 +528,7 @@ func _draw() -> void:
 	draw_arc(Vector2.ZERO, 7.0, 0.0, TAU, 20, ring_color, 1.0, false)
 	draw_set_transform(Vector2.ZERO)
 	if state == State.DOWNED:
-		# Revive progress bar.
-		var w := 16.0
-		draw_rect(Rect2(-w * 0.5, -16, w, 3), Color(0, 0, 0, 0.7))
-		draw_rect(Rect2(-w * 0.5 + 1, -15, (w - 2) * revive_progress / REVIVE_TIME, 1), Color(0.5, 1.0, 0.5))
-		return
+		return  # the World's HeroOverlay shows the revive circle and progress
 	# (The aim reticle is drawn by the World's HeroOverlay, above effects.)
 	# Small HP bar once hurt.
 	if hp < max_hp:

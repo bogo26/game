@@ -15,6 +15,8 @@ const EDGE := 4.0
 const HERO_SHEET := "res://assets/sprites/heroes/%s.png"
 const MAP_HINT_TIME := 8.0
 const CAPTIONS: Array[String] = ["SPC", "MOV", "ULT"]
+## A player's panel flashes this long when they get hit.
+const HURT_FLASH := 0.3
 
 var world: World
 var minimap: Minimap
@@ -32,6 +34,7 @@ var _hint_label: Label
 var _blessing_label: Label
 var _hint_left := MAP_HINT_TIME
 var _slot_labels: Array[Label] = []
+var _hurt_flash := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _portraits: Dictionary = {}  # hero_id -> Texture2D
 
 
@@ -70,12 +73,15 @@ func _ready() -> void:
 		minimap.setup(world)
 	Events.xp_changed.connect(_on_xp_changed)
 	Events.team_level_up.connect(func(_l: int) -> void: _flash = 0.6)
+	Events.hero_damaged.connect(_on_hero_damaged)
 	_on_xp_changed(GameState.xp, GameState.xp_to_next(), GameState.team_level)
 
 
 func _process(delta: float) -> void:
 	_time += delta
 	_flash = maxf(0.0, _flash - delta)
+	for k in _hurt_flash.size():
+		_hurt_flash[k] = maxf(0.0, _hurt_flash[k] - delta)
 	var view := _canvas.get_viewport_rect().size
 	var bar_x := floorf((view.x - BAR_SIZE.x) * 0.5)
 	_level_label.text = "LV %d" % _level
@@ -95,6 +101,11 @@ func _process(delta: float) -> void:
 	_update_center_message(view)
 	_update_boss_label(view)
 	_canvas.queue_redraw()
+
+
+func _on_hero_damaged(slot: int, _amount: float) -> void:
+	if slot >= 0 and slot < _hurt_flash.size():
+		_hurt_flash[slot] = HURT_FLASH
 
 
 func _on_xp_changed(current: int, needed: int, level: int) -> void:
@@ -177,8 +188,18 @@ func _draw_hud() -> void:
 
 func _draw_player_panel(hero: Hero, origin: Vector2) -> void:
 	var c := hero.color
-	_canvas.draw_rect(Rect2(origin, PANEL_SIZE), Color(0.03, 0.03, 0.06, 0.62))
-	_canvas.draw_rect(Rect2(origin, PANEL_SIZE), Color(c, 0.8), false, 1.0)
+	var bg := Color(0.03, 0.03, 0.06, 0.62)
+	var border := Color(c, 0.8)
+	var hurt := _hurt_flash[hero.slot % _hurt_flash.size()] / HURT_FLASH
+	if hero.is_low_hp():  # pulses red while low
+		var pulse := 0.5 + 0.5 * sin(_time * 9.0)
+		border = border.lerp(Hero.LOW_HP_COLOR, pulse)
+		bg = bg.lerp(Color(0.35, 0.02, 0.04, 0.7), pulse * 0.6)
+	if hurt > 0.0:  # just got hit
+		border = border.lerp(Color(1, 0.85, 0.85), hurt)
+		bg = bg.lerp(Color(0.6, 0.05, 0.05, 0.75), hurt)
+	_canvas.draw_rect(Rect2(origin, PANEL_SIZE), bg)
+	_canvas.draw_rect(Rect2(origin, PANEL_SIZE), border, false, 1.0)
 	var portrait := _portrait(hero.hero_id)
 	if portrait:
 		var tint := Color(0.5, 0.5, 0.5) if hero.is_downed() else Color.WHITE
@@ -195,16 +216,25 @@ func _draw_player_panel(hero: Hero, origin: Vector2) -> void:
 	_bar(Vector2(x, origin.y + 11), w, 3, hp_ratio, hp_color)
 	# Special / movement cooldowns and the ultimate meter.
 	var third := floorf((w - 4) / 3.0)
-	_bar(Vector2(x, origin.y + 17), third, 2, 1.0 - hero.special().cooldown_ratio(), Color("f2c84a"))
-	_bar(Vector2(x + third + 2, origin.y + 17), third, 2, 1.0 - hero.movement().cooldown_ratio(), Color("5ad8f0"))
 	var ult_color := Color("c070f0")
 	if hero.ult_charge >= 1.0:
 		ult_color = ult_color.lerp(Color.WHITE, 0.5 + 0.5 * sin(_time * 10.0))
-	_bar(Vector2(x + (third + 2) * 2, origin.y + 17), third, 2, hero.ult_charge, ult_color)
+	var fills := [1.0 - hero.special().cooldown_ratio(), 1.0 - hero.movement().cooldown_ratio(), hero.ult_charge]
+	var colors := [Color("f2c84a"), Color("5ad8f0"), ult_color]
+	for k in 3:
+		var ability_slot := k + 1  # special, movement, ultimate
+		var bar_color: Color = colors[k]
+		if hero.ready_flash[ability_slot] > 0.0:
+			bar_color = Color.WHITE  # just came back
+		var pos := Vector2(x + (third + 2) * k, origin.y + 17)
+		if hero.denied_time[ability_slot] > 0.0:  # pressed while not ready
+			_canvas.draw_rect(Rect2(pos - Vector2(2, 2), Vector2(third + 4, 6)), Color(1, 0.25, 0.25, 0.9))
+		_bar(pos, third, 2, fills[k], bar_color)
 	var font := _canvas.get_theme_default_font()
 	if hero.is_downed():
-		_canvas.draw_string(font, Vector2(x, origin.y + 27), "DOWN!  revive me",
-			HORIZONTAL_ALIGNMENT_LEFT, w, 8, Color(1, 0.4, 0.35))
+		if int(_time * 3.0) % 2 == 0:  # blinks
+			_canvas.draw_string(font, Vector2(x, origin.y + 27), "DOWN!  revive me",
+				HORIZONTAL_ALIGNMENT_LEFT, w, 8, Color(1, 0.4, 0.35))
 		return
 	# Each caption centred under its own bar.
 	for k in 3:

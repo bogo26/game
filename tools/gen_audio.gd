@@ -11,7 +11,8 @@ const RATE := 22050
 ## f0/f1: start/end frequency (exponential slide), dur: seconds, attack: s,
 ## decay: envelope power (higher = snappier), noise: 0..1 pitched-noise mix,
 ## arp: semitone steps cycled every arp_step s, vib: [depth, rate], lp: 0..1
-## lowpass amount (1 = none), duty: square pulse width.
+## lowpass amount (1 = none), duty: square pulse width, pulses: the envelope
+## repeats this many times over the sound (a heartbeat's lub-dub).
 const SFX := {
 	"shoot_arrow": {"wave": "square", "f0": 1400.0, "f1": 700.0, "dur": 0.07, "decay": 2.0, "vol": 0.22, "duty": 0.25},
 	"shoot_magic": {"wave": "saw", "f0": 500.0, "f1": 1100.0, "dur": 0.13, "decay": 1.5, "vol": 0.2, "vib": [0.08, 30.0], "lp": 0.4},
@@ -62,6 +63,17 @@ const SFX := {
 	"fuse": {"wave": "noise", "f0": 5200.0, "f1": 7400.0, "dur": 0.6, "decay": 0.5, "vol": 0.13, "lp": 0.55, "vib": [0.25, 13.0]},
 	"windup": {"wave": "saw", "f0": 170.0, "f1": 520.0, "dur": 0.48, "decay": 0.45, "vol": 0.24, "attack": 0.08, "lp": 0.3, "vib": [0.06, 17.0]},
 	"spawn": {"wave": "sine", "f0": 560.0, "f1": 150.0, "dur": 0.34, "decay": 0.9, "vol": 0.13, "noise": 0.35, "lp": 0.35, "vib": [0.1, 11.0]},
+	# Feedback: low HP, abilities ready or not, revives, a teammate calling for help.
+	"heartbeat": {"wave": "sine", "f0": 80.0, "f1": 45.0, "dur": 0.5, "pulses": 2, "decay": 2.5, "vol": 0.55, "lp": 0.3},
+	"ult_ready": {"wave": "triangle", "f0": 660.0, "f1": 660.0, "dur": 0.42, "decay": 0.9, "vol": 0.26, "arp": [0, 7, 12, 19], "arp_step": 0.07},
+	"denied": {"wave": "square", "f0": 150.0, "f1": 120.0, "dur": 0.07, "decay": 1.8, "vol": 0.12, "duty": 0.5},
+	"ready": {"wave": "sine", "f0": 1250.0, "f1": 1500.0, "dur": 0.06, "decay": 1.8, "vol": 0.1},
+	"revive_tick": {"wave": "sine", "f0": 600.0, "f1": 700.0, "dur": 0.08, "decay": 1.5, "vol": 0.16},
+	"help": {"wave": "square", "f0": 880.0, "f1": 880.0, "dur": 0.34, "decay": 0.9, "vol": 0.16, "duty": 0.25, "arp": [0, -5], "arp_step": 0.17},
+	"wave": {"wave": "saw", "f0": 196.0, "f1": 196.0, "dur": 0.7, "decay": 0.8, "vol": 0.3, "attack": 0.03, "arp": [0, 5, 7], "arp_step": 0.12, "lp": 0.3},
+	"boss_death": {"wave": "saw", "f0": 150.0, "f1": 30.0, "dur": 1.6, "decay": 1.0, "vol": 0.5, "noise": 0.5, "vib": [0.12, 6.0], "lp": 0.25},
+	"victory": {"wave": "square", "f0": 523.0, "f1": 523.0, "dur": 1.3, "decay": 0.5, "vol": 0.22, "duty": 0.25, "arp": [0, 4, 7, 12, 16, 19, 24, 24], "arp_step": 0.11},
+	"defeat": {"wave": "triangle", "f0": 392.0, "f1": 262.0, "dur": 1.4, "decay": 0.6, "vol": 0.3, "arp": [0, -1, -3, -5, -7], "arp_step": 0.25, "lp": 0.4},
 }
 
 ## Chords are MIDI note triads per bar; bpm; drums: "full", "light" or "none".
@@ -120,6 +132,7 @@ func _render_sfx(p: Dictionary, seed_value: int) -> PackedFloat32Array:
 	var arp_step: float = p.get("arp_step", 0.08)
 	var vib: Array = p.get("vib", [0.0, 0.0])
 	var lp_amount: float = p.get("lp", 1.0)
+	var pulse_len: float = dur / float(p.get("pulses", 1))
 	var phase := 0.0
 	var noise_phase := 0.0
 	var noise_value := 0.0
@@ -140,7 +153,8 @@ func _render_sfx(p: Dictionary, seed_value: int) -> PackedFloat32Array:
 				noise_phase -= floorf(noise_phase)
 				noise_value = rng.randf_range(-1.0, 1.0)
 			s = lerpf(s, noise_value, noise_mix)
-		var env := minf(1.0, t / attack) * pow(1.0 - k, decay)
+		var local_t := fmod(t, pulse_len)
+		var env := minf(1.0, local_t / attack) * pow(1.0 - local_t / pulse_len, decay)
 		s *= env * vol
 		lp += (s - lp) * lp_amount
 		out[i] = lp
