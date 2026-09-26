@@ -75,6 +75,8 @@ var t_shot_speed := PackedFloat32Array()
 var t_blast_radius := PackedFloat32Array()
 var t_blast_damage := PackedFloat32Array()
 var t_fuse := PackedFloat32Array()
+## 1 for types that never walk on their own (bosses, breakable objects, nests).
+var t_static := PackedByteArray()
 var max_radius := 0.0
 ## Largest hurtbox among the enemies that exist right now: how far around a
 ## shot to look for bodies. A boss widens it only while it's alive.
@@ -153,6 +155,7 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	t_blast_radius.clear()
 	t_blast_damage.clear()
 	t_fuse.clear()
+	t_static.clear()
 	max_radius = 0.0
 	for data in types:
 		t_speed.append(data.speed)
@@ -174,6 +177,7 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 		t_blast_radius.append(data.explosion_radius)
 		t_blast_damage.append(data.explosion_damage)
 		t_fuse.append(data.fuse_time)
+		t_static.append(1 if data.is_static() else 0)
 		max_radius = maxf(max_radius, data.radius)
 	_type_count.resize(types.size())
 	_type_count.fill(0)
@@ -226,6 +230,11 @@ func _refresh_hurt_reach() -> void:
 
 func is_alive(i: int) -> bool:
 	return i >= 0 and i < count and hp[i] > 0.0
+
+
+## Regular walking enemies (not a boss body, breakable object or nest).
+func is_mobile(i: int) -> bool:
+	return t_static[type[i]] == 0
 
 
 func alive_count() -> int:

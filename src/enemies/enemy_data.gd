@@ -39,3 +39,8 @@ enum Behavior {
 @export var atlas_row := 0
 @export var walk_frames := 4
 @export var anim_fps := 8.0
+
+
+## Doesn't walk on its own: moved by a controller (boss) or fixed in place.
+func is_static() -> bool:
+	return behavior == Behavior.BOSS

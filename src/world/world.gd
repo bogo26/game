@@ -69,6 +69,8 @@ var spawner := SpawnDirector.new()
 var particles := FxSim.new()
 var upgrade_pool := UpgradePool.new()
 var director := LevelDirector.new()
+## Tiles the team has seen (minimap).
+var reveal := MapReveal.new()
 var boss: BossDemon
 ## Run statistics for this level.
 var kills := 0
@@ -121,6 +123,7 @@ func _ready() -> void:
 	grid = level.grid
 	camera.setup(grid.size_px())
 	camera.snap_to(level.player_spawns[0])
+	reveal.setup(grid.width, grid.height)
 
 	var enemy_types: Array[EnemyData] = []
 	for path in ENEMY_TYPES:
@@ -237,6 +240,7 @@ func _process(delta: float) -> void:
 	_apply_pickups()
 	_check_wipe(dt)
 	camera.follow(hero_positions, dt)
+	reveal.tick(dt, camera.visible_rect())
 	if level_ups_enabled and GameState.pending_level_ups > 0 and not level_up.is_open() and not heroes.is_empty():
 		level_up.open(heroes, upgrade_pool)
 		get_tree().paused = true

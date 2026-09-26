@@ -16,8 +16,9 @@ enum Action {
 	UI_DOWN,
 	UI_LEFT,
 	UI_RIGHT,
+	MAP,
 }
-const ACTION_COUNT := 11
+const ACTION_COUNT := 12
 
 const DEVICE_NONE := -2
 const DEVICE_KEYBOARD := -1
@@ -146,6 +147,7 @@ func _read_keyboard_mouse() -> void:
 	_write(Action.MOVEMENT, _key(KEY_SPACE) or _key(KEY_SHIFT))
 	_write(Action.ULTIMATE, _key(KEY_Q))
 	_write(Action.PAUSE, _key(KEY_ESCAPE))
+	_write(Action.MAP, _key(KEY_TAB) or _key(KEY_M))
 	_write(Action.UI_ACCEPT, _key(KEY_ENTER) or _key(KEY_KP_ENTER) or _key(KEY_SPACE))
 	_write(Action.UI_BACK, _key(KEY_ESCAPE) or _key(KEY_BACKSPACE))
 	_write(Action.UI_UP, up)
@@ -181,6 +183,7 @@ func _read_joypad(d: int, delta: float) -> void:
 	_write(Action.MOVEMENT, _btn(d, JOY_BUTTON_RIGHT_SHOULDER) or _btn(d, JOY_BUTTON_A))
 	_write(Action.ULTIMATE, _btn(d, JOY_BUTTON_LEFT_SHOULDER) or _btn(d, JOY_BUTTON_Y))
 	_write(Action.PAUSE, _btn(d, JOY_BUTTON_START))
+	_write(Action.MAP, _btn(d, JOY_BUTTON_BACK))
 	_write(Action.UI_ACCEPT, _btn(d, JOY_BUTTON_A))
 	_write(Action.UI_BACK, _btn(d, JOY_BUTTON_B))
 	_write(Action.UI_UP, dpad.y < 0.0 or left_stick.y < -UI_STICK_THRESHOLD)

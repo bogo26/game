@@ -14,6 +14,8 @@ const TILE_COORDS: Array[Vector2i] = [
 	Vector2i(0, 1), Vector2i(1, 1), Vector2i(2, 1), Vector2i(3, 1),
 ]
 const SOLID_TILES: Array[Tile] = [Tile.WALL_TOP, Tile.WALL_FACE, Tile.VOID, Tile.DOOR]
+## What each cell shows as on the minimap.
+enum MapKind { VOID, WALL, FLOOR, DOOR, EXIT, WATER, CHASM, SPIKES }
 const TILES_TEXTURE := preload("res://assets/tiles/dungeon_tiles.png")
 
 var grid: LevelGrid
@@ -28,6 +30,8 @@ var room_cells: Dictionary = {}
 var room_doors: Dictionary = {}
 ## Cell index -> arena room id (0 = not in an arena).
 var room_of_cell := PackedByteArray()
+## Cell index -> MapKind.
+var map_kind := PackedByteArray()
 
 var _tiles: TileMapLayer
 
@@ -49,6 +53,8 @@ func build(p_data: LevelData) -> void:
 	room_doors.clear()
 	room_of_cell = PackedByteArray()
 	room_of_cell.resize(width * height)
+	map_kind = PackedByteArray()
+	map_kind.resize(width * height)
 
 	var chars: Array[PackedStringArray] = []
 	for y in height:
@@ -108,6 +114,7 @@ func build(p_data: LevelData) -> void:
 			var tile := _pick_tile(chars, x, y, width, height)
 			if tile != Tile.VOID:
 				_tiles.set_cell(Vector2i(x, y), 0, TILE_COORDS[tile])
+			map_kind[y * width + x] = _map_kind_of(chars[y][x])
 	if player_spawns.is_empty():
 		player_spawns.append(grid.nearest_open(grid.size_px() * 0.5, 64))
 	_tiles.modulate = data.tint
@@ -163,6 +170,19 @@ func _pick_tile(chars: Array[PackedStringArray], x: int, y: int, w: int, h: int)
 	if hash_value < 95:
 		return Tile.FLOOR2
 	return Tile.FLOOR3
+
+
+static func _map_kind_of(ch: String) -> MapKind:
+	match ch:
+		" ":
+			return MapKind.VOID
+		"#":
+			return MapKind.WALL
+		"D":
+			return MapKind.DOOR
+		"X":
+			return MapKind.EXIT
+	return MapKind.FLOOR
 
 
 static func _parse_rows(layout: String) -> PackedStringArray:

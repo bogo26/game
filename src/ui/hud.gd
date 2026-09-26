@@ -7,13 +7,16 @@ extends CanvasLayer
 ##   ultimate meter; empty slots show a join prompt in drop-in mode
 ## - an arrow at the screen edge pointing at an off-screen objective
 ## - boss HP bar during the boss fight, and the controller-disconnected notice
+## - the minimap while a player holds MAP (plus a hint at the start of a level)
 
 const BAR_SIZE := Vector2(160, 4)
 const PANEL_SIZE := Vector2(112, 28)
 const EDGE := 4.0
 const HERO_SHEET := "res://assets/sprites/heroes/%s.png"
+const MAP_HINT_TIME := 8.0
 
 var world: World
+var minimap: Minimap
 var _level := 1
 var _xp := 0
 var _needed := 1
@@ -24,12 +27,16 @@ var _level_label: Label
 var _objective_label: Label
 var _center_label: Label
 var _boss_label: Label
+var _hint_label: Label
+var _hint_left := MAP_HINT_TIME
 var _slot_labels: Array[Label] = []
 var _portraits: Dictionary = {}  # hero_id -> Texture2D
 
 
 func setup(p_world: World) -> void:
 	world = p_world
+	if minimap:
+		minimap.setup(world)
 
 
 func _ready() -> void:
@@ -48,8 +55,15 @@ func _ready() -> void:
 	_center_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_boss_label = _label(Color("ff8a70"))
 	_boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint_label = _label(Color(0.75, 0.75, 0.82))
+	_hint_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_hint_label.text = "Hold TAB / BACK for the map"
 	for i in InputRouter.MAX_PLAYERS:
 		_slot_labels.append(_label(GameState.player_color(i)))
+	minimap = Minimap.new()
+	add_child(minimap)
+	if world:
+		minimap.setup(world)
 	Events.xp_changed.connect(_on_xp_changed)
 	Events.team_level_up.connect(func(_l: int) -> void: _flash = 0.6)
 	_on_xp_changed(GameState.xp, GameState.xp_to_next(), GameState.team_level)
@@ -66,6 +80,12 @@ func _process(delta: float) -> void:
 		_objective_label.text = world.director.objective
 	_objective_label.position = Vector2(0, 11)
 	_objective_label.size = Vector2(view.x, 10)
+	_hint_left = maxf(0.0, _hint_left - delta)
+	if minimap.is_requested():
+		_hint_left = 0.0  # they found it
+	_hint_label.position = Vector2(0, 21)
+	_hint_label.size = Vector2(view.x, 10)
+	_hint_label.modulate.a = clampf(_hint_left, 0.0, 1.0)
 	_update_slot_labels(view)
 	_update_center_message(view)
 	_update_boss_label(view)
