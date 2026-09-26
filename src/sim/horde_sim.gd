@@ -36,7 +36,10 @@ const FLASH_TIME := 0.08
 const SLOW_FACTOR := 0.45
 const MARK_DAMAGE_MULT := 1.75
 const RANGED_BACKOFF := 0.55   # ranged enemies retreat inside this fraction of their range
-const SHOT_POSE_TIME := 0.3
+## Ranged enemies stand still and glow this long before each shot.
+const WINDUP_TIME := 0.4
+## A ranged enemy that can't shoot yet (no sight line, off screen) looks again after this.
+const RETRY_TIME := 0.25
 ## Enemies pushed harder than this (px/s) toward a chasm go over the edge.
 const FALL_PUSH := 30.0
 const FALL_TIME := 0.45
@@ -52,7 +55,7 @@ const FLAG_SHATTER := 4   ## frozen: shatters into a freezing nova when it dies
 const FLAG_PLAGUE := 8    ## poisoned: bursts into a toxic cloud when it dies
 enum DeathFx { INFERNO, SHATTER, PLAGUE }
 ## Render tint codes (atlas shader, custom.b).
-enum Tint { NONE, CHILL, FROZEN, BURN, POISON }
+enum Tint { NONE, CHILL, FROZEN, BURN, POISON, CHARGING }
 
 var count := 0
 var pos := PackedVector2Array()
@@ -126,6 +129,13 @@ var hit_type := PackedInt32Array()
 var hit_crit := PackedByteArray()
 ## Enemy shots fired since the World last checked (for sound).
 var shots_fired := 0
+## Ranged enemies only start a shot inside this rectangle (the camera view),
+## so nothing fires from off screen. Empty = anywhere.
+var view_rect := Rect2()
+## Exploders whose fuse lit this frame (uids), and ranged enemies that started
+## winding up a shot (positions), for the World's warnings.
+var fuse_uids := PackedInt32Array()
+var windup_pos := PackedVector2Array()
 ## Enemies that went over a chasm edge since the World last checked (sound).
 var falls := 0
 ## Elemental death effects since the last drain (the World plays them out):
@@ -498,6 +508,12 @@ func apply_mark(i: int, seconds: float) -> void:
 	mark[i] = maxf(mark[i], seconds)
 
 
+## Forgets this frame's fuse and wind-up logs (the World read them).
+func clear_warning_logs() -> void:
+	fuse_uids.clear()
+	windup_pos.clear()
+
+
 func clear_blasts() -> void:
 	blast_pos.clear()
 	blast_radius.clear()
@@ -582,6 +598,8 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	var ntargets := targets.size()
 	var decay := exp(-KNOCKBACK_DECAY * dt)
 	var parity := _frame & 1
+	var check_view := view_rect.has_area()
+	var view := view_rect.grow(-4.0)
 
 	for i in n:
 		if HP[i] <= 0.0:
@@ -684,25 +702,40 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 			if behavior == EnemyData.Behavior.RANGED and best < INF:
 				var dist := sqrt(best)
 				var attack_range := range_t[t]
-				if dist < attack_range:
-					if dist < attack_range * RANGED_BACKOFF:
-						desired = (p - tp) / maxf(dist, 0.001)
-					else:
-						desired = Vector2.ZERO
-					var cd := ACT[i] - dt
-					if cd <= 0.0:
-						cd = cooldown_t[t]
+				if STATE[i] == 1:
+					# Winding up (pose + pink glow): stand still, then fire at the
+					# nearest hero if it's still in sight.
+					desired = Vector2.ZERO
+					var wind := ACT[i] - dt
+					if wind <= 0.0:
+						STATE[i] = 0
+						wind = cooldown_t[t] - WINDUP_TIME
 						if projectiles != null and grid.line_of_sight(p, tp):
 							var aim := (tp - p) / maxf(dist, 0.001)
 							projectiles.spawn(p + Vector2(0, -8), aim * shot_speed_t[t], shot_damage_t[t], 3.0,
 								attack_range * 1.6 / shot_speed_t[t], ProjectileSim.Team.ENEMY, -1,
 								ProjectileSim.Look.SPIT)
 							shots_fired += 1
+					ACT[i] = wind
+				elif dist < attack_range:
+					if dist < attack_range * RANGED_BACKOFF:
+						desired = (p - tp) / maxf(dist, 0.001)
+					else:
+						desired = Vector2.ZERO
+					var cd := ACT[i] - dt
+					if cd <= 0.0:
+						if (not check_view or view.has_point(p)) and grid.line_of_sight(p, tp):
+							STATE[i] = 1
+							cd = WINDUP_TIME
+							windup_pos.append(p)
+						else:
+							cd = RETRY_TIME
 					ACT[i] = cd
 			elif behavior == EnemyData.Behavior.EXPLODER and best < INF:
 				if STATE[i] == 0 and best < blast_radius_t[t] * blast_radius_t[t] * 0.4:
 					STATE[i] = 1
 					ACT[i] = fuse_t[t]
+					fuse_uids.append(uid[i])
 				if STATE[i] == 1:
 					desired = Vector2.ZERO
 					var fuse := ACT[i] - dt
@@ -988,8 +1021,8 @@ func render(layer: InstanceLayer) -> void:
 			frame += 4 + int(AN[i] * 12.0) % 2
 		elif beh == EnemyData.Behavior.NEST and action[i] > 0.0:
 			frame += 4 + int(AN[i] * 10.0) % 2  # spawning (LevelDirector sets the pose timer)
-		elif beh == EnemyData.Behavior.RANGED and action[i] > t_cooldown[t] - SHOT_POSE_TIME:
-			frame += 4
+		elif beh == EnemyData.Behavior.RANGED and state[i] == 1:
+			frame += 4  # winding up a shot
 		elif STN[i] <= 0.0:
 			frame += int(AN[i] * fps[t]) % frames[t]
 		buf[o + 8] = float(frame)
@@ -1006,6 +1039,8 @@ func render(layer: InstanceLayer) -> void:
 				tint = Tint.CHILL
 		if tint == Tint.NONE and SLW[i] > 0.0:
 			tint = Tint.CHILL
+		if beh == EnemyData.Behavior.RANGED and state[i] == 1 and STN[i] <= 0.0:
+			tint = Tint.CHARGING
 		buf[o + 10] = float(tint)
 		w += 1
 	layer.buffer = buf

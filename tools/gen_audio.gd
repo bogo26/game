@@ -58,6 +58,10 @@ const SFX := {
 	"freeze": {"wave": "sine", "f0": 2300.0, "f1": 3300.0, "dur": 0.16, "decay": 1.6, "vol": 0.14, "noise": 0.3},
 	"shatter": {"wave": "noise", "f0": 7500.0, "f1": 3000.0, "dur": 0.22, "decay": 1.8, "vol": 0.26, "lp": 0.7},
 	"plague": {"wave": "saw", "f0": 150.0, "f1": 105.0, "dur": 0.4, "decay": 1.2, "vol": 0.16, "noise": 0.5, "lp": 0.25, "vib": [0.08, 8.0]},
+	# Warnings: an exploder's fuse hiss, the boss winding up, a spawn portal opening.
+	"fuse": {"wave": "noise", "f0": 5200.0, "f1": 7400.0, "dur": 0.6, "decay": 0.5, "vol": 0.13, "lp": 0.55, "vib": [0.25, 13.0]},
+	"windup": {"wave": "saw", "f0": 170.0, "f1": 520.0, "dur": 0.48, "decay": 0.45, "vol": 0.24, "attack": 0.08, "lp": 0.3, "vib": [0.06, 17.0]},
+	"spawn": {"wave": "sine", "f0": 560.0, "f1": 150.0, "dur": 0.34, "decay": 0.9, "vol": 0.13, "noise": 0.35, "lp": 0.35, "vib": [0.1, 11.0]},
 }
 
 ## Chords are MIDI note triads per bar; bpm; drums: "full", "light" or "none".

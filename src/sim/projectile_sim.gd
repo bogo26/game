@@ -10,6 +10,8 @@ const CAPACITY := 1024
 const ATLAS_COLUMNS := 8
 
 enum Team { PLAYER, ENEMY }
+## Shader tint code for enemy shots (they throb; see atlas_instance.gdshader).
+const HOSTILE_TINT := 6.0
 ## Frame indices in row 0 of assets/sprites/fx/fx_atlas.png.
 enum Look { ARROW, BOLT, ORB, SPIT, KNIFE, RIVET, SOUL, FIRE }
 
@@ -305,5 +307,6 @@ func render(layer: InstanceLayer) -> void:
 		buf[o + 7] = roundf(p.y)
 		buf[o + 8] = float(look[i])
 		buf[o + 9] = 0.45 if crit[i] != 0 else 0.0  # crit shots glow
+		buf[o + 10] = HOSTILE_TINT if team[i] == Team.ENEMY else 0.0
 	layer.buffer = buf
 	layer.commit(n)

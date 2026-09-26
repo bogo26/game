@@ -34,6 +34,7 @@ const COLOR_CHEST := Color(1.0, 0.8, 0.25)
 const COLOR_SHRINE := Color(0.4, 0.95, 1.0)
 const COLOR_NEST := Color(0.95, 0.25, 0.45)
 const COLOR_USED := Color(0.45, 0.45, 0.5)
+const COLOR_HEART := Color(0.5, 1.0, 0.55)
 
 var world: World
 ## Debug / screenshots: keep the map up (--show-map).
@@ -240,6 +241,10 @@ func _draw_points_of_interest(s: float) -> void:
 			draw_rect(Rect2((c - box * 0.5).floor(), box), COLOR_USED if it.used else COLOR_CHEST)
 		else:
 			_diamond(c, box.x * 0.7 + 1.0, COLOR_USED if it.used else COLOR_SHRINE)
+	var pickups := world.pickups
+	for i in pickups.count:
+		if pickups.kind[i] == PickupSim.Kind.HEART and world.reveal.is_seen_at(pickups.pos[i]):
+			_plus(to_map(pickups.pos[i]).floor(), arm, COLOR_HEART)
 	var exit := level.exit_center()
 	if exit.is_finite() and (world.director.exit_open or world.reveal.is_seen_at(exit)):
 		var r := 2.0 + s * 0.75
@@ -271,7 +276,7 @@ func _draw_heroes(s: float) -> void:
 func _draw_legend(font: Font, pos: Vector2) -> void:
 	var x := pos.x
 	var y := pos.y
-	x = _legend_item(font, x, y, Color.WHITE, "Heroes", 0)
+	x = _legend_item(font, x, y, Color.WHITE, "Heroes", 5)
 	x = _legend_item(font, x, y, COLOR_ENEMY, "Enemies", 0)
 	x = _legend_item(font, x, y, COLOR_OBJECTIVE, "Objective", 1)
 	x = _legend_item(font, x, y, COLOR_EXIT, "Exit", 2)
@@ -279,10 +284,11 @@ func _draw_legend(font: Font, pos: Vector2) -> void:
 	x = _legend_item(font, x, y, COLOR_NEST, "Nest", 3)
 	x = _legend_item(font, x, y, COLOR_CHEST, "Chest", 0)
 	x = _legend_item(font, x, y, COLOR_SHRINE, "Shrine", 2)
+	x = _legend_item(font, x, y, COLOR_HEART, "Heart", 4)
 
 
-## Draws an icon (0 square, 1 ring, 2 diamond, 3 cross) and a label;
-## returns the next x.
+## Draws an icon (0 square, 1 ring, 2 diamond, 3 cross, 4 plus, 5 the four
+## player colours) and a label; returns the next x.
 func _legend_item(font: Font, x: float, y: float, color: Color, text: String, icon: int) -> float:
 	var center := Vector2(x + 3, y - 3)
 	match icon:
@@ -295,8 +301,19 @@ func _legend_item(font: Font, x: float, y: float, color: Color, text: String, ic
 		3:
 			draw_line(center - Vector2(2.5, 2.5), center + Vector2(2.5, 2.5), color, 1.5)
 			draw_line(center - Vector2(2.5, -2.5), center + Vector2(2.5, -2.5), color, 1.5)
+		4:
+			_plus(center, 2.5, color)
+		5:
+			for k in 4:
+				draw_rect(Rect2(center - Vector2(2, 2) + Vector2(k % 2, k / 2) * 2.0, Vector2(2, 2)),
+					GameState.player_color(k))
 	draw_string(font, Vector2(x + 9, y), text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(0.75, 0.75, 0.8))
 	return x + 9 + font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x + 10
+
+
+func _plus(center: Vector2, arm: float, color: Color) -> void:
+	draw_line(center - Vector2(arm, 0), center + Vector2(arm, 0), color, 1.5)
+	draw_line(center - Vector2(0, arm), center + Vector2(0, arm), color, 1.5)
 
 
 func _diamond(center: Vector2, r: float, color: Color) -> void:

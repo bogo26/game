@@ -4,6 +4,9 @@ extends RefCounted
 ## camera on reachable floor at a steady rate, falls back to the level's spawn
 ## hints when nothing off-screen is open, and recycles enemies that fall far
 ## behind so the pressure stays on the team.
+## Enemies that appear where players can see them (arena waves, nests, boss
+## summons) come through a portal first: queue_spawn() opens it, and the
+## enemy steps out PORTAL_TIME later.
 
 const ALIVE_CAP_BY_PLAYERS: Array[int] = [150, 150, 200, 250, 300]
 const HP_SCALE_PER_EXTRA_PLAYER := 0.35
@@ -13,6 +16,10 @@ const RECYCLE_INTERVAL := 0.5
 ## Spawn points further than this (in flow-field steps) from any player are skipped.
 const MAX_PATH_TILES := 70
 const HINT_MIN_DISTANCE := 96.0
+## Corridor spawns (off screen) never land closer than this to a hero.
+const CORRIDOR_MIN_DISTANCE := 110.0
+## Seconds a spawn portal is open before its enemy steps out.
+const PORTAL_TIME := 0.5
 
 enum Mode {
 	OFF,       ## nothing spawns
@@ -31,8 +38,8 @@ var corridor_cap_fraction := 1.0
 ## ARENA mode: floor cells to spawn on and how many enemies are left to spawn.
 var arena_cells: Array[Vector2i] = []
 var arena_remaining := 0
-## Emitted for each arena spawn so the World can draw a spawn portal.
-signal spawned_in_arena(position: Vector2)
+## A spawn portal opened (the World draws it and plays a sound).
+signal portal_opened(position: Vector2, seconds: float)
 var alive_cap := 150
 ## Enemies per second while below the cap.
 var spawn_rate := 30.0
@@ -45,6 +52,11 @@ var weights := PackedFloat32Array()
 var _budget := 0.0
 var _recycle_in := RECYCLE_INTERVAL
 var _rng := RandomNumberGenerator.new()
+## Enemies waiting in open portals.
+var _pending_pos := PackedVector2Array()
+var _pending_type := PackedInt32Array()
+var _pending_hp := PackedFloat32Array()
+var _pending_time := PackedFloat32Array()
 
 
 func setup(p_horde: HordeSim, p_grid: LevelGrid, p_flow: FlowField, hints: Array[Vector2]) -> void:
@@ -88,7 +100,22 @@ func start_arena(cells: Array[Vector2i], quota: int, rate: float) -> void:
 	_budget = 0.0
 
 
+## Opens a spawn portal at `p`; the enemy appears after `delay` seconds.
+func queue_spawn(type_id: int, p: Vector2, hp_mult: float, delay: float = PORTAL_TIME) -> void:
+	_pending_pos.append(p)
+	_pending_type.append(type_id)
+	_pending_hp.append(hp_mult)
+	_pending_time.append(delay)
+	portal_opened.emit(p, delay)
+
+
+## Enemies still waiting in open portals.
+func pending_count() -> int:
+	return _pending_time.size()
+
+
 func tick(dt: float, view: Rect2, hero_positions: PackedVector2Array) -> void:
+	_tick_portals(dt)
 	if not enabled or mode == Mode.OFF:
 		return
 	_budget = minf(_budget + spawn_rate * dt, 30.0)
@@ -96,7 +123,7 @@ func tick(dt: float, view: Rect2, hero_positions: PackedVector2Array) -> void:
 	if mode == Mode.CORRIDOR:
 		cap = int(alive_cap * corridor_cap_fraction)
 	var attempts := 0
-	var alive := horde.enemy_count()
+	var alive := horde.enemy_count() + pending_count()
 	while _budget >= 1.0 and alive < cap and attempts < 24:
 		if mode == Mode.ARENA and arena_remaining <= 0:
 			break
@@ -105,17 +132,39 @@ func tick(dt: float, view: Rect2, hero_positions: PackedVector2Array) -> void:
 			else find_arena_point(hero_positions)
 		if not p.is_finite():
 			continue
-		horde.spawn(pick_type(), p, effective_hp_multiplier())
+		if mode == Mode.ARENA:
+			queue_spawn(pick_type(), p, effective_hp_multiplier())  # on screen: through a portal
+			arena_remaining -= 1
+		else:
+			horde.spawn(pick_type(), p, effective_hp_multiplier())
 		alive += 1
 		_budget -= 1.0
-		if mode == Mode.ARENA:
-			arena_remaining -= 1
-			spawned_in_arena.emit(p)
 	if mode == Mode.CORRIDOR:
 		_recycle_in -= dt
 		if _recycle_in <= 0.0:
 			_recycle_in = RECYCLE_INTERVAL
 			_recycle(view, hero_positions)
+
+
+func _tick_portals(dt: float) -> void:
+	var k := 0
+	while k < _pending_time.size():
+		var left := _pending_time[k] - dt
+		if left > 0.0:
+			_pending_time[k] = left
+			k += 1
+			continue
+		horde.spawn(_pending_type[k], _pending_pos[k], _pending_hp[k])
+		# Swap-remove: order doesn't matter.
+		var last := _pending_time.size() - 1
+		_pending_pos[k] = _pending_pos[last]
+		_pending_type[k] = _pending_type[last]
+		_pending_hp[k] = _pending_hp[last]
+		_pending_time[k] = _pending_time[last]
+		_pending_pos.resize(last)
+		_pending_type.resize(last)
+		_pending_hp.resize(last)
+		_pending_time.resize(last)
 
 
 ## A random arena floor cell at least HINT_MIN_DISTANCE from every hero.
@@ -166,19 +215,23 @@ func find_spawn_point(view: Rect2, hero_positions: PackedVector2Array) -> Vector
 				p = Vector2(outer.position.x, _rng.randf_range(outer.position.y, outer.end.y))
 			_:
 				p = Vector2(outer.end.x, _rng.randf_range(outer.position.y, outer.end.y))
-		if _is_good_cell(p):
+		if _is_good_cell(p) and _far_from_heroes(p, hero_positions, CORRIDOR_MIN_DISTANCE):
 			return p + Vector2(_rng.randf_range(-3, 3), _rng.randf_range(-3, 3))
-	# Nothing open off-screen (small rooms): use a spawn hint away from heroes.
+	# Nothing open off-screen (small rooms): use a spawn hint the team can't
+	# see, away from every hero.
 	if not spawn_hints.is_empty():
 		var hint := spawn_hints[_rng.randi_range(0, spawn_hints.size() - 1)]
-		var far_enough := true
-		for q in hero_positions:
-			if q.distance_squared_to(hint) < HINT_MIN_DISTANCE * HINT_MIN_DISTANCE:
-				far_enough = false
-				break
-		if far_enough and _is_good_cell(hint):
+		if not view.has_point(hint) and _far_from_heroes(hint, hero_positions, CORRIDOR_MIN_DISTANCE) \
+				and _is_good_cell(hint):
 			return hint
 	return Vector2.INF
+
+
+static func _far_from_heroes(p: Vector2, hero_positions: PackedVector2Array, distance: float) -> bool:
+	for q in hero_positions:
+		if q.distance_squared_to(p) < distance * distance:
+			return false
+	return true
 
 
 func _is_good_cell(p: Vector2) -> bool:

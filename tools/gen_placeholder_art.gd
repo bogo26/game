@@ -925,13 +925,15 @@ func _draw_projectile(img: Image, ox: int, oy: int, kind: String) -> void:
 			_rect(img, ox + 6, oy + 6, 5, 4, Color("b070ff"))
 			_rect(img, ox + 7, oy + 7, 3, 2, Color("f0e0ff"))
 			_rect(img, ox + 3, oy + 7, 3, 2, Color("7040c0"))
-		"orb":
-			_rect(img, ox + 5, oy + 5, 6, 6, Color("f2d24a"))
-			_rect(img, ox + 6, oy + 6, 3, 3, Color("fffae0"))
-		"spit":
-			_rect(img, ox + 6, oy + 6, 4, 4, Color("7af05a"))
-			_rect(img, ox + 3, oy + 7, 3, 2, Color("4aa83a"))
-			_px(img, ox + 8, oy + 7, Color("e0ffd0"))
+		"orb":  # holy: pale gold, never mistaken for enemy fire
+			_rect(img, ox + 5, oy + 5, 6, 6, Color("ffe68a"))
+			_rect(img, ox + 6, oy + 6, 4, 4, Color("fff6cc"))
+			_px(img, ox + 7, oy + 7, Color("ffffff"))
+		"spit":  # enemy shots are all hot pink (see FxLayer.DANGER)
+			_rect(img, ox + 3, oy + 7, 3, 2, Color("a8185a"))
+			_rect(img, ox + 6, oy + 5, 5, 5, Color("ff3d8b"))
+			_rect(img, ox + 7, oy + 6, 3, 3, Color("ff9ac4"))
+			_px(img, ox + 8, oy + 7, Color("ffffff"))
 		"knife":
 			_rect(img, ox + 5, oy + 7, 7, 1, Color("d8dce4"))
 			_rect(img, ox + 3, oy + 7, 2, 1, Color("6a4a2a"))
@@ -943,10 +945,12 @@ func _draw_projectile(img: Image, ox: int, oy: int, kind: String) -> void:
 			_rect(img, ox + 6, oy + 5, 5, 6, Color("5af0d0"))
 			_rect(img, ox + 7, oy + 6, 3, 4, Color("d0fff4"))
 			_rect(img, ox + 3, oy + 7, 3, 2, Color("2a9a8a"))
-		"fire":
-			_rect(img, ox + 5, oy + 5, 6, 6, Color("ff7a2a"))
-			_rect(img, ox + 6, oy + 6, 4, 4, Color("ffd04a"))
-			_px(img, ox + 7, oy + 7, Color("fff8d0"))
+		"fire":  # the boss's fireballs: a bigger hot pink orb
+			_rect(img, ox + 5, oy + 4, 7, 8, Color("e0205a"))
+			_rect(img, ox + 4, oy + 5, 9, 6, Color("e0205a"))
+			_rect(img, ox + 5, oy + 5, 7, 6, Color("ff3d8b"))
+			_rect(img, ox + 6, oy + 6, 5, 4, Color("ff9ac4"))
+			_rect(img, ox + 7, oy + 7, 3, 2, Color("ffffff"))
 	_outline(img, Rect2i(ox, oy, 16, 16))
 
 

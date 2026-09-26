@@ -31,7 +31,8 @@ func _activate(aim: Vector2) -> void:
 	if delay > 0.0:
 		_pending_time.append(delay)
 		_pending_pos.append(p)
-		world().ground_fx.telegraph(p, _radius(), color, delay)
+		# Dashed and in the caster's colour, so it never reads as an enemy's telegraph.
+		world().warn_fx.telegraph(p, _radius(), hero.color, delay, true)
 	else:
 		_land(p)
 

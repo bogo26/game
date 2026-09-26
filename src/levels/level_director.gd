@@ -131,11 +131,12 @@ func on_enemy_killed() -> void:
 		_update_objective()
 
 
-## Enemies still to beat in the active arena: not yet spawned + alive inside.
+## Enemies still to beat in the active arena: not yet spawned (or still in a
+## spawn portal) + alive inside.
 func enemies_left() -> int:
 	if active_room == null:
 		return 0
-	return world.spawner.arena_remaining + _in_room_alive
+	return world.spawner.arena_remaining + world.spawner.pending_count() + _in_room_alive
 
 
 # --- arenas ----------------------------------------------------------------------------------
@@ -197,7 +198,7 @@ func _tick_active_room(dt: float) -> void:
 	for i in horde.count:
 		if horde.hp[i] > 0.0 and not horde.is_object(i) and level.room_at_position(horde.pos[i]) == room.id:
 			_in_room_alive += 1
-	if world.spawner.arena_remaining <= 0 and _in_room_alive == 0:
+	if world.spawner.arena_remaining <= 0 and world.spawner.pending_count() == 0 and _in_room_alive == 0:
 		_clear(room)
 	else:
 		_update_objective()
@@ -267,13 +268,12 @@ func _tick_nests(dt: float) -> void:
 		if nest.timer > 0.0:
 			continue
 		nest.timer = NEST_INTERVAL * randf_range(0.85, 1.15)
-		if horde.enemy_count() >= spawner.alive_cap:
+		if horde.enemy_count() + spawner.pending_count() >= spawner.alive_cap:
 			continue
 		for n in NEST_BATCH:
 			var spot := world.grid.nearest_open(p + Vector2.from_angle(randf() * TAU) * randf_range(12.0, 20.0))
-			horde.spawn(spawner.pick_type(), spot, spawner.effective_hp_multiplier())
-			world.fx.ring(spot, 7.0, Color(0.9, 0.3, 0.6), 0.3)
-		horde.action[i] = NEST_POSE_TIME
+			spawner.queue_spawn(spawner.pick_type(), spot, spawner.effective_hp_multiplier())
+		horde.action[i] = NEST_POSE_TIME + SpawnDirector.PORTAL_TIME
 		if world.camera.visible_rect().has_point(p):
 			Audio.play(&"nest")
 

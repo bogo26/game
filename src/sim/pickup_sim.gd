@@ -121,15 +121,36 @@ func _remove_at(i: int, P: PackedVector2Array) -> void:
 	count = last
 
 
-func render(layer: InstanceLayer) -> void:
+## Gems go to `layer`; hearts go to `heart_layer` when given (drawn above the
+## horde, so a crowd can't hide them).
+func render(layer: InstanceLayer, heart_layer: InstanceLayer = null) -> void:
 	var buf := layer.buffer
-	var n := mini(count, layer.capacity)
-	for i in n:
+	var cap := layer.capacity
+	var hbuf := heart_layer.buffer if heart_layer else PackedFloat32Array()
+	var hcap := heart_layer.capacity if heart_layer else 0
+	var w := 0
+	var hw := 0
+	for i in count:
 		var p := pos[i]
 		var bob := roundf(sin(age[i] * 5.0 + float(i)) * 1.0) if target[i] == -1 else 0.0
-		var o := i * InstanceLayer.STRIDE
+		var cell := float(FX_ROW + look_of(kind[i], value[i]))
+		if heart_layer and kind[i] == Kind.HEART:
+			if hw < hcap:
+				var ho := hw * InstanceLayer.STRIDE
+				hbuf[ho + 3] = roundf(p.x)
+				hbuf[ho + 7] = roundf(p.y) + bob
+				hbuf[ho + 8] = cell
+				hw += 1
+			continue
+		if w >= cap:
+			continue
+		var o := w * InstanceLayer.STRIDE
 		buf[o + 3] = roundf(p.x)
 		buf[o + 7] = roundf(p.y) + bob
-		buf[o + 8] = float(FX_ROW + look_of(kind[i], value[i]))
+		buf[o + 8] = cell
+		w += 1
 	layer.buffer = buf
-	layer.commit(n)
+	layer.commit(w)
+	if heart_layer:
+		heart_layer.buffer = hbuf
+		heart_layer.commit(hw)

@@ -6,6 +6,10 @@ extends Node2D
 ##   phase 1 (100-60%): walks at the nearest hero, fireball fans and ground slams
 ##   phase 2 (60-25%):  adds fire rings and summons swarmers
 ##   phase 3 (<25%):    enraged: faster, adds telegraphed charges
+## Every attack is announced during its wind-up (the boss glows and growls),
+## drawn above the horde: the slam's area, the charge's exact path, the fan's
+## aim lines (the aim is locked when the wind-up starts), a turning ring of
+## dots for the fire ring, and spawn portals where summoned adds will appear.
 
 signal defeated
 
@@ -14,6 +18,7 @@ enum Action { WALK, WINDUP, CHARGE }
 enum Attack { FAN, SLAM, RING, SUMMON, CHARGE }
 
 const SPRITE := preload("res://assets/sprites/enemies/boss_demon.png")
+const FLASH_SHADER := preload("res://assets/shaders/sprite_flash.gdshader")
 ## 64x64 frames drawn with the feet (the node's position) at (32, 58).
 const SPRITE_OFFSET := Vector2(0, -26)
 ## Fireballs leave from the chest.
@@ -27,6 +32,13 @@ const SLAM_DAMAGE := 30.0
 const CHARGE_DAMAGE := 26.0
 const CHARGE_SPEED := 260.0
 const CHARGE_DISTANCE := 200.0
+## A charge hits heroes whose feet come this close to its path.
+const CHARGE_REACH := BODY_RADIUS + Hero.RADIUS + 4.0
+const WINDUP_TIME := 0.5
+const SLAM_WINDUP := 0.9
+const CHARGE_WINDUP := 0.7
+## Fireball fans spread over ±FAN_SPREAD radians.
+const FAN_SPREAD := 0.6
 
 var world: World
 var uid := -1
@@ -40,6 +52,7 @@ var _attack_timer := 2.0
 var _action_time := 0.0
 var _anim := 0.0
 var _charge_dir := Vector2.ZERO
+var _fan_dir := Vector2.DOWN
 var _charge_left := 0.0
 var _charge_hit: Dictionary = {}
 var _add_hp_multiplier := 1.0
@@ -64,6 +77,9 @@ func _ready() -> void:
 	sprite.texture = SPRITE
 	sprite.hframes = 4
 	sprite.offset = SPRITE_OFFSET
+	var mat := ShaderMaterial.new()
+	mat.shader = FLASH_SHADER
+	sprite.material = mat
 
 
 func hp_ratio() -> float:
@@ -105,7 +121,7 @@ func tick(dt: float) -> void:
 			p = next
 			_charge_left -= step
 			for hero in world.heroes:
-				if not _charge_hit.has(hero.slot) and hero.position.distance_to(p) < BODY_RADIUS + Hero.RADIUS + 4.0:
+				if not _charge_hit.has(hero.slot) and hero.position.distance_to(p) < CHARGE_REACH:
 					_charge_hit[hero.slot] = true
 					hero.take_hit(CHARGE_DAMAGE)
 			world.fx.disc(p + Vector2(0, -10), 10.0, Color(1, 0.4, 0.2, 0.4), 0.15)
@@ -138,34 +154,44 @@ func _begin_attack(p: Vector2, target: Vector2) -> void:
 		options.append_array([Attack.RING, Attack.SUMMON])
 	if phase == Phase.THREE:
 		options.append_array([Attack.CHARGE, Attack.CHARGE])
-	pending_attack = options[_rng.randi_range(0, options.size() - 1)]
+	wind_up(options[_rng.randi_range(0, options.size() - 1)], p, target)
+
+
+## Starts `attack`'s wind-up and draws its warning.
+func wind_up(attack: Attack, p: Vector2, target: Vector2) -> void:
+	pending_attack = attack
 	action = Action.WINDUP
+	_action_time = WINDUP_TIME
+	var warn := world.warn_fx
+	var danger := FxLayer.DANGER
 	match pending_attack:
 		Attack.SLAM:
-			_action_time = 0.9
-			world.ground_fx.telegraph(p, SLAM_RADIUS, Color(1, 0.3, 0.2), _action_time)
+			_action_time = SLAM_WINDUP
+			warn.telegraph(p, SLAM_RADIUS, danger, _action_time)
 		Attack.CHARGE:
-			_action_time = 0.7
+			_action_time = CHARGE_WINDUP
 			_charge_dir = (target - p).normalized()
-			world.ground_fx.warn_line(p, p + _charge_dir * CHARGE_DISTANCE, Color(1, 0.3, 0.2), _action_time)
-		_:
-			_action_time = 0.5
+			warn.warn_band(p, p + _charge_dir * CHARGE_DISTANCE, CHARGE_REACH * 2.0, danger, _action_time)
+		Attack.FAN:
+			_fan_dir = _aim_at(p, target)
+			var count := _fan_count()
+			for k in count:
+				var d := _fan_dir.rotated(_fan_angle(k, count))
+				warn.warn_line(p + MUZZLE + d * 12.0, p + MUZZLE + d * 96.0, danger, _action_time, 1.0)
+		Attack.RING:
+			# On the top layer and wider than the body, so the boss can't hide it.
+			world.fx.dot_ring(p + MUZZLE, 44.0, 12, danger, _action_time)
+		Attack.SUMMON:
+			_summon(8)  # the adds step out of their portals as the wind-up ends
+	Audio.play(&"windup")
 
 
 func _execute_attack(p: Vector2, target: Vector2) -> void:
 	match pending_attack:
 		Attack.FAN:
-			# Aim from the chest at the hero's body, so the middle fireball flies
-			# straight at them instead of over their head.
-			var dir := Vector2.DOWN
-			if target.is_finite():
-				var to := target + Hero.SPRITE_FEET_OFFSET - (p + MUZZLE)
-				if to.length_squared() > 1.0:
-					dir = to.normalized()
-			var count := 7 + 2 * phase
+			var count := _fan_count()
 			for k in count:
-				var a := lerpf(-0.6, 0.6, float(k) / float(count - 1))
-				_fireball(p, dir.rotated(a), 115.0)
+				_fireball(p, _fan_dir.rotated(_fan_angle(k, count)), 115.0)
 		Attack.SLAM:
 			for hero in world.heroes:
 				if hero.position.distance_to(p) <= SLAM_RADIUS + Hero.RADIUS \
@@ -181,13 +207,31 @@ func _execute_attack(p: Vector2, target: Vector2) -> void:
 			for k in count:
 				_fireball(p, Vector2.from_angle(offset + TAU * k / count), 95.0)
 		Attack.SUMMON:
-			_summon(8)
+			pass  # summoned when the wind-up started
 		Attack.CHARGE:
 			action = Action.CHARGE
 			_charge_left = CHARGE_DISTANCE
 			_charge_hit.clear()
 			return
 	_end_action()
+
+
+## Aim from the chest at the hero's body, so the middle fireball flies
+## straight at them instead of over their head.
+func _aim_at(p: Vector2, target: Vector2) -> Vector2:
+	if target.is_finite():
+		var to := target + Hero.SPRITE_FEET_OFFSET - (p + MUZZLE)
+		if to.length_squared() > 1.0:
+			return to.normalized()
+	return Vector2.DOWN
+
+
+func _fan_count() -> int:
+	return 7 + 2 * phase
+
+
+func _fan_angle(k: int, count: int) -> float:
+	return lerpf(-FAN_SPREAD, FAN_SPREAD, float(k) / float(count - 1))
 
 
 func _end_action() -> void:
@@ -201,13 +245,13 @@ func _fireball(p: Vector2, dir: Vector2, speed: float) -> void:
 		ProjectileSim.Team.ENEMY, -1, ProjectileSim.Look.FIRE)
 
 
+## Swarmers around the boss, each through a spawn portal.
 func _summon(count: int) -> void:
 	var type_id := world.horde.type_index(&"swarmer")
 	var center := position
 	for k in count:
 		var spot := world.grid.nearest_open(center + Vector2.from_angle(TAU * k / count) * 44.0)
-		world.horde.spawn(type_id, spot, _add_hp_multiplier)
-		world.fx.ring(spot, 10.0, Color(0.8, 0.3, 1.0), 0.4)
+		world.spawner.queue_spawn(type_id, spot, _add_hp_multiplier)
 
 
 func _nearest_hero(p: Vector2) -> Vector2:
@@ -230,8 +274,18 @@ func _update_sprite() -> void:
 	elif action == Action.CHARGE:
 		frame = 3
 	sprite.frame = frame
+	var mat := sprite.material as ShaderMaterial
+	if action == Action.WINDUP:
+		# A hot pink throb that hit flashes can't wash out: an attack is coming.
+		var pulse := 0.5 + 0.5 * sin(_anim * 30.0)
+		mat.set_shader_parameter("flash_color", FxLayer.DANGER.lightened(0.35))
+		mat.set_shader_parameter("flash_amount", 0.35 + 0.35 * pulse)
+		sprite.modulate = Color.WHITE
+		return
 	var flash := world.horde.flash[_index] > 0.0
-	sprite.modulate = Color(3, 3, 3) if flash else (Color(1.3, 0.8, 0.8) if phase == Phase.THREE else Color.WHITE)
+	mat.set_shader_parameter("flash_color", Color.WHITE)
+	mat.set_shader_parameter("flash_amount", 0.75 if flash else 0.0)
+	sprite.modulate = Color(1.3, 0.8, 0.8) if phase == Phase.THREE else Color.WHITE
 
 
 func _die() -> void:

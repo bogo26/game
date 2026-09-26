@@ -119,6 +119,9 @@ var blessing_left := 0.0
 var blessing_color := Color.WHITE
 ## Barrel blasts waiting to go off: [position, radius, damage, slot, delay].
 var _pending_blasts: Array[Array] = []
+## Exploders with a lit fuse (uids) and where they were last seen in the horde.
+var _lit_fuses := PackedInt32Array()
+var _lit_hints := PackedInt32Array()
 ## Recent enemy deaths (Raise Dead): positions and times.
 var _corpse_pos := PackedVector2Array()
 var _corpse_time := PackedFloat32Array()
@@ -127,6 +130,10 @@ const MAX_CORPSES := 96
 
 @onready var level: Level = $Level
 @onready var ground_fx: FxLayer = $GroundFx
+## Above the horde: telegraphs, fuses and spawn portals (never hidden by enemies).
+@onready var warn_fx: FxLayer = $WarnFx
+@onready var heart_layer: InstanceLayer = $HeartLayer
+@onready var hero_overlay: HeroOverlay = $HeroOverlay
 @onready var props_root: Node2D = $Props
 @onready var entities: Node2D = $Entities
 @onready var fx: FxLayer = $Fx
@@ -175,6 +182,9 @@ func _ready() -> void:
 	horde_layer.setup(HORDE_ATLAS, HordeSim.SPRITE_CELL, HordeSim.SPRITE_FEET, HordeSim.CAPACITY)
 	projectile_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 8), ProjectileSim.CAPACITY)
 	pickup_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 11), PickupSim.CAPACITY)
+	heart_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 11), 128)
+	hero_overlay.world = self
+	spawner.portal_opened.connect(_on_portal_opened)
 	particle_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 8), FxSim.CAPACITY, true)
 	Events.team_level_up.connect(_on_team_level_up)
 	Events.hero_damaged.connect(_on_hero_damaged)
@@ -265,9 +275,11 @@ func _process(delta: float) -> void:
 	flow.tick(dt, target_positions)
 	director.tick(dt)
 	spawner.tick(dt, camera.visible_rect(), hero_positions)
+	horde.view_rect = camera.visible_rect()
 	horde.update(dt, target_positions)
 	_update_spikes(dt)
 	_apply_blasts()
+	_update_warnings()
 	_apply_contact_damage()
 	var t_horde := Time.get_ticks_usec()
 
@@ -307,7 +319,7 @@ func _process(delta: float) -> void:
 
 	horde.render(horde_layer)
 	projectiles.render(projectile_layer)
-	pickups.render(pickup_layer)
+	pickups.render(pickup_layer, heart_layer)
 	var t_fx := Time.get_ticks_usec()
 	for hero in heroes:
 		if hero.is_dashing() and randf() < 0.6:
@@ -316,6 +328,7 @@ func _process(delta: float) -> void:
 	particles.render(particle_layer)
 	numbers.tick(dt)
 	ground_fx.tick(dt)
+	warn_fx.tick(dt)
 	fx.tick(dt)
 	var t_end := Time.get_ticks_usec()
 	PerfMonitor.record(&"fx", t_end - t_fx)
@@ -675,6 +688,42 @@ func _apply_blasts() -> void:
 		shake(2.5)
 		Audio.play(&"explosion")
 	horde.clear_blasts()
+
+
+## Exploder fuses become filling circles that follow the fuse (and vanish if
+## the exploder dies first); ranged enemies starting a shot glint.
+func _update_warnings() -> void:
+	if not horde.fuse_uids.is_empty():
+		Audio.play(&"fuse")
+		for id in horde.fuse_uids:
+			_lit_fuses.append(id)
+			_lit_hints.append(-1)
+	for p in horde.windup_pos:
+		particles.burst(p + Vector2(0, -9), 3, FxLayer.DANGER, 30.0, 0.25, 1)
+	horde.clear_warning_logs()
+	var live_pos := PackedVector2Array()
+	var live_radius := PackedFloat32Array()
+	var live_progress := PackedFloat32Array()
+	var k := 0
+	while k < _lit_fuses.size():
+		var i := horde.index_of_uid(_lit_fuses[k], _lit_hints[k])
+		if i == -1 or horde.hp[i] <= 0.0 or horde.state[i] != 1:
+			_lit_fuses.remove_at(k)
+			_lit_hints.remove_at(k)
+			continue
+		_lit_hints[k] = i
+		var t := horde.type[i]
+		live_pos.append(horde.pos[i])
+		live_radius.append(horde.t_blast_radius[t] + Hero.RADIUS)
+		live_progress.append(1.0 - horde.action[i] / maxf(horde.t_fuse[t], 0.001))
+		k += 1
+	warn_fx.set_live(live_pos, live_radius, live_progress)
+
+
+func _on_portal_opened(p: Vector2, seconds: float) -> void:
+	warn_fx.portal(p, 8.0, FxLayer.DANGER, seconds)
+	if camera.visible_rect().grow(16.0).has_point(p):
+		Audio.play(&"spawn")
 
 
 func _apply_projectile_hits() -> void:

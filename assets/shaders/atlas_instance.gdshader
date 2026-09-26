@@ -1,7 +1,8 @@
 shader_type canvas_item;
 // Draws one atlas cell per MultiMesh instance (see src/sim/instance_layer.gd).
-// INSTANCE_CUSTOM: r = cell index, g = hit flash (0..1), b = status tint code
-// (0 none, 1 chilled/slowed, 2 frozen, 3 burning, 4 poisoned; HordeSim.Tint), a = alpha.
+// INSTANCE_CUSTOM: r = cell index, g = hit flash (0..1), b = tint code
+// (0 none, 1 chilled/slowed, 2 frozen, 3 burning, 4 poisoned, 5 winding up an
+// attack; HordeSim.Tint; 6 = enemy shot, ProjectileSim), a = alpha.
 
 uniform vec2 atlas_cells = vec2(8.0, 8.0);
 
@@ -27,6 +28,13 @@ void fragment() {
 		c.rgb = c.rgb * vec3(1.25, 0.78, 0.5) + vec3(0.24, 0.07, 0.0);
 	} else if (tint == 4.0) {
 		c.rgb = c.rgb * vec3(0.72, 1.18, 0.6) + vec3(0.04, 0.14, 0.02);
+	} else if (tint == 5.0) {
+		// About to attack: pulses hot pink.
+		float pulse = 0.5 + 0.5 * sin(TIME * 28.0);
+		c.rgb = mix(c.rgb, vec3(1.0, 0.3, 0.62), 0.3 + 0.35 * pulse);
+	} else if (tint == 6.0) {
+		// Enemy shots throb so they stand out from everything else.
+		c.rgb *= 1.0 + 0.35 * (0.5 + 0.5 * sin(TIME * 16.0));
 	}
 	c.a *= v_custom.a;
 	COLOR = c;

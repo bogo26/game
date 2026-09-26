@@ -24,6 +24,11 @@ const SPRITE_FEET_OFFSET := Vector2(0, -6)
 const RETICLE_DISTANCE := 22.0
 const ACCELERATION := 14.0
 const HERO_DATA_PATH := "res://src/heroes/data/%s.tres"
+const OUTLINE_SHADER := preload("res://assets/shaders/hero_outline.gdshader")
+## The "P1" tag shows this long at level start and after a revive.
+const TAG_TIME := 3.0
+## Ring shown while a shrine blessing lasts (not a player colour).
+const BLESSING_RING := Color(1.0, 0.94, 0.66)
 
 var slot := 0
 var hero_id: StringName = &"knight"
@@ -50,6 +55,8 @@ var invulnerable_time := 0.0
 ## 0..1; the ultimate is usable at 1.
 var ult_charge := 0.0
 var revive_progress := 0.0
+## Seconds left showing the "P1" tag (HeroOverlay).
+var tag_time := TAG_TIME
 ## XP gems within this distance home in on the hero.
 var pickup_range := 28.0
 ## Ignores all damage (stress test, debug).
@@ -120,6 +127,10 @@ func _ready() -> void:
 	sprite.texture = load("res://assets/sprites/heroes/%s.png" % hero_id)
 	sprite.hframes = Frame.size()
 	sprite.position = SPRITE_FEET_OFFSET
+	var outline := ShaderMaterial.new()
+	outline.shader = OUTLINE_SHADER
+	outline.set_shader_parameter("outline_color", color)
+	sprite.material = outline
 
 
 func attack() -> Ability:
@@ -202,6 +213,7 @@ func muzzle_position() -> Vector2:
 
 func tick(delta: float) -> void:
 	invulnerable_time = maxf(0.0, invulnerable_time - delta)
+	tag_time = maxf(0.0, tag_time - delta)
 	_tick_blessings(delta)
 	if state == State.DOWNED:
 		velocity = Vector2.ZERO
@@ -389,6 +401,7 @@ func revive(hp_fraction: float) -> void:
 	hp = maxf(1.0, max_hp * hp_fraction)
 	revive_progress = 0.0
 	invulnerable_time = REVIVE_IFRAMES
+	tag_time = TAG_TIME
 	Events.hero_revived.emit(slot)
 
 
@@ -430,9 +443,8 @@ func _draw() -> void:
 		ring_color = color.lerp(Color.WHITE, 0.5 + 0.5 * sin(_anim_time * 10.0))
 	draw_set_transform(Vector2(0, 1), 0.0, Vector2(1.0, 0.5))
 	draw_circle(Vector2.ZERO, 7.0, Color(0, 0, 0, 0.35), true, -1.0, false)
-	if not blessings.is_empty() and world and state == State.ALIVE:
-		var glow := world.blessing_color
-		draw_arc(Vector2.ZERO, 9.0 + sin(_anim_time * 6.0), 0.0, TAU, 20, Color(glow, 0.7), 1.0, false)
+	if not blessings.is_empty() and state == State.ALIVE:
+		draw_arc(Vector2.ZERO, 9.0 + sin(_anim_time * 6.0), 0.0, TAU, 20, Color(BLESSING_RING, 0.7), 1.0, false)
 	draw_arc(Vector2.ZERO, 7.0, 0.0, TAU, 20, ring_color, 1.0, false)
 	draw_set_transform(Vector2.ZERO)
 	if state == State.DOWNED:
@@ -441,10 +453,7 @@ func _draw() -> void:
 		draw_rect(Rect2(-w * 0.5, -16, w, 3), Color(0, 0, 0, 0.7))
 		draw_rect(Rect2(-w * 0.5 + 1, -15, (w - 2) * revive_progress / REVIVE_TIME, 1), Color(0.5, 1.0, 0.5))
 		return
-	# Aim reticle.
-	var reticle := (SPRITE_FEET_OFFSET + aim_dir * RETICLE_DISTANCE).round()
-	draw_rect(Rect2(reticle - Vector2(1, 1), Vector2(3, 3)), color)
-	draw_rect(Rect2(reticle, Vector2(1, 1)), Color.WHITE)
+	# (The aim reticle is drawn by the World's HeroOverlay, above effects.)
 	# Small HP bar once hurt.
 	if hp < max_hp:
 		var bw := 12.0

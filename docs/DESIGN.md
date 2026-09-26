@@ -72,7 +72,8 @@ Downed state:
 | Big Demon (boss) | Phase-based attack patterns, node-based |
 
 Spawn director:
-- Spawns just outside the camera on walkable tiles, in waves plus a constant trickle.
+- Spawns just outside the camera on walkable tiles, in waves plus a constant trickle. Off-screen spawns stay at least 110 px from every hero.
+- **Spawn portals:** anything that appears where players can see it (arena waves, nests, boss summons) comes through a portal first. `SpawnDirector.queue_spawn()` opens a swirling dark portal and the enemy steps out 0.5 s later. Enemies waiting in portals count toward the cap and the arena's enemies left, and an arena can't clear while any are waiting.
 - Alive cap by player count: 150 / 200 / 250 / 300.
 - Recycles enemies left more than ~1.5 screens behind.
 - Enemy HP scales by player count: ×(1 + 0.35 × (n − 1)).
@@ -151,6 +152,12 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
     - fireball fans and ground slams
     - plus fire rings and swarmer summons
     - enraged: faster, plus telegraphed charges
+  - **Every attack is telegraphed** during its wind-up: the boss glows hot pink (a flash shader, which hit flashes can't wash out) and growls, and the warning is drawn above the horde:
+    - slam: its exact circle filling up
+    - charge: a band as wide as what it hits
+    - fan: one aim line per fireball, with the aim locked when the wind-up starts
+    - fire ring: a ring of turning dots around the boss
+    - summon: the adds' spawn portals
   - HP is 1800 × level multiplier × player-count scaling. It is immune to stun and slow.
 - **Screens:** Main menu → Character select → Game (levels) → End screen (victory/defeat + stats) → Play again / Main menu.
   - **Main menu:** Start Run, Test Room (drop-in sandbox), Quit. The main, pause and end menus use Godot focus navigation, so keyboard, any gamepad or mouse all work, with move/confirm sounds (`UiSounds`).
@@ -287,7 +294,7 @@ docs/         this document
 
 ### Enemy behaviours
 - **Chaser:** flow field; direct steering within 2 tiles of a hero.
-- **Ranged (spitter):** holds position inside its range, backs off when heroes get closer than 55% of it, and fires when it has line of sight.
+- **Ranged (spitter):** holds position inside its range, backs off when heroes get closer than 55% of it. When its cooldown is up and it has line of sight, it stands still and glows hot pink for 0.4 s (its shot pose), then fires at the nearest hero. It only starts a shot while it's inside the camera view, so nothing fires from off screen.
 - **Exploder:** lights its fuse when close, then blasts heroes in its radius that it has line of sight to (walls stop it, like the boss slam). Killing it during the fuse cancels the blast, and self-destructs drop no XP.
 - **Knockback:** damage pushes enemies away from the hit source, scaled per type (brutes resist). Stun freezes, slow halves speed, and marks make enemies take ×1.75 damage.
 
@@ -357,6 +364,13 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - explosion debris, dash dust, hurt and pickup sparkles, level-up bursts
 
   Oldest particles are overwritten, so cost is bounded (~0.1 ms).
+- **Readability** (what's dangerous, and where you are):
+  - **Draw order** (bottom to top): ground effects, props, gems, horde, hearts, warnings (`WarnFx`: telegraphs, fuses, spawn portals), heroes and bosses, particles, effects, damage numbers, **all projectiles**, then the hero overlay. Enemies never hide a warning, and nothing hides a shot.
+  - **Hostile = hot pink** (`FxLayer.DANGER`): every enemy projectile uses it (spit and boss fireballs are pink orbs with a white core and a dark outline) and throbs in the shader, and so does every enemy warning. Heroes' own telegraphs (the Mage's Meteor) are dashed and in the caster's colour. The Cleric's orb is pale gold.
+  - **Exploders:** a lit fuse shows as a filling circle exactly as big as the blast, with a hiss; it follows the fuse and vanishes if the exploder dies first.
+  - **Heroes** have a 1 px outline in their player colour (`hero_outline.gdshader`), so two players on the same hero, or the dark Rogue and Necromancer on dark floors, are easy to find. A "P1" tag shows over each hero for 3 s at level start, after a revive and while downed. Reticles are drawn above everything (`HeroOverlay`).
+  - Hearts are drawn above the horde and marked on the minimap; shrine blessings ring heroes in pale gold rather than a player-like colour.
+  - Lines 1 px wide are drawn as line primitives: with vertex snapping on, a 1 px quad at an angle collapses to nothing.
 - **Damage numbers:** one node draws up to 40 numbers.
   - **Crits** always get a gold double-size number with "!" (e.g. `14!`), a gold star burst and a "tink" sound. Ordinary numbers can never push them off screen.
   - Ordinary hits get a white number from 12 damage up (double size from 40).
@@ -366,7 +380,7 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - white hit flash in the shader
   - frozen tint
   - pixel-snapped screen shake
-- **Audio:** `tools/gen_audio.gd` renders 32 SFX and 3 music loops (menu, dungeon, boss) with a small synth and sequencer into `assets/audio`.
+- **Audio:** `tools/gen_audio.gd` renders 48 SFX and 3 music loops (menu, dungeon, boss) with a small synth and sequencer into `assets/audio`.
 - **`Audio` autoload:**
   - Plays SFX through a 24-voice pool on an `SFX` bus.
   - Each sound has a minimum repeat interval (e.g. kills every 50 ms), so a horde never drowns everything out.
