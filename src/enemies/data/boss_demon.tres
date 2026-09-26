@@ -13,4 +13,4 @@ contact_damage = 18.0
 xp = 0
 knockback_taken = 0.0
 behavior = 3
-atlas_row = 7
+atlas_row = 0

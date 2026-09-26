@@ -71,6 +71,7 @@ var upgrade_pool := UpgradePool.new()
 var director := LevelDirector.new()
 ## Tiles the team has seen (minimap).
 var reveal := MapReveal.new()
+var spikes := SpikeTraps.new()
 var boss: BossDemon
 ## Run statistics for this level.
 var kills := 0
@@ -124,6 +125,9 @@ func _ready() -> void:
 	camera.setup(grid.size_px())
 	camera.snap_to(level.player_spawns[0])
 	reveal.setup(grid.width, grid.height)
+	spikes.setup(level.spike_cells, grid)
+	for g in spikes.group_cells.size():
+		level.set_spikes(spikes.group_cells[g], spikes.group_state[g])
 
 	var enemy_types: Array[EnemyData] = []
 	for path in ENEMY_TYPES:
@@ -224,6 +228,7 @@ func _process(delta: float) -> void:
 	director.tick(dt)
 	spawner.tick(dt, camera.visible_rect(), hero_positions)
 	horde.update(dt, target_positions)
+	_update_spikes(dt)
 	_apply_blasts()
 	_apply_contact_damage()
 	var t_horde := Time.get_ticks_usec()
@@ -330,7 +335,7 @@ func _damage_scratch(center: Vector2, damage: float, knockback: float, source_sl
 		if damage > 0.0:
 			hit_enemy(j, damage, push, source_slot, source)
 		elif push != Vector2.ZERO:
-			horde.vel[j] += push
+			horde.push(j, push, source_slot)
 		if stun_time > 0.0:
 			horde.apply_stun(j, stun_time)
 		if slow_time > 0.0:
@@ -460,6 +465,32 @@ func _apply_contact_damage() -> void:
 				hero.take_hit(dmg)
 
 
+func _update_spikes(dt: float) -> void:
+	if spikes.is_empty():
+		return
+	for change in spikes.tick(dt):
+		var group := change.x
+		level.set_spikes(spikes.group_cells[group], change.y)
+		if change.y == SpikeTraps.State.UP:
+			_stab(group)
+
+
+## Spikes shoot up: everyone standing on that group's traps gets stabbed.
+func _stab(group: int) -> void:
+	for hero in heroes:
+		if hero.is_targetable() and spikes.is_in_group(hero.position, group):
+			hero.take_hit(SpikeTraps.HERO_DAMAGE)
+	var damage := SpikeTraps.ENEMY_DAMAGE * spawner.effective_hp_multiplier()
+	for i in horde.count:
+		if horde.hp[i] > 0.0 and horde.is_mobile(i) and spikes.is_in_group(horde.pos[i], group):
+			horde.damage(i, damage, Vector2.ZERO, -1)
+	var view := camera.visible_rect().grow(16.0)
+	for cell: Vector2i in spikes.group_cells[group]:
+		if view.has_point(LevelGrid.cell_center(cell)):
+			Audio.play(&"spikes")
+			break
+
+
 func _apply_blasts() -> void:
 	for k in horde.blast_pos.size():
 		var p := horde.blast_pos[k]
@@ -556,28 +587,34 @@ func _process_kills() -> void:
 	var n := horde.kill_pos.size()
 	if n > 0:
 		Audio.play(&"kill")
+	if horde.falls > 0:
+		Audio.play(&"fall")
+		horde.falls = 0
 	for k in n:
 		var p := horde.kill_pos[k]
 		var t := horde.kill_type[k]
+		var in_chasm := grid.terrain_at(p) == LevelGrid.Terrain.CHASM
 		if k < MAX_PUFFS_PER_FRAME:
 			var body := p - Vector2(0, horde.t_hurt_height[t] * 0.5)
 			particles.burst(body, 6, _enemy_color(t), 60.0, 0.45, 3, Vector2.ZERO, TAU, 30.0)
 		var killer := horde.kill_slot[k]
 		kills += 1
-		_corpse_pos.append(p)
-		_corpse_time.append(elapsed)
-		if _corpse_pos.size() > MAX_CORPSES:
-			_corpse_pos.remove_at(0)
-			_corpse_time.remove_at(0)
+		if not in_chasm:
+			_corpse_pos.append(p)
+			_corpse_time.append(elapsed)
+			if _corpse_pos.size() > MAX_CORPSES:
+				_corpse_pos.remove_at(0)
+				_corpse_time.remove_at(0)
 		director.on_enemy_killed()
 		if killer >= 0:
 			var hero := hero_for_slot(killer)
 			if hero:
 				hero.on_kill()
 		if killer != HordeSim.SELF_KILL:
-			pickups.spawn(p, PickupSim.Kind.XP, horde.t_xp[t])
+			var drop := grid.nearest_open(p) if grid.is_solid_at(p) else p  # fell into a chasm
+			pickups.spawn(drop, PickupSim.Kind.XP, horde.t_xp[t])
 			if _rng.randf() < HEART_DROP_CHANCE:
-				pickups.spawn(p + Vector2(4, 0), PickupSim.Kind.HEART, 1)
+				pickups.spawn(drop + Vector2(4, 0), PickupSim.Kind.HEART, 1)
 		Events.enemy_killed.emit(p, t, killer)
 	horde.clear_kill_log()
 

@@ -46,6 +46,13 @@ const SFX := {
 	"tesla": {"wave": "noise", "f0": 8000.0, "f1": 3000.0, "dur": 0.1, "decay": 2.0, "vol": 0.14, "lp": 0.8},
 	"ui_move": {"wave": "square", "f0": 780.0, "f1": 780.0, "dur": 0.03, "decay": 2.0, "vol": 0.12, "duty": 0.25},
 	"ui_confirm": {"wave": "square", "f0": 880.0, "f1": 1320.0, "dur": 0.09, "decay": 1.5, "vol": 0.15, "duty": 0.25},
+	"spikes": {"wave": "square", "f0": 2300.0, "f1": 1500.0, "dur": 0.11, "decay": 2.4, "vol": 0.14, "duty": 0.125, "noise": 0.6},
+	"fall": {"wave": "sine", "f0": 900.0, "f1": 160.0, "dur": 0.42, "decay": 0.9, "vol": 0.16},
+	"break": {"wave": "noise", "f0": 5200.0, "f1": 1600.0, "dur": 0.17, "decay": 2.2, "vol": 0.26, "lp": 0.6},
+	"chest": {"wave": "square", "f0": 784.0, "f1": 784.0, "dur": 0.62, "decay": 0.8, "vol": 0.18, "duty": 0.25, "arp": [0, 4, 7, 12, 16, 19, 24], "arp_step": 0.06},
+	"shrine": {"wave": "triangle", "f0": 330.0, "f1": 330.0, "dur": 0.95, "decay": 0.7, "vol": 0.3, "arp": [0, 7, 12, 19, 24], "arp_step": 0.12, "vib": [0.05, 5.0]},
+	"nest": {"wave": "saw", "f0": 170.0, "f1": 90.0, "dur": 0.18, "decay": 1.8, "vol": 0.2, "noise": 0.4, "lp": 0.3},
+	"nest_break": {"wave": "noise", "f0": 1300.0, "f1": 110.0, "dur": 0.5, "decay": 1.4, "vol": 0.42, "lp": 0.3},
 }
 
 ## Chords are MIDI note triads per bar; bpm; drums: "full", "light" or "none".

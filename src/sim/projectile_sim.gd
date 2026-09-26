@@ -116,7 +116,7 @@ func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_bodies: PackedVect
 	var P := pos
 	var V := vel
 	var L := life
-	var solid := grid.solid
+	var solid := grid.shot_solid  # chasms don't stop shots
 	var gw := grid.width
 	var gh := grid.height
 	var inv_tile := LevelGrid.INV_TILE

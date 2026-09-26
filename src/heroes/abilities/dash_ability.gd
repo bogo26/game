@@ -117,7 +117,7 @@ func _tick_active(delta: float) -> void:
 			if damage > 0.0:
 				w.hit_enemy(j, scaled_damage(damage), push, hero.slot, hero)
 			elif push != Vector2.ZERO:
-				horde.vel[j] += push
+				horde.push(j, push, hero.slot)
 			if stun_time > 0.0:
 				horde.apply_stun(j, stun_time + mod(&"stun_time"))
 			if slow_time > 0.0:

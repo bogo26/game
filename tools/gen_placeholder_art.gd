@@ -4,13 +4,16 @@ extends SceneTree
 ##   godot --headless --path . -s res://tools/gen_placeholder_art.gd
 ##   ./tools/dev.sh import
 ## Outputs:
-##   assets/tiles/dungeon_tiles.png        16x16 tiles, see Tiles enum in level.gd
+##   assets/tiles/tiles_<theme>.png        16x16 tiles per level theme (see THEMES, Level.Tile)
 ##   assets/sprites/heroes/<id>.png        8 frames of 16x16 (see HERO_FRAMES)
 ##   assets/sprites/enemies/horde_atlas.png 32x32 cells; one row per enemy kind,
 ##                                          cols 0-3 walk, 4-5 action (see ENEMY_ROWS)
 ##   assets/sprites/fx/fx_atlas.png         16x16 cells; row 0 projectiles, row 1 pickups
 ##   assets/fonts/pixel5x8.png + .fnt       proportional 5x8 pixel font (BMFont), ASCII 32-126
 ##   assets/sprites/enemies/boss_demon.png  4 frames of 64x64: walk0, walk1, windup, charge
+##   assets/sprites/props/chest.png         2 frames of 16x16: closed, open
+##   assets/sprites/props/shrine.png        2 frames of 16x24: active, used (orb is white: tinted in game)
+##   assets/sprites/fx/glow.png             64x64 soft light (torch glow)
 ##   assets/icon.png                        256x256 app icon (knight vs. the horde)
 
 const OUTLINE := Color("140c1c")
@@ -42,7 +45,7 @@ const HEROES := {
 
 
 ## Row index of each enemy kind in the horde atlas (EnemyData.atlas_row).
-const ENEMY_ROWS := ["swarmer", "brute", "spitter", "exploder", "skeleton"]
+const ENEMY_ROWS := ["swarmer", "brute", "spitter", "exploder", "skeleton", "barrel", "urn", "nest"]
 ## Column index of each projectile / pickup in row 0 / row 1 of the fx atlas.
 const PROJECTILES := ["arrow", "bolt", "orb", "spit", "knife", "rivet", "soul", "fire"]
 const PICKUPS := ["gem_small", "gem_medium", "gem_large", "heart"]
@@ -56,6 +59,7 @@ func _initialize() -> void:
 	_gen_fx_atlas()
 	_gen_font()
 	_gen_boss()
+	_gen_props()
 	_gen_icon()
 	print("placeholder art generated")
 	quit()
@@ -104,41 +108,109 @@ func _save(img: Image, path: String) -> void:
 
 
 # --- tiles -----------------------------------------------------------------------
+## One 128x80 tile sheet per level theme, same layout (see Level.Tile / Level.Decor):
+##   row 0: floor0-3, floor shadow, wall top, wall face, void
+##   row 1: door, exit, spawn marker, arena floor, spikes down / warn / up, water edge
+##   row 2: water x3 (animated), chasm edge, chasm x3 (animated), -
+##   row 3: floor decor: bones, skull, cobweb L / R, rubble, puddle, moss, cracks
+##   row 4: wall decor: torch x3 (animated), banner, chains, wall crack
+const THEMES := {
+	"crypt": {"style": "slab", "floor": "2e2b40", "arena": "352a3a", "moss": "34503a",
+		"wall_top": "4a4666", "wall_hi": "615d84", "wall_lo": "2c2940", "brick": "3d3957", "mortar": "24223a",
+		"face_hi": "5a5680", "water": "22406a", "water_hi": "4e7cb4", "pit": "07060c", "pit_hi": "30284a",
+		"lava": false, "banner": "5a3a9a", "banner_hi": "c8a040"},
+	"flooded": {"style": "slab", "floor": "26383a", "arena": "2c3438", "moss": "3c6e46",
+		"wall_top": "3e5a58", "wall_hi": "5a7e78", "wall_lo": "223634", "brick": "34504c", "mortar": "1c2e2c",
+		"face_hi": "56786e", "water": "1f4f6e", "water_hi": "5fa6c8", "pit": "061420", "pit_hi": "1e4a60",
+		"lava": false, "banner": "2a7a6a", "banner_hi": "d0e0a0"},
+	"bones": {"style": "dirt", "floor": "3a3027", "arena": "40302a", "moss": "4e4a2a",
+		"wall_top": "5c4c3e", "wall_hi": "7a6652", "wall_lo": "33281f", "brick": "4a3c30", "mortar": "281e16",
+		"face_hi": "6e5a48", "water": "3a3f26", "water_hi": "6a7040", "pit": "050403", "pit_hi": "2e241a",
+		"lava": false, "banner": "7a3a24", "banner_hi": "e0d0b0"},
+	"throne": {"style": "slab", "floor": "2b1b22", "arena": "3a1c20", "moss": "4a2a2a",
+		"wall_top": "4c2a32", "wall_hi": "6c3e48", "wall_lo": "2a141a", "brick": "3e222a", "mortar": "1e0c10",
+		"face_hi": "643842", "water": "4a1018", "water_hi": "a0303a", "pit": "a8300c", "pit_hi": "ffc040",
+		"lava": true, "banner": "a02020", "banner_hi": "f0c040"},
+}
+const TILE_SHEET := "res://assets/tiles/tiles_%s.png"
+
 
 func _gen_tiles() -> void:
+	for theme: String in THEMES:
+		_gen_tile_sheet(theme, THEMES[theme])
+	_gen_glow()
+
+
+func _gen_tile_sheet(theme: String, t: Dictionary) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1337
-	var img := _img(128, 32)
-	var floor_base := Color("2e2b40")
+	var img := _img(128, 80)
+	var floor_base := Color(t["floor"])
 	# Row 0: floor0..3, floor_shadow, wall_top, wall_face, void
 	for v in 4:
-		_floor_tile(img, v * 16, 0, floor_base, rng, v)
-	_floor_tile(img, 64, 0, floor_base, rng, 0)
+		_floor_tile(img, v * 16, 0, floor_base, rng, v, t)
+	_floor_tile(img, 64, 0, floor_base, rng, 0, t)
 	for y in 4:
 		for x in 16:
 			var c := img.get_pixel(64 + x, y)
 			img.set_pixel(64 + x, y, c.darkened(0.45 - y * 0.1))
-	_wall_top(img, 80, 0, rng)
-	_wall_face(img, 96, 0, rng)
+	_wall_top(img, 80, 0, rng, t)
+	_wall_face(img, 96, 0, rng, t)
 	_rect(img, 112, 0, 16, 16, Color("0c0b12"))
-	# Row 1: door, exit portal, spawn marker (debug), arena floor tint
+	# Row 1: door, exit portal, spawn marker (debug), arena floor, spikes x3, water edge
 	_door(img, 0, 16)
-	_portal(img, 16, 16)
-	_floor_tile(img, 32, 16, floor_base, rng, 0)
+	_portal(img, 16, 16, floor_base)
+	_floor_tile(img, 32, 16, floor_base, rng, 0, t)
 	_rect(img, 38, 22, 4, 4, Color("a03040"))
-	_floor_tile(img, 48, 16, Color("352a3a"), rng, 1)
-	_save(img, "res://assets/tiles/dungeon_tiles.png")
+	_floor_tile(img, 48, 16, Color(t["arena"]), rng, 1, t)
+	for state in 3:
+		_floor_tile(img, 64 + state * 16, 16, floor_base, rng, 0, t)
+		_spikes(img, 64 + state * 16, 16, state)
+	_water(img, 112, 16, 0, t)
+	_water_lip(img, 112, 16, floor_base, t)
+	# Row 2: water x3, chasm edge, chasm x3
+	for f in 3:
+		_water(img, f * 16, 32, f, t)
+	_chasm(img, 48, 32, 0, t)
+	_chasm_edge(img, 48, 32, floor_base, rng, t)
+	for f in 3:
+		_chasm(img, 64 + f * 16, 32, f, t)
+	# Row 3: floor decor
+	_decor_bones(img, 0, 48)
+	_decor_skull(img, 16, 48)
+	_decor_cobweb(img, 32, 48, false)
+	_decor_cobweb(img, 48, 48, true)
+	_decor_rubble(img, 64, 48, t, rng)
+	_decor_puddle(img, 80, 48, t)
+	_decor_moss(img, 96, 48, t, rng)
+	_decor_cracks(img, 112, 48, floor_base, rng)
+	# Row 4: wall decor
+	for f in 3:
+		_decor_torch(img, f * 16, 64, f)
+	_decor_banner(img, 48, 64, t)
+	_decor_chains(img, 64, 64)
+	_decor_wall_crack(img, 80, 64, t)
+	_save(img, TILE_SHEET % theme)
 
 
-func _floor_tile(img: Image, ox: int, oy: int, base: Color, rng: RandomNumberGenerator, variant: int) -> void:
+func _floor_tile(img: Image, ox: int, oy: int, base: Color, rng: RandomNumberGenerator, variant: int,
+		t: Dictionary) -> void:
+	var dirt: bool = t["style"] == "dirt"
 	for y in 16:
 		for x in 16:
 			var n := rng.randf_range(-0.035, 0.035)
 			var c := Color(base.r + n, base.g + n, base.b + n)
-			# Stone slab seams every 8px, offset per row of slabs.
-			var seam_x := (x + (8 if y >= 8 else 0)) % 16 == 0
-			if y % 8 == 0 or seam_x:
-				c = c.darkened(0.25)
+			if dirt:
+				# Packed earth: blotchy, no seams.
+				if rng.randf() < 0.08:
+					c = c.darkened(0.18)
+				elif rng.randf() < 0.05:
+					c = c.lightened(0.1)
+			else:
+				# Stone slab seams every 8px, offset per row of slabs.
+				var seam_x := (x + (8 if y >= 8 else 0)) % 16 == 0
+				if y % 8 == 0 or seam_x:
+					c = c.darkened(0.25)
 			img.set_pixel(ox + x, oy + y, c)
 	match variant:
 		1:  # crack
@@ -155,22 +227,22 @@ func _floor_tile(img: Image, ox: int, oy: int, base: Color, rng: RandomNumberGen
 				_px(img, px + 1, py + 1, base.darkened(0.3))
 		3:  # moss
 			for i in 10:
-				_px(img, ox + rng.randi_range(1, 14), oy + rng.randi_range(9, 14), Color("34503a"))
+				_px(img, ox + rng.randi_range(1, 14), oy + rng.randi_range(9, 14), Color(t["moss"]))
 
 
-func _wall_top(img: Image, ox: int, oy: int, rng: RandomNumberGenerator) -> void:
-	var base := Color("4a4666")
+func _wall_top(img: Image, ox: int, oy: int, rng: RandomNumberGenerator, t: Dictionary) -> void:
+	var base := Color(t["wall_top"])
 	for y in 16:
 		for x in 16:
 			var n := rng.randf_range(-0.02, 0.02)
 			img.set_pixel(ox + x, oy + y, Color(base.r + n, base.g + n, base.b + n))
-	_rect(img, ox, oy, 16, 1, Color("615d84"))
-	_rect(img, ox, oy + 15, 16, 1, Color("2c2940"))
+	_rect(img, ox, oy, 16, 1, Color(t["wall_hi"]))
+	_rect(img, ox, oy + 15, 16, 1, Color(t["wall_lo"]))
 
 
-func _wall_face(img: Image, ox: int, oy: int, rng: RandomNumberGenerator) -> void:
-	var brick := Color("3d3957")
-	var mortar := Color("24223a")
+func _wall_face(img: Image, ox: int, oy: int, rng: RandomNumberGenerator, t: Dictionary) -> void:
+	var brick := Color(t["brick"])
+	var mortar := Color(t["mortar"])
 	for y in 16:
 		for x in 16:
 			var row := y / 4
@@ -181,7 +253,7 @@ func _wall_face(img: Image, ox: int, oy: int, rng: RandomNumberGenerator) -> voi
 			if y >= 13:
 				c = c.darkened(0.35)
 			img.set_pixel(ox + x, oy + y, c)
-	_rect(img, ox, oy, 16, 1, Color("5a5680"))
+	_rect(img, ox, oy, 16, 1, Color(t["face_hi"]))
 
 
 func _door(img: Image, ox: int, oy: int) -> void:
@@ -194,18 +266,241 @@ func _door(img: Image, ox: int, oy: int) -> void:
 	_rect(img, ox, oy, 16, 1, Color("2a1a0e"))
 
 
-func _portal(img: Image, ox: int, oy: int) -> void:
+func _portal(img: Image, ox: int, oy: int, floor_base: Color) -> void:
 	var center := Vector2(7.5, 7.5)
 	for y in 16:
 		for x in 16:
 			var d := Vector2(x, y).distance_to(center)
 			var ang := atan2(y - center.y, x - center.x)
 			var swirl := sin(ang * 3.0 + d * 0.9)
-			var c := Color("2e2b40")
+			var c := floor_base
 			if d < 7.5:
 				var t := 1.0 - d / 7.5
 				c = Color("5a2a9a").lerp(Color("e0a0ff"), clampf(t * 0.8 + swirl * 0.2, 0.0, 1.0))
 			img.set_pixel(ox + x, oy + y, c)
+
+
+## Spike trap plate: 0 retracted (holes), 1 warning (tips), 2 up.
+func _spikes(img: Image, ox: int, oy: int, state: int) -> void:
+	var plate := Color("4c4a56")
+	_rect(img, ox + 1, oy + 1, 14, 14, plate.darkened(0.35))
+	_rect(img, ox + 2, oy + 2, 12, 12, plate)
+	_rect(img, ox + 2, oy + 2, 12, 1, plate.lightened(0.2))
+	var steel := Color("d8dce6")
+	var shade := Color("8a8e9c")
+	for hy in 3:
+		for hx in 3:
+			var cx := ox + 4 + hx * 4
+			var cy := oy + 5 + hy * 4
+			_rect(img, cx - 1, cy, 2, 1, Color("16141c"))
+			if state == 1:
+				_px(img, cx - 1, cy - 1, steel)
+			elif state == 2:
+				# A spike standing in the hole (3/4 view: rises upward).
+				_rect(img, cx - 1, cy - 3, 2, 3, shade)
+				_px(img, cx - 1, cy - 3, steel)
+				_px(img, cx - 1, cy - 4, steel)
+				_px(img, cx, cy - 2, steel)
+
+
+func _water(img: Image, ox: int, oy: int, frame: int, t: Dictionary) -> void:
+	var base := Color(t["water"])
+	var hi := Color(t["water_hi"])
+	for y in 16:
+		for x in 16:
+			var wave := sin((x + frame * 5.3) * 0.8 + y * 1.7) + sin((y * 1.3 - frame * 4.1) * 0.9 + x * 0.4)
+			var c := base
+			if wave > 1.45:
+				c = hi
+			elif wave > 1.1:
+				c = base.lerp(hi, 0.45)
+			elif wave < -1.4:
+				c = base.darkened(0.2)
+			img.set_pixel(ox + x, oy + y, c)
+
+
+## Stone rim where floor meets water below it.
+func _water_lip(img: Image, ox: int, oy: int, floor_base: Color, t: Dictionary) -> void:
+	_rect(img, ox, oy, 16, 2, floor_base.darkened(0.1))
+	_rect(img, ox, oy + 2, 16, 1, floor_base.darkened(0.45))
+	_rect(img, ox, oy + 3, 16, 1, Color(t["water_hi"]).lerp(Color(t["water"]), 0.4))
+
+
+func _chasm(img: Image, ox: int, oy: int, frame: int, t: Dictionary) -> void:
+	var base := Color(t["pit"])
+	var hi := Color(t["pit_hi"])
+	var lava: bool = t["lava"]
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99 + frame
+	for y in 16:
+		for x in 16:
+			var c := base
+			if lava:
+				var glow := sin(x * 0.7 + frame * 2.1) * 0.5 + sin(y * 0.9 - frame * 1.7 + x * 0.3) * 0.5
+				c = base.lerp(hi, clampf(glow * 0.5 + 0.25, 0.0, 0.8))
+			img.set_pixel(ox + x, oy + y, c)
+	# Drifting specks (dust in the dark, bubbles in lava).
+	for i in 5:
+		var px := (i * 7 + frame * 3) % 16
+		var py := (i * 5 + 3 - frame * 2 + 16) % 16
+		_px(img, ox + px, oy + py, hi if not lava else Color("fff0a0"))
+
+
+## The far side of a chasm: the rock face dropping away under the floor.
+func _chasm_edge(img: Image, ox: int, oy: int, floor_base: Color, rng: RandomNumberGenerator, t: Dictionary) -> void:
+	var rock := floor_base.darkened(0.35)
+	var lava: bool = t["lava"]
+	for y in 9:
+		for x in 16:
+			var c := rock.darkened(y * 0.07)
+			if (x * 3 + y) % 5 == 0:
+				c = c.darkened(0.25)
+			if rng.randf() < 0.08:
+				c = c.lightened(0.12)
+			if lava and y >= 6:
+				c = c.lerp(Color(t["pit_hi"]), 0.25 * (y - 5))
+			img.set_pixel(ox + x, oy + y, c)
+	_rect(img, ox, oy, 16, 1, floor_base.lightened(0.08))
+
+
+func _decor_bones(img: Image, ox: int, oy: int) -> void:
+	var bone := Color("d8d2bc")
+	var shade := Color("9a947e")
+	for i in 7:
+		_px(img, ox + 4 + i, oy + 6 + i / 2, bone)
+		_px(img, ox + 11 - i, oy + 6 + i / 2, shade if i % 2 == 0 else bone)
+	_rect(img, ox + 3, oy + 5, 2, 2, bone)
+	_rect(img, ox + 11, oy + 5, 2, 2, bone)
+	_rect(img, ox + 3, oy + 9, 2, 1, shade)
+	_rect(img, ox + 11, oy + 9, 2, 1, shade)
+
+
+func _decor_skull(img: Image, ox: int, oy: int) -> void:
+	var bone := Color("e2dcc6")
+	_rect(img, ox + 5, oy + 5, 6, 5, bone)
+	_rect(img, ox + 6, oy + 10, 4, 2, bone.darkened(0.2))
+	_rect(img, ox + 6, oy + 7, 1, 2, Color("1a1420"))
+	_rect(img, ox + 9, oy + 7, 1, 2, Color("1a1420"))
+	_px(img, ox + 7, oy + 11, Color("1a1420"))
+	_outline(img, Rect2i(ox, oy, 16, 16))
+
+
+func _decor_cobweb(img: Image, ox: int, oy: int, mirror: bool) -> void:
+	var web := Color(0.85, 0.85, 0.9, 0.55)
+	for i in 12:
+		var x := i if not mirror else 15 - i
+		_px(img, ox + x, oy, web)  # along the top edge
+	for i in 10:
+		var x := 0 if not mirror else 15
+		_px(img, ox + x, oy + i, web)  # along the side
+	for i in 9:
+		var x := i if not mirror else 15 - i
+		_px(img, ox + x, oy + i, web)  # diagonal
+	for r in [4, 8]:
+		for a in 10:
+			var ang := PI * 0.5 * a / 9.0
+			var x := int(round(cos(ang) * r))
+			var y := int(round(sin(ang) * r))
+			_px(img, ox + (x if not mirror else 15 - x), oy + y, web)
+
+
+func _decor_rubble(img: Image, ox: int, oy: int, t: Dictionary, rng: RandomNumberGenerator) -> void:
+	var stone := Color(t["wall_top"])
+	for i in 5:
+		var x := ox + rng.randi_range(2, 11)
+		var y := oy + rng.randi_range(4, 12)
+		var w := rng.randi_range(2, 3)
+		_rect(img, x, y, w, 2, stone)
+		_rect(img, x, y, w, 1, stone.lightened(0.25))
+	_outline(img, Rect2i(ox, oy, 16, 16), Color(0.05, 0.04, 0.08, 0.8))
+
+
+func _decor_puddle(img: Image, ox: int, oy: int, t: Dictionary) -> void:
+	var water := Color(t["water"])
+	for y in range(5, 12):
+		var half := 6 - absi(y - 8)
+		_rect(img, ox + 8 - half, oy + y, half * 2, 1, Color(water, 0.85))
+	_rect(img, ox + 5, oy + 7, 3, 1, Color(t["water_hi"]))
+
+
+func _decor_moss(img: Image, ox: int, oy: int, t: Dictionary, rng: RandomNumberGenerator) -> void:
+	var moss := Color(t["moss"])
+	for i in 22:
+		var a := rng.randf() * TAU
+		var d := rng.randf() * 5.5
+		_px(img, ox + 8 + int(cos(a) * d), oy + 8 + int(sin(a) * d * 0.7),
+			moss.lightened(0.15) if i % 4 == 0 else moss)
+
+
+func _decor_cracks(img: Image, ox: int, oy: int, floor_base: Color, rng: RandomNumberGenerator) -> void:
+	var dark := floor_base.darkened(0.55)
+	var x := 3
+	var y := 3
+	for i in 12:
+		_px(img, ox + x, oy + y, dark)
+		x = clampi(x + 1, 0, 15)
+		if rng.randf() < 0.5:
+			y = clampi(y + 1, 0, 15)
+	_px(img, ox + 8, oy + 7, dark)
+	_px(img, ox + 9, oy + 9, dark)
+	_px(img, ox + 9, oy + 10, dark)
+
+
+## Wall-mounted torch (drawn over a wall face tile): bracket, handle, flame.
+func _decor_torch(img: Image, ox: int, oy: int, frame: int) -> void:
+	_rect(img, ox + 6, oy + 10, 4, 2, Color("2a2a30"))
+	_rect(img, ox + 7, oy + 6, 2, 5, Color("6a4a2a"))
+	_px(img, ox + 7, oy + 6, Color("8a6a3a"))
+	var sway: int = [0, 1, -1][frame]
+	var tall: int = [0, 1, 0][frame]
+	_rect(img, ox + 6 + maxi(sway, 0), oy + 2 - tall, 4 - absi(sway), 4 + tall, Color("ff8a2a"))
+	_rect(img, ox + 7, oy + 3 - tall, 2, 3 + tall, Color("ffd04a"))
+	_px(img, ox + 7 + maxi(sway, 0), oy + 1 - tall, Color("ffb040"))
+	_px(img, ox + 8, oy + 4, Color("fff4c0"))
+
+
+func _decor_banner(img: Image, ox: int, oy: int, t: Dictionary) -> void:
+	var cloth := Color(t["banner"])
+	var trim := Color(t["banner_hi"])
+	_rect(img, ox + 3, oy + 1, 10, 1, Color("5a4a3a"))
+	_rect(img, ox + 4, oy + 2, 8, 10, cloth)
+	_rect(img, ox + 4, oy + 2, 1, 10, cloth.darkened(0.25))
+	_rect(img, ox + 5, oy + 12, 2, 2, cloth)
+	_rect(img, ox + 9, oy + 12, 2, 2, cloth)
+	_rect(img, ox + 7, oy + 5, 2, 4, trim)
+	_rect(img, ox + 6, oy + 6, 4, 1, trim)
+
+
+func _decor_chains(img: Image, ox: int, oy: int) -> void:
+	for x in [4, 11]:
+		for y in range(0, 12):
+			_px(img, ox + x + (y % 2), oy + y, Color("7a7a86") if y % 2 == 0 else Color("4a4a56"))
+	_rect(img, ox + 3, oy + 12, 3, 2, Color("5a5a66"))
+	_rect(img, ox + 10, oy + 12, 3, 2, Color("5a5a66"))
+
+
+func _decor_wall_crack(img: Image, ox: int, oy: int, t: Dictionary) -> void:
+	var dark := Color(t["mortar"]).darkened(0.4)
+	var x := 9
+	for y in range(1, 13):
+		_px(img, ox + x, oy + y, dark)
+		if y % 3 == 0:
+			x += 1 if y % 2 == 0 else -1
+			_px(img, ox + x + 1, oy + y, dark)
+
+
+## Soft white light blob, tinted and blended additively in game (torch light).
+func _gen_glow() -> void:
+	var img := _img(64, 64)
+	for y in 64:
+		for x in 64:
+			var d := Vector2(x + 0.5, y + 0.5).distance_to(Vector2(32, 32)) / 32.0
+			var a := clampf(1.0 - d, 0.0, 1.0)
+			a = a * a
+			# Banded (dithered-looking) falloff keeps it pixel-art friendly.
+			a = floorf(a * 6.0) / 6.0
+			img.set_pixel(x, y, Color(1, 1, 1, a))
+	_save(img, "res://assets/sprites/fx/glow.png")
 
 
 # --- heroes ----------------------------------------------------------------------
@@ -373,6 +668,12 @@ func _gen_horde_atlas() -> void:
 					_draw_exploder(img, ox, oy, col)
 				"skeleton":
 					_draw_skeleton(img, ox, oy, col)
+				"barrel":
+					_draw_barrel(img, ox, oy, col)
+				"urn":
+					_draw_urn(img, ox, oy, col)
+				"nest":
+					_draw_nest(img, ox, oy, col)
 			_outline(img, Rect2i(ox, oy, 32, 32))
 	_save(img, "res://assets/sprites/enemies/horde_atlas.png")
 
@@ -482,6 +783,115 @@ func _draw_skeleton(img: Image, ox: int, oy: int, col: int) -> void:
 	_rect(img, ox + 20, oy + 12 + b, 1, 6, Color("9a7a5a"))
 	if col >= 4:
 		_rect(img, ox + 20, oy + 8 + b, 1, 5, Color("c8c8d0"))
+
+
+## Explosive barrel: red staves, iron hoops, a hazard mark. One frame.
+func _draw_barrel(img: Image, ox: int, oy: int, col: int) -> void:
+	if col > 0:
+		return
+	var wood := Color("b8402a")
+	var dark := Color("7a2418")
+	_rect(img, ox + 11, oy + 12, 10, 12, wood)
+	_rect(img, ox + 12, oy + 11, 8, 1, wood.lightened(0.15))
+	_rect(img, ox + 11, oy + 12, 2, 12, dark)
+	_rect(img, ox + 19, oy + 12, 2, 12, wood.lightened(0.12))
+	for y in [13, 21]:
+		_rect(img, ox + 11, oy + y, 10, 1, Color("3a3440"))
+	_rect(img, ox + 15, oy + 15, 2, 4, Color("f2d24a"))
+	_px(img, ox + 15, oy + 20, Color("f2d24a"))
+	_px(img, ox + 16, oy + 20, Color("f2d24a"))
+	_rect(img, ox + 12, oy + 11, 8, 1, Color("5a2a1a"))
+
+
+## Clay urn: breaks for loot. One frame.
+func _draw_urn(img: Image, ox: int, oy: int, col: int) -> void:
+	if col > 0:
+		return
+	var clay := Color("b07a4a")
+	var dark := Color("7a4e2c")
+	_rect(img, ox + 12, oy + 16, 9, 8, clay)
+	_rect(img, ox + 13, oy + 15, 7, 1, clay)
+	_rect(img, ox + 14, oy + 13, 5, 2, clay.darkened(0.1))
+	_rect(img, ox + 13, oy + 12, 7, 1, clay.lightened(0.1))
+	_rect(img, ox + 12, oy + 16, 2, 8, dark)
+	_rect(img, ox + 12, oy + 19, 9, 1, Color("5a8a9a"))
+	_px(img, ox + 18, oy + 17, clay.lightened(0.35))
+
+
+## Spawner nest: a mound of bones and flesh around a glowing core.
+## Frames 0-3 idle pulse, 4-5 spawning.
+func _draw_nest(img: Image, ox: int, oy: int, col: int) -> void:
+	if col > 5:
+		return
+	var flesh := Color("6a2a3e")
+	var dark := Color("40182a")
+	var bone := Color("d8d0b8")
+	var bulge := 1 if col >= 4 else 0
+	for y in range(12 - bulge, 24):
+		var half := 9 - absi(y - 19) / 2 + (bulge if y < 18 else 0)
+		_rect(img, ox + 16 - half, oy + y, half * 2, 1, flesh if y < 21 else dark)
+	for b in [[8, 20], [21, 19], [11, 15], [20, 14], [15, 13]]:
+		_rect(img, ox + b[0], oy + b[1], 3, 1, bone)
+		_px(img, ox + b[0], oy + b[1] - 1, bone)
+	var glow := [0.0, 0.35, 0.7, 0.35, 1.0, 0.8][col] as float
+	var core := Color("e04a8a").lerp(Color("ffd0f0"), glow)
+	_rect(img, ox + 14, oy + 16 - bulge, 4, 3, core)
+	_px(img, ox + 15, oy + 17 - bulge, Color.WHITE if glow > 0.6 else core.lightened(0.3))
+
+
+# --- props (chests, shrines: node sprites) ---------------------------------------------
+
+func _gen_props() -> void:
+	var chest := _img(32, 16)
+	for f in 2:
+		_draw_chest(chest, f * 16, f == 1)
+		_outline(chest, Rect2i(f * 16, 0, 16, 16))
+	_save(chest, "res://assets/sprites/props/chest.png")
+	var shrine := _img(32, 24)
+	for f in 2:
+		_draw_shrine(shrine, f * 16, f == 1)
+		_outline(shrine, Rect2i(f * 16, 0, 16, 24))
+	_save(shrine, "res://assets/sprites/props/shrine.png")
+
+
+func _draw_chest(img: Image, ox: int, open: bool) -> void:
+	var wood := Color("8a5a2a")
+	var gold := Color("f2c84a")
+	_rect(img, ox + 2, 8, 12, 7, wood)
+	_rect(img, ox + 2, 8, 12, 1, wood.lightened(0.2))
+	_rect(img, ox + 2, 14, 12, 1, wood.darkened(0.3))
+	_rect(img, ox + 2, 8, 1, 7, gold)
+	_rect(img, ox + 13, 8, 1, 7, gold)
+	if open:
+		_rect(img, ox + 3, 7, 10, 2, Color("ffe890"))
+		_rect(img, ox + 4, 6, 3, 1, Color("fff8d0"))
+		_rect(img, ox + 2, 2, 12, 4, wood.darkened(0.15))
+		_rect(img, ox + 2, 2, 12, 1, gold)
+	else:
+		_rect(img, ox + 2, 4, 12, 4, wood.lightened(0.08))
+		_rect(img, ox + 2, 4, 12, 1, wood.lightened(0.3))
+		_rect(img, ox + 2, 7, 12, 1, gold)
+		_rect(img, ox + 7, 7, 2, 3, gold.darkened(0.2))
+		_px(img, ox + 7, 9, Color("2a1a0e"))
+
+
+func _draw_shrine(img: Image, ox: int, used: bool) -> void:
+	var stone := Color("7a7890")
+	_rect(img, ox + 3, 17, 10, 6, stone)
+	_rect(img, ox + 3, 17, 10, 1, stone.lightened(0.25))
+	_rect(img, ox + 2, 22, 12, 2, stone.darkened(0.3))
+	_rect(img, ox + 5, 14, 6, 3, stone.darkened(0.1))
+	var orb := Color(0.35, 0.35, 0.4) if used else Color.WHITE
+	for y in range(3, 12):
+		var half := 3 - absi(y - 7) / 2
+		_rect(img, ox + 8 - half, y, half * 2, 1, orb)
+	if used:
+		_px(img, ox + 7, 6, Color(0.15, 0.15, 0.2))
+		_px(img, ox + 8, 7, Color(0.15, 0.15, 0.2))
+		_px(img, ox + 8, 8, Color(0.15, 0.15, 0.2))
+	else:
+		_px(img, ox + 6, 5, Color(1, 1, 1))
+		_rect(img, ox + 9, 8, 1, 2, Color(0.8, 0.8, 0.85))
 
 
 # --- fx atlas: projectiles (row 0, pointing right) and pickups (row 1) ----------------

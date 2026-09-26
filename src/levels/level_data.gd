@@ -5,8 +5,13 @@ extends Resource
 ##   .  floor           P  player spawn (floor)
 ##   X  exit portal     S  enemy spawn hint (floor)
 ##   D  door (floor until an arena room locks it)
-##   1-9 arena room floor (room id); doors touching a room belong to it
+##   1-9 arena room floor (room id): everything inside the room's walls
+##      belongs to it; doors touching a room belong to it
 ##   B  boss spawn point (floor)
+##   ~  water (slows walkers)      :  chasm (no walking; shots fly over)
+##   ^  spike trap
+##   b  explosive barrel   u  urn (loot)   N  enemy nest (spawner)
+##   C  treasure chest     A  shrine (team blessing)
 
 @export var display_name := "Level"
 @export_multiline var layout := ""
@@ -25,6 +30,8 @@ extends Resource
 @export var arena_spawn_rate := 28.0
 
 @export_group("Look")
+## Tile sheet: assets/tiles/tiles_<theme>.png (crypt, flooded, bones, throne).
+@export var theme: StringName = &"crypt"
 @export var tint := Color.WHITE
 
 @export_group("Boss")

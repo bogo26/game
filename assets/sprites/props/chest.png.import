@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bbm1pcteawnov"
-path="res://.godot/imported/dungeon_tiles.png-d2a802545180195a91907226824965bd.ctex"
+uid="uid://djn71kh8w0aur"
+path="res://.godot/imported/chest.png-54ebe516dca64df3db424ad76c099e57.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/tiles/dungeon_tiles.png"
-dest_files=["res://.godot/imported/dungeon_tiles.png-d2a802545180195a91907226824965bd.ctex"]
+source_file="res://assets/sprites/props/chest.png"
+dest_files=["res://.godot/imported/chest.png-54ebe516dca64df3db424ad76c099e57.ctex"]
 
 [params]
 

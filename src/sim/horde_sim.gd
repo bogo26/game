@@ -37,6 +37,9 @@ const SLOW_FACTOR := 0.45
 const MARK_DAMAGE_MULT := 1.75
 const RANGED_BACKOFF := 0.55   # ranged enemies retreat inside this fraction of their range
 const SHOT_POSE_TIME := 0.3
+## Enemies pushed harder than this (px/s) toward a chasm go over the edge.
+const FALL_PUSH := 30.0
+const FALL_TIME := 0.45
 
 var count := 0
 var pos := PackedVector2Array()
@@ -53,6 +56,8 @@ var facing := PackedFloat32Array()     # +1 right, -1 left
 var action := PackedFloat32Array()     # behaviour timer (ranged cooldown, exploder fuse)
 var state := PackedInt32Array()        # behaviour state (exploder: 1 = fuse lit)
 var mark := PackedFloat32Array()       # > 0: takes critical damage (Rogue marks)
+var fall := PackedFloat32Array()       # > 0: falling into a chasm (seconds left)
+var last_slot := PackedInt32Array()    # player slot that last hit or pushed it (-1 none)
 
 # Per-type tables (index = type id).
 var types: Array[EnemyData] = []
@@ -96,6 +101,8 @@ var hit_type := PackedInt32Array()
 var hit_crit := PackedByteArray()
 ## Enemy shots fired since the World last checked (for sound).
 var shots_fired := 0
+## Enemies that went over a chasm edge since the World last checked (sound).
+var falls := 0
 ## Exploder blasts since the last drain (World damages heroes + draws FX).
 var blast_pos := PackedVector2Array()
 var blast_radius := PackedFloat32Array()
@@ -135,6 +142,8 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	action.resize(CAPACITY)
 	state.resize(CAPACITY)
 	mark.resize(CAPACITY)
+	fall.resize(CAPACITY)
+	last_slot.resize(CAPACITY)
 	count = 0
 	t_speed.clear()
 	t_radius.clear()
@@ -213,6 +222,8 @@ func spawn(type_id: int, p: Vector2, hp_multiplier: float = 1.0) -> int:
 	action[i] = randf() * 1.5
 	state[i] = 0
 	mark[i] = 0.0
+	fall[i] = 0.0
+	last_slot[i] = -1
 	_type_count[type_id] += 1
 	hurt_max_half_width = maxf(hurt_max_half_width, t_hurt_half_width[type_id])
 	hurt_max_height = maxf(hurt_max_height, t_hurt_height[type_id])
@@ -249,8 +260,10 @@ func alive_count() -> int:
 func damage(i: int, amount: float, knockback: Vector2, source_slot: int, crit: bool = false,
 		at: Vector2 = Vector2.INF) -> bool:
 	var h := hp[i]
-	if h <= 0.0:
+	if h <= 0.0 or fall[i] > 0.0:
 		return false
+	if source_slot >= 0:
+		last_slot[i] = source_slot
 	if mark[i] > 0.0 and not crit:
 		amount *= MARK_DAMAGE_MULT
 		crit = true
@@ -283,6 +296,17 @@ func apply_stun(i: int, seconds: float) -> void:
 func apply_slow(i: int, seconds: float) -> void:
 	if t_behavior[type[i]] != EnemyData.Behavior.BOSS:
 		slow[i] = maxf(slow[i], seconds)
+
+
+## Knockback without damage; the pusher gets the kill if it goes into a chasm.
+func push(i: int, impulse: Vector2, source_slot: int) -> void:
+	vel[i] += impulse * t_knockback[type[i]]
+	if source_slot >= 0:
+		last_slot[i] = source_slot
+
+
+func is_falling(i: int) -> bool:
+	return fall[i] > 0.0
 
 
 ## Middle of the enemy's hurtbox (its drawn body); `pos` is the feet.
@@ -351,6 +375,8 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	var ACT := action
 	var STATE := state
 	var MK := mark
+	var FALLS := fall
+	var terr := grid.terrain
 	var speed_t := t_speed
 	var radius_t := t_radius
 	var behavior_t := t_behavior
@@ -382,6 +408,23 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 			continue
 		var p := P[i]
 		var t := T[i]
+		var falling := FALLS[i]
+		if falling > 0.0:
+			# Tumbling into a chasm: drift with the push, then gone (kill
+			# credit to whoever pushed it; no self-kill, so XP still drops).
+			falling -= dt
+			P[i] = p + V[i] * (dt * 0.5)
+			V[i] = V[i] * decay
+			if falling <= 0.0:
+				FALLS[i] = 0.0
+				HP[i] = 0.0
+				kill_pos.append(p)
+				kill_type.append(t)
+				kill_slot.append(last_slot[i])
+				_dead_pending += 1
+			else:
+				FALLS[i] = falling
+			continue
 		var r := radius_t[t]
 		var fl := FL[i]
 		if fl > 0.0:
@@ -458,6 +501,8 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 			var spd := speed_t[t]
 			if sl > 0.0:
 				spd *= SLOW_FACTOR
+			if ci >= 0 and ci < ncells and terr[ci] == LevelGrid.Terrain.WATER:
+				spd *= LevelGrid.WATER_SPEED
 			desired *= spd
 
 		# Separation: half of the enemies refresh their push each frame.
@@ -491,8 +536,11 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 					j = nxt[j]
 			S[i] = push
 
-		var v := desired + S[i] * SEPARATION_STRENGTH + V[i]
-		V[i] = V[i] * decay
+		var kv := V[i]
+		var v := desired + S[i] * SEPARATION_STRENGTH + kv
+		V[i] = kv * decay
+		# A hard enough push carries it over a chasm's edge.
+		var knocked := kv.length_squared() > FALL_PUSH * FALL_PUSH
 		if v.x > 2.0:
 			FC[i] = 1.0
 		elif v.x < -2.0:
@@ -505,14 +553,27 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 		var edge_x := nx + (r if v.x > 0.0 else -r)
 		var ex := int(edge_x * INV_TILE)
 		var py := int(p.y * INV_TILE)
-		if edge_x < 0.0 or ex >= gw or solid[py * gw + ex] != 0:
+		if edge_x < 0.0 or ex >= gw:
 			nx = p.x
+		else:
+			var cx_i := py * gw + ex
+			if solid[cx_i] != 0 and not (knocked and terr[cx_i] == LevelGrid.Terrain.CHASM):
+				nx = p.x
 		var edge_y := ny + (r if v.y > 0.0 else -r)
 		var ey := int(edge_y * INV_TILE)
 		var ncx := int(nx * INV_TILE)
-		if edge_y < 0.0 or ey >= gh or solid[ey * gw + ncx] != 0:
+		if edge_y < 0.0 or ey >= gh:
 			ny = p.y
+		else:
+			var cy_i := ey * gw + ncx
+			if solid[cy_i] != 0 and not (knocked and terr[cy_i] == LevelGrid.Terrain.CHASM):
+				ny = p.y
 		P[i] = Vector2(nx, ny)
+		if knocked:
+			var cc := int(ny * INV_TILE) * gw + int(nx * INV_TILE)
+			if cc >= 0 and cc < ncells and terr[cc] == LevelGrid.Terrain.CHASM:
+				FALLS[i] = FALL_TIME
+				falls += 1
 
 	pos = P
 	vel = V
@@ -526,6 +587,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	action = ACT
 	state = STATE
 	mark = MK
+	fall = FALLS
 
 
 ## Removes enemies killed since the last update (swap with the last one).
@@ -562,6 +624,8 @@ func _remove_at(i: int) -> void:
 		action[i] = action[last]
 		state[i] = state[last]
 		mark[i] = mark[last]
+		fall[i] = fall[last]
+		last_slot[i] = last_slot[last]
 	count = last
 
 
@@ -603,7 +667,7 @@ func nearest(center: Vector2, max_distance: float) -> int:
 	var best := -1
 	var best_d2 := max_distance * max_distance
 	for j in _scratch:
-		if j < count and hp[j] > 0.0:
+		if j < count and hp[j] > 0.0 and fall[j] <= 0.0:
 			var d2 := center.distance_squared_to(pos[j])
 			if d2 < best_d2:
 				best_d2 = d2
@@ -617,7 +681,7 @@ func contact_damage_at(center: Vector2, body_radius: float) -> float:
 	hash.gather(center, body_radius + max_radius, _scratch)
 	var worst := 0.0
 	for j in _scratch:
-		if j < count and hp[j] > 0.0 and stun[j] <= 0.0:
+		if j < count and hp[j] > 0.0 and stun[j] <= 0.0 and fall[j] <= 0.0:
 			var t := type[j]
 			var rr := body_radius + t_radius[t]
 			if center.distance_squared_to(pos[j]) <= rr * rr:
@@ -645,6 +709,7 @@ func render(layer: InstanceLayer) -> void:
 	var FL := flash
 	var SLW := slow
 	var STN := stun
+	var FALLS := fall
 	var frame0 := t_frame0
 	var frames := t_frames
 	var fps := t_fps
@@ -658,7 +723,12 @@ func render(layer: InstanceLayer) -> void:
 		if t_behavior[t] == EnemyData.Behavior.BOSS:
 			continue  # drawn by its controller node
 		var o := w * InstanceLayer.STRIDE
-		buf[o] = FC[i]
+		var size := 1.0
+		if FALLS[i] > 0.0:
+			size = FALLS[i] / FALL_TIME  # shrinks and fades into the chasm
+		buf[o] = FC[i] * size
+		buf[o + 5] = size
+		buf[o + 11] = size
 		buf[o + 3] = roundf(p.x)
 		buf[o + 7] = roundf(p.y)
 		var frame := frame0[t]

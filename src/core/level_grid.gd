@@ -3,15 +3,26 @@ extends RefCounted
 ## Tile-resolution walkability grid shared by collision, the flow field and
 ## spawning. Cells outside the grid count as solid. World position (0, 0) is
 ## the top-left corner of cell (0, 0).
+## Two blocking layers: `solid` stops walkers (walls, closed doors, chasms)
+## and `shot_solid` stops projectiles and sight (walls and closed doors only),
+## so shots fly across chasms. `terrain` marks what walkable floor is made of.
+
+enum Terrain { FLOOR, WATER, CHASM, SPIKES }
 
 const TILE := 16
 const INV_TILE := 1.0 / TILE
 const EPSILON := 0.001
+## Walking speed multiplier in water (heroes and enemies).
+const WATER_SPEED := 0.6
 
 var width := 0
 var height := 0
 ## 1 = blocks movement.
 var solid := PackedByteArray()
+## 1 = blocks projectiles and line of sight.
+var shot_solid := PackedByteArray()
+## Terrain per cell.
+var terrain := PackedByteArray()
 ## Bumped on every change so cached data (flow fields) knows to refresh.
 var version := 0
 
@@ -25,6 +36,10 @@ func resize(p_width: int, p_height: int) -> void:
 	height = p_height
 	solid = PackedByteArray()
 	solid.resize(width * height)
+	shot_solid = PackedByteArray()
+	shot_solid.resize(width * height)
+	terrain = PackedByteArray()
+	terrain.resize(width * height)
 	version += 1
 
 
@@ -42,10 +57,47 @@ func is_solid(x: int, y: int) -> bool:
 	return solid[y * width + x] != 0
 
 
+## Walls and doors: block walking and shots alike.
 func set_solid(x: int, y: int, value: bool) -> void:
 	if in_bounds(x, y):
 		solid[y * width + x] = 1 if value else 0
+		shot_solid[y * width + x] = 1 if value else 0
 		version += 1
+
+
+## A chasm: can't be walked on, but shots and sight cross it.
+func set_chasm(x: int, y: int) -> void:
+	if in_bounds(x, y):
+		var i := y * width + x
+		solid[i] = 1
+		shot_solid[i] = 0
+		terrain[i] = Terrain.CHASM
+		version += 1
+
+
+## Walkable terrain (floor, water, spikes).
+func set_terrain(x: int, y: int, value: Terrain) -> void:
+	if in_bounds(x, y):
+		terrain[y * width + x] = value
+
+
+func terrain_at(pos: Vector2) -> Terrain:
+	var x := floori(pos.x * INV_TILE)
+	var y := floori(pos.y * INV_TILE)
+	if not in_bounds(x, y):
+		return Terrain.FLOOR
+	return terrain[y * width + x] as Terrain
+
+
+## Walking speed multiplier at a position (slowed in water).
+func speed_factor_at(pos: Vector2) -> float:
+	return WATER_SPEED if terrain_at(pos) == Terrain.WATER else 1.0
+
+
+func is_shot_solid(x: int, y: int) -> bool:
+	if x < 0 or y < 0 or x >= width or y >= height:
+		return true
+	return shot_solid[y * width + x] != 0
 
 
 func is_solid_at(pos: Vector2) -> bool:
@@ -101,11 +153,12 @@ func move_and_slide(pos: Vector2, motion: Vector2, r: float) -> Vector2:
 	return pos
 
 
-## Grid ray march (DDA). True if no solid tile lies between a and b.
+## Grid ray march (DDA). True if nothing that stops shots lies between a
+## and b (chasms don't).
 func line_of_sight(a: Vector2, b: Vector2) -> bool:
 	var cell := cell_of(a)
 	var end := cell_of(b)
-	if is_solid(cell.x, cell.y):
+	if is_shot_solid(cell.x, cell.y):
 		return false
 	var d := b - a
 	var step_x := 1 if d.x > 0.0 else -1
@@ -125,7 +178,7 @@ func line_of_sight(a: Vector2, b: Vector2) -> bool:
 		else:
 			t_max_y += t_delta_y
 			cell.y += step_y
-		if is_solid(cell.x, cell.y):
+		if is_shot_solid(cell.x, cell.y):
 			return false
 	return true
 

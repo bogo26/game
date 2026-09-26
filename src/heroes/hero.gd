@@ -233,7 +233,8 @@ func tick(delta: float) -> void:
 
 
 func _speed_factor() -> float:
-	return buff_product(&"move_speed_factor")
+	var terrain := world.grid.speed_factor_at(position) if world and world.grid else 1.0
+	return buff_product(&"move_speed_factor") * terrain
 
 
 ## Product of a buff hook (e.g. &"damage_factor") over all four abilities.
