@@ -53,6 +53,11 @@ const SFX := {
 	"shrine": {"wave": "triangle", "f0": 330.0, "f1": 330.0, "dur": 0.95, "decay": 0.7, "vol": 0.3, "arp": [0, 7, 12, 19, 24], "arp_step": 0.12, "vib": [0.05, 5.0]},
 	"nest": {"wave": "saw", "f0": 170.0, "f1": 90.0, "dur": 0.18, "decay": 1.8, "vol": 0.2, "noise": 0.4, "lp": 0.3},
 	"nest_break": {"wave": "noise", "f0": 1300.0, "f1": 110.0, "dur": 0.5, "decay": 1.4, "vol": 0.42, "lp": 0.3},
+	"zap": {"wave": "square", "f0": 1900.0, "f1": 800.0, "dur": 0.09, "decay": 2.2, "vol": 0.11, "duty": 0.125, "noise": 0.7},
+	"thunder": {"wave": "noise", "f0": 2600.0, "f1": 55.0, "dur": 0.75, "decay": 1.2, "vol": 0.45, "lp": 0.3},
+	"freeze": {"wave": "sine", "f0": 2300.0, "f1": 3300.0, "dur": 0.16, "decay": 1.6, "vol": 0.14, "noise": 0.3},
+	"shatter": {"wave": "noise", "f0": 7500.0, "f1": 3000.0, "dur": 0.22, "decay": 1.8, "vol": 0.26, "lp": 0.7},
+	"plague": {"wave": "saw", "f0": 150.0, "f1": 105.0, "dur": 0.4, "decay": 1.2, "vol": 0.16, "noise": 0.5, "lp": 0.25, "vib": [0.08, 8.0]},
 }
 
 ## Chords are MIDI note triads per bar; bpm; drums: "full", "light" or "none".

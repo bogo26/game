@@ -4,6 +4,7 @@ extends Node
 ##       [--projectiles=400] [--fullscreen | --size=3840x2160] [--vsync=on]
 ##       [--max-fps=120] [--log-slow] [--heroes=necromancer,engineer,...] [--ult-spam]
 ##       [--level=level_2]   (a level from src/levels/data; default: the fixed stress room)
+##       [--elements]        (every hero gets all four elements at tier III: worst case)
 ## Four bot heroes fire constantly while the spawner keeps the horde at the
 ## cap. After a warm-up it measures frame times and exits with code 0 when the
 ## targets from docs/DESIGN.md are met, 1 otherwise.
@@ -26,6 +27,7 @@ var _log_slow := false
 var _last_usec := 0
 var _slow_frames: PackedStringArray = []
 var _level := STRESS_ROOM
+var _elements := false
 
 
 func _ready() -> void:
@@ -60,6 +62,8 @@ func _ready() -> void:
 			_ult_spam = true
 		elif arg.begins_with("--level="):
 			_level = "res://src/levels/data/%s.tres" % value
+		elif arg == "--elements":
+			_elements = true
 
 	DisplayServer.window_set_vsync_mode(
 		DisplayServer.VSYNC_ENABLED if vsync else DisplayServer.VSYNC_DISABLED)
@@ -81,6 +85,11 @@ func _ready() -> void:
 	_world.spawner.alive_cap = _enemies
 	for hero in _world.heroes:
 		hero.god_mode = true
+		if _elements:
+			for element in Elements.MOD_KEYS:
+				for tier in range(1, 4):
+					hero.apply_upgrade(UpgradePool.shared_library().find(StringName("%s_%d" % [element, tier])),
+						false)
 	PerfMonitor.visible = true
 	print("stress test: %d enemies, %d projectiles, %.0fs after %.0fs warm-up" % [
 		_enemies, _projectiles, _seconds, _warmup])

@@ -15,7 +15,7 @@ const KNOWN_ABILITY_MODS: Array[StringName] = [
 	&"pierce", &"bounces", &"effect_time", &"arc_deg", &"stun_time", &"slow_time",
 	&"distance_pct", &"iframes", &"end_burst", &"heal_allies", &"arrival_damage",
 	&"duration", &"zone_damage", &"heal_pct", &"buff_damage", &"lifesteal", &"minion_hp_pct",
-	&"max_active",
+	&"max_active", &"fire", &"ice", &"poison", &"lightning",
 ]
 
 static var _shared_library: UpgradeLibrary
@@ -46,6 +46,8 @@ func roll_offers(hero_id: StringName, stacks: Dictionary, count: int = 3) -> Arr
 			continue
 		if int(stacks.get(u.id, 0)) >= u.max_stacks:
 			continue
+		if u.requires != &"" and int(stacks.get(u.requires, 0)) == 0:
+			continue  # the previous tier comes first
 		candidates.append(u)
 	var offers: Array[UpgradeData] = []
 	while offers.size() < count and not candidates.is_empty():

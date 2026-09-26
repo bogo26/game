@@ -33,6 +33,7 @@ var effect := PackedInt32Array()
 var effect_time := PackedFloat32Array()
 var splash := PackedFloat32Array()     # > 0: area damage on impact
 var crit := PackedByteArray()          # 1: rolled a crit at spawn (glows, hits show as crits)
+var elemental := PackedByteArray()     # 1: a hero's attack carrying its elements (see Elements)
 
 ## Splash impacts this frame (for FX): position + radius pairs.
 var impacts := PackedVector2Array()
@@ -41,6 +42,10 @@ var _scratch := PackedInt32Array()
 
 ## Heroes hit by enemy projectiles this frame: [hero index, damage] pairs.
 var hero_hits := PackedFloat32Array()
+## Enemies hit by elemental shots this frame: [enemy index, owner slot]
+## pairs, and each hit's damage. The World applies the elements.
+var element_hits := PackedInt32Array()
+var element_hit_damage := PackedFloat32Array()
 
 
 func _init() -> void:
@@ -60,6 +65,7 @@ func _init() -> void:
 	effect_time.resize(CAPACITY)
 	splash.resize(CAPACITY)
 	crit.resize(CAPACITY)
+	elemental.resize(CAPACITY)
 
 
 ## Returns the projectile index, or -1 when full.
@@ -85,6 +91,7 @@ func spawn(p: Vector2, v: Vector2, dmg: float, r: float, lifetime: float, p_team
 	effect_time[i] = 0.0
 	splash[i] = 0.0
 	crit[i] = 0
+	elemental[i] = 0
 	return i
 
 
@@ -102,6 +109,11 @@ func set_crit(i: int) -> void:
 	crit[i] = 1
 
 
+## Marks a hero's attack shot: its hits get logged for the owner's elements.
+func set_elemental(i: int) -> void:
+	elemental[i] = 1
+
+
 func clear() -> void:
 	count = 0
 
@@ -111,6 +123,8 @@ func clear() -> void:
 func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_bodies: PackedVector2Array,
 		hero_targetable: PackedByteArray, hero_radius: float) -> void:
 	hero_hits.clear()
+	element_hits.clear()
+	element_hit_damage.clear()
 	impacts.clear()
 	impact_radius.clear()
 	var P := pos
@@ -226,6 +240,10 @@ func _hit_enemy(i: int, j: int, horde: HordeSim, v: Vector2, at: Vector2) -> voi
 			horde.apply_slow(j, effect_time[i])
 		Effect.STUN:
 			horde.apply_stun(j, effect_time[i])
+	if elemental[i] != 0:
+		element_hits.append(j)
+		element_hits.append(owner[i])
+		element_hit_damage.append(damage[i])
 	last_hit[i] = horde.uid[j]
 	pierce[i] -= 1
 	var r := splash[i]
@@ -260,6 +278,7 @@ func _remove_at(i: int, P: PackedVector2Array, V: PackedVector2Array, L: PackedF
 		effect_time[i] = effect_time[last]
 		splash[i] = splash[last]
 		crit[i] = crit[last]
+		elemental[i] = elemental[last]
 	count = last
 
 

@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="UpgradeLibrary" load_steps=53 format=3]
+[gd_resource type="Resource" script_class="UpgradeLibrary" load_steps=65 format=3]
 
 [ext_resource type="Script" path="res://src/upgrades/upgrade_library.gd" id="1_library"]
 [ext_resource type="Script" path="res://src/upgrades/upgrade_data.gd" id="2_upgrade"]
@@ -503,6 +503,170 @@ max_stacks = 2
 hero_id = &"necromancer"
 effects = PackedStringArray("ability ultimate count 6", "ability ultimate max_active 6")
 
+[sub_resource type="Resource" id="Resource_fire_1"]
+script = ExtResource("2_upgrade")
+id = &"fire_1"
+display_name = "Ember Strikes"
+description = "Attacks set enemies on fire: 50% of the hit per second for 3s"
+rarity = 1
+max_stacks = 1
+hero_id = &""
+effects = PackedStringArray("ability attack fire 1")
+element = &"fire"
+tier = 1
+weight_bonus = 1.0
+
+[sub_resource type="Resource" id="Resource_fire_2"]
+script = ExtResource("2_upgrade")
+id = &"fire_2"
+display_name = "Wildfire"
+description = "Burns are 60% hotter and last 4s. Fire spreads to enemies they touch"
+rarity = 1
+max_stacks = 1
+hero_id = &""
+effects = PackedStringArray("ability attack fire 1")
+requires = &"fire_1"
+element = &"fire"
+tier = 2
+weight_bonus = 2.5
+
+[sub_resource type="Resource" id="Resource_fire_3"]
+script = ExtResource("2_upgrade")
+id = &"fire_3"
+display_name = "Inferno"
+description = "Burning enemies explode when they die, setting everything nearby ablaze"
+rarity = 2
+max_stacks = 1
+hero_id = &""
+effects = PackedStringArray("ability attack fire 1")
+requires = &"fire_2"
+element = &"fire"
+tier = 3
+weight_bonus = 8.0
+
+[sub_resource type="Resource" id="Resource_ice_1"]
+script = ExtResource("2_upgrade")
+id = &"ice_1"
+display_name = "Frostbite"
+description = "Attacks chill enemies: 40% slower for 2.5s"
+rarity = 1
+max_stacks = 1
+hero_id = &""
+effects = PackedStringArray("ability attack ice 1")
+element = &"ice"
+tier = 1
+weight_bonus = 1.0
+
+[sub_resource type="Resource" id="Resource_ice_2"]
+script = ExtResource("2_upgrade")
+id = &"ice_2"
+display_name = "Permafrost"
+description = "Every 3rd hit on a chilled enemy freezes it solid for 1.5s"
+rarity = 1
+max_stacks = 1
+hero_id = &""
+effects = PackedStringArray("ability attack ice 1")
+requires = &"ice_1"
+element = &"ice"
+tier = 2
+weight_bonus = 2.5
+
+[sub_resource type="Resource" id="Resource_ice_3"]
+script = ExtResource("2_upgrade")
+id = &"ice_3"
+display_name = "Shatter"
+description = "Frozen enemies take double damage and shatter when they die, freezing others"
+rarity = 2
+max_stacks = 1
+hero_id = &""
+effects = PackedStringArray("ability attack ice 1")
+requires = &"ice_2"
+element = &"ice"
+tier = 3
+weight_bonus = 8.0
+
+[sub_resource type="Resource" id="Resource_poison_1"]
+script = ExtResource("2_upgrade")
+id = &"poison_1"
+display_name = "Venom"
+description = "Attacks poison: 25% of the hit per second for 4s, and slows. Stacks 4 times"
+rarity = 1
+max_stacks = 1
+hero_id = &""
+effects = PackedStringArray("ability attack poison 1")
+element = &"poison"
+tier = 1
+weight_bonus = 1.0
+
+[sub_resource type="Resource" id="Resource_poison_2"]
+script = ExtResource("2_upgrade")
+id = &"poison_2"
+display_name = "Virulence"
+description = "Poison stacks up to 8 times and lasts 6s"
+rarity = 1
+max_stacks = 1
+hero_id = &""
+effects = PackedStringArray("ability attack poison 1")
+requires = &"poison_1"
+element = &"poison"
+tier = 2
+weight_bonus = 2.5
+
+[sub_resource type="Resource" id="Resource_poison_3"]
+script = ExtResource("2_upgrade")
+id = &"poison_3"
+display_name = "Plague"
+description = "Poisoned enemies burst into toxic clouds that poison everything inside"
+rarity = 2
+max_stacks = 1
+hero_id = &""
+effects = PackedStringArray("ability attack poison 1")
+requires = &"poison_2"
+element = &"poison"
+tier = 3
+weight_bonus = 8.0
+
+[sub_resource type="Resource" id="Resource_lightning_1"]
+script = ExtResource("2_upgrade")
+id = &"lightning_1"
+display_name = "Static Charge"
+description = "Hits stagger enemies and zap the nearest one for 50% damage"
+rarity = 1
+max_stacks = 1
+hero_id = &""
+effects = PackedStringArray("ability attack lightning 1")
+element = &"lightning"
+tier = 1
+weight_bonus = 1.0
+
+[sub_resource type="Resource" id="Resource_lightning_2"]
+script = ExtResource("2_upgrade")
+id = &"lightning_2"
+display_name = "Arc Lightning"
+description = "Zaps chain through 3 enemies for 60% damage and stun them"
+rarity = 1
+max_stacks = 1
+hero_id = &""
+effects = PackedStringArray("ability attack lightning 1")
+requires = &"lightning_1"
+element = &"lightning"
+tier = 2
+weight_bonus = 2.5
+
+[sub_resource type="Resource" id="Resource_lightning_3"]
+script = ExtResource("2_upgrade")
+id = &"lightning_3"
+display_name = "Thunderstrike"
+description = "Every 5th hit calls down a thunderbolt: triple damage, stun, chains 6"
+rarity = 2
+max_stacks = 1
+hero_id = &""
+effects = PackedStringArray("ability attack lightning 1")
+requires = &"lightning_2"
+element = &"lightning"
+tier = 3
+weight_bonus = 8.0
+
 [resource]
 script = ExtResource("1_library")
-upgrades = Array[ExtResource("2_upgrade")]([SubResource("Resource_sharpened"), SubResource("Resource_quick_hands"), SubResource("Resource_swift_boots"), SubResource("Resource_vitality"), SubResource("Resource_iron_skin"), SubResource("Resource_keen_eye"), SubResource("Resource_brutal"), SubResource("Resource_magnet"), SubResource("Resource_recharge"), SubResource("Resource_regeneration"), SubResource("Resource_focus"), SubResource("Resource_nimble"), SubResource("Resource_amplify"), SubResource("Resource_bloodthirst"), SubResource("Resource_guardian_angel"), SubResource("Resource_glass_cannon"), SubResource("Resource_overcharge"), SubResource("Resource_knight_wide_slash"), SubResource("Resource_knight_aftershock"), SubResource("Resource_knight_shockwave"), SubResource("Resource_knight_endless_spin"), SubResource("Resource_ranger_twin_arrows"), SubResource("Resource_ranger_piercing"), SubResource("Resource_ranger_wide_volley"), SubResource("Resource_ranger_deluge"), SubResource("Resource_mage_bigger_bursts"), SubResource("Resource_mage_twin_bolts"), SubResource("Resource_mage_deep_freeze"), SubResource("Resource_mage_blink_nova"), SubResource("Resource_cleric_radiant"), SubResource("Resource_cleric_blessed_orbs"), SubResource("Resource_cleric_swift_grace"), SubResource("Resource_cleric_mending"), SubResource("Resource_cleric_wrath"), SubResource("Resource_berserker_cleaver"), SubResource("Resource_berserker_bloodlust"), SubResource("Resource_berserker_earthshaker"), SubResource("Resource_berserker_unstoppable"), SubResource("Resource_rogue_precision"), SubResource("Resource_rogue_fan"), SubResource("Resource_rogue_shadow_dance"), SubResource("Resource_rogue_legion"), SubResource("Resource_engineer_overclock"), SubResource("Resource_engineer_extra_turret"), SubResource("Resource_engineer_afterburner"), SubResource("Resource_engineer_supercoil"), SubResource("Resource_necro_bone_horde"), SubResource("Resource_necro_sturdy_bones"), SubResource("Resource_necro_soul_rend"), SubResource("Resource_necro_endless_legion")])
+upgrades = Array[ExtResource("2_upgrade")]([SubResource("Resource_sharpened"), SubResource("Resource_quick_hands"), SubResource("Resource_swift_boots"), SubResource("Resource_vitality"), SubResource("Resource_iron_skin"), SubResource("Resource_keen_eye"), SubResource("Resource_brutal"), SubResource("Resource_magnet"), SubResource("Resource_recharge"), SubResource("Resource_regeneration"), SubResource("Resource_focus"), SubResource("Resource_nimble"), SubResource("Resource_amplify"), SubResource("Resource_bloodthirst"), SubResource("Resource_guardian_angel"), SubResource("Resource_glass_cannon"), SubResource("Resource_overcharge"), SubResource("Resource_knight_wide_slash"), SubResource("Resource_knight_aftershock"), SubResource("Resource_knight_shockwave"), SubResource("Resource_knight_endless_spin"), SubResource("Resource_ranger_twin_arrows"), SubResource("Resource_ranger_piercing"), SubResource("Resource_ranger_wide_volley"), SubResource("Resource_ranger_deluge"), SubResource("Resource_mage_bigger_bursts"), SubResource("Resource_mage_twin_bolts"), SubResource("Resource_mage_deep_freeze"), SubResource("Resource_mage_blink_nova"), SubResource("Resource_cleric_radiant"), SubResource("Resource_cleric_blessed_orbs"), SubResource("Resource_cleric_swift_grace"), SubResource("Resource_cleric_mending"), SubResource("Resource_cleric_wrath"), SubResource("Resource_berserker_cleaver"), SubResource("Resource_berserker_bloodlust"), SubResource("Resource_berserker_earthshaker"), SubResource("Resource_berserker_unstoppable"), SubResource("Resource_rogue_precision"), SubResource("Resource_rogue_fan"), SubResource("Resource_rogue_shadow_dance"), SubResource("Resource_rogue_legion"), SubResource("Resource_engineer_overclock"), SubResource("Resource_engineer_extra_turret"), SubResource("Resource_engineer_afterburner"), SubResource("Resource_engineer_supercoil"), SubResource("Resource_necro_bone_horde"), SubResource("Resource_necro_sturdy_bones"), SubResource("Resource_necro_soul_rend"), SubResource("Resource_necro_endless_legion"), SubResource("Resource_fire_1"), SubResource("Resource_fire_2"), SubResource("Resource_fire_3"), SubResource("Resource_ice_1"), SubResource("Resource_ice_2"), SubResource("Resource_ice_3"), SubResource("Resource_poison_1"), SubResource("Resource_poison_2"), SubResource("Resource_poison_3"), SubResource("Resource_lightning_1"), SubResource("Resource_lightning_2"), SubResource("Resource_lightning_3")])

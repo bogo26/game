@@ -25,9 +25,10 @@ func _activate(aim: Vector2) -> void:
 		reach_now *= 1.3
 	var center := hero.position + Vector2(0, -4)
 	var arc := deg_to_rad(arc_degrees + mod(&"arc_deg"))
+	var elemental: Hero = hero if slot == Slot.ATTACK and hero.has_elements() else null
 	var hits := world().damage_enemies_in_arc(center, aim, reach_now, arc * 0.5,
 		scaled_damage(damage * multiplier), knockback * (1.5 if heavy else 1.0), hero.slot,
-		stun_time + mod(&"stun_time"))
+		stun_time + mod(&"stun_time"), elemental)
 	hero.on_hits(hits)
 	world().fx.slash(center + aim * 3.0, reach_now * 0.8, aim.angle(), arc,
 		color if not heavy else Color(1, 0.8, 0.4))

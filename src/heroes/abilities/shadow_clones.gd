@@ -67,8 +67,10 @@ func _on_attack(aim: Vector2) -> void:
 	var arc := deg_to_rad(arc_degrees)
 	for i in _ghosts.size():
 		var p := _ghost_position(i) + Vector2(0, -4)
+		# Clones copy the attack, elements included.
 		hero.on_hits(w.damage_enemies_in_arc(p, aim, reach, arc * 0.5,
-			scaled_damage(damage * damage_fraction), 30.0, hero.slot))
+			scaled_damage(damage * damage_fraction), 30.0, hero.slot, 0.0,
+			hero if hero.has_elements() else null))
 		w.fx.slash(p + aim * 3.0, reach * 0.8, aim.angle(), arc, Color(0.6, 0.4, 1.0, 0.8), 0.1)
 
 

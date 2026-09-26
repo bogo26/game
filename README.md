@@ -67,7 +67,13 @@ Things to use in the levels:
 - **Chests** give the whole team a bonus upgrade.
 - **Shrines** bless the team: Fury, Haste, Life or Wrath.
 
-**Test Room** on the main menu is a drop-in sandbox with an endless horde and one of everything.
+Upgrades include four **elemental chains** for your attack: fire, ice, poison and lightning. Each has three tiers, and the third is a big one:
+- **Inferno:** burning enemies explode.
+- **Shatter:** frozen enemies take double damage and burst into a freezing nova.
+- **Plague:** poisoned enemies leave toxic clouds.
+- **Thunderstrike:** every 5th hit calls down a bolt.
+
+**Test Room** on the main menu is a drop-in sandbox with an endless horde and one of everything. Add `-- --upgrades=fire_3,ice_2` to `./tools/dev.sh run` to start with those upgrades and the tiers before them.
 
 ## Status
 

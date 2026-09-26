@@ -83,6 +83,8 @@ var spawner := SpawnDirector.new()
 var particles := FxSim.new()
 var upgrade_pool := UpgradePool.new()
 var director := LevelDirector.new()
+## Elemental attack upgrades (fire, ice, poison, lightning).
+var elements: Elements
 ## Tiles the team has seen (minimap).
 var reveal := MapReveal.new()
 var spikes := SpikeTraps.new()
@@ -158,6 +160,7 @@ func _ready() -> void:
 	flow.setup(grid)
 	horde.setup(grid, flow, enemy_types)
 	horde.projectiles = projectiles
+	elements = Elements.new(self)
 	spawner.setup(horde, grid, flow, level.enemy_spawn_hints)
 	spawner.enabled = spawn_enemies
 	if run_mode:
@@ -219,6 +222,7 @@ func spawn_hero(slot: int) -> Hero:
 	hero.position = grid.nearest_open(anchor + SPAWN_OFFSETS[slot])
 	entities.add_child(hero)
 	heroes.append(hero)
+	_apply_debug_upgrades(hero)
 	spawner.set_player_count(heroes.size())
 	Events.hero_spawned.emit(slot)
 	return hero
@@ -260,6 +264,9 @@ func _process(delta: float) -> void:
 	var t_horde := Time.get_ticks_usec()
 
 	projectiles.update(dt, horde, grid, _hero_bodies, _hero_targetable, Hero.HURT_RADIUS)
+	var t_elements := Time.get_ticks_usec()
+	elements.process_projectile_hits(projectiles)
+	var elements_usec := Time.get_ticks_usec() - t_elements
 	_apply_projectile_hits()
 	_update_zones(dt)
 	_update_barrel_blasts(dt)
@@ -267,6 +274,9 @@ func _process(delta: float) -> void:
 
 	_emit_hit_effects()
 	_process_kills()
+	t_elements = Time.get_ticks_usec()
+	elements.tick(dt)
+	PerfMonitor.record(&"elements", elements_usec + Time.get_ticks_usec() - t_elements)
 	_apply_ult_charge()
 	pickups.update(dt, hero_positions, _hero_ranges, _hero_active)
 	_apply_pickups()
@@ -319,11 +329,13 @@ func damage_enemies_in_circle(center: Vector2, radius: float, damage: float, kno
 	return _damage_scratch(center, damage, knockback, source_slot, stun_time, slow_time)
 
 
-## Damages enemies in a cone (melee swings).
+## Damages enemies in a cone (melee swings). `elemental`: the hero whose
+## attack this is, so each enemy hit also gets that hero's elements.
 func damage_enemies_in_arc(center: Vector2, dir: Vector2, radius: float, half_angle: float,
-		damage: float, knockback: float, source_slot: int, stun_time: float = 0.0) -> int:
+		damage: float, knockback: float, source_slot: int, stun_time: float = 0.0,
+		elemental: Hero = null) -> int:
 	horde.query_arc(center, dir, radius, half_angle, _scratch)
-	return _damage_scratch(center, damage, knockback, source_slot, stun_time, 0.0)
+	return _damage_scratch(center, damage, knockback, source_slot, stun_time, 0.0, elemental)
 
 
 ## Damages every enemy inside a rectangle (screen-wide ultimates).
@@ -351,7 +363,7 @@ func hit_enemy(j: int, damage: float, push: Vector2, source_slot: int, source: H
 
 
 func _damage_scratch(center: Vector2, damage: float, knockback: float, source_slot: int,
-		stun_time: float, slow_time: float) -> int:
+		stun_time: float, slow_time: float, elemental: Hero = null) -> int:
 	var hits := 0
 	var source := hero_for_slot(source_slot) if source_slot >= 0 else null
 	for j in _scratch:
@@ -361,6 +373,8 @@ func _damage_scratch(center: Vector2, damage: float, knockback: float, source_sl
 			push = away.normalized() * knockback if away.length_squared() > 0.01 else Vector2.UP * knockback
 		if damage > 0.0:
 			hit_enemy(j, damage, push, source_slot, source)
+			if elemental:
+				elements.on_attack_hit(elemental, j, damage)
 		elif push != Vector2.ZERO:
 			horde.push(j, push, source_slot)
 		if stun_time > 0.0:
@@ -669,6 +683,8 @@ func _update_zones(dt: float) -> void:
 			if zone.damage > 0.0 or zone.slow_time > 0.0 or zone.stun_time > 0.0:
 				damage_enemies_in_circle(zone.position, zone.radius, zone.damage, zone.knockback,
 					zone.owner_slot, zone.stun_time, zone.slow_time)
+			if zone.poison_dps > 0.0:
+				elements.poison_area(zone)
 			if zone.heal > 0.0:
 				for hero in heroes:
 					if not hero.is_downed() and hero.position.distance_to(zone.position) <= zone.radius:
@@ -853,6 +869,24 @@ func _apply_leash() -> void:
 		var clamped := Vector2(clampf(hero.position.x, min_p.x, max_p.x), clampf(hero.position.y, min_p.y, max_p.y))
 		if clamped != hero.position:
 			hero.position = grid.move_and_slide(hero.position, clamped - hero.position, Hero.RADIUS)
+
+
+## Debug: --upgrades=fire_3,ice_1 gives every hero those upgrades (and the
+## tiers they require) for this level.
+func _apply_debug_upgrades(hero: Hero) -> void:
+	for arg in OS.get_cmdline_user_args():
+		if not arg.begins_with("--upgrades="):
+			continue
+		var library := UpgradePool.shared_library()
+		for id in arg.get_slice("=", 1).split(",", false):
+			var chain: Array[UpgradeData] = []
+			var upgrade := library.find(StringName(id))
+			while upgrade:
+				chain.push_front(upgrade)
+				upgrade = library.find(upgrade.requires) if upgrade.requires != &"" else null
+			for u in chain:
+				if not hero.upgrade_stacks.has(u.id):
+					hero.apply_upgrade(u, false)
 
 
 static func _cmdline_int(prefix: String, default_value: int) -> int:

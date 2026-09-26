@@ -215,6 +215,9 @@ func _build_card(upgrade: UpgradeData, hero: Hero, size: Vector2) -> Panel:
 	var card := Panel.new()
 	card.size = size
 	var rarity_color := UpgradeData.RARITY_COLORS[upgrade.rarity]
+	var element := Elements.MOD_KEYS.find(upgrade.element)
+	if element != -1:
+		rarity_color = Elements.COLORS[element]
 	var inner_w := size.x - 8.0
 	var name_label := _wrapped_label(upgrade.display_name, Color.WHITE, inner_w)
 	name_label.position = Vector2(4, 6)
@@ -222,6 +225,8 @@ func _build_card(upgrade: UpgradeData, hero: Hero, size: Vector2) -> Panel:
 	var tag := UpgradeData.RARITY_NAMES[upgrade.rarity]
 	if upgrade.hero_id != &"":
 		tag = hero.data.display_name
+	if element != -1:
+		tag = "%s %s" % [Elements.NAMES[element], ["", "I", "II", "III"][clampi(upgrade.tier, 0, 3)]]
 	var rarity := _label(tag.to_upper(), 8, rarity_color)
 	rarity.position = Vector2(4, 30)
 	card.add_child(rarity)
@@ -229,7 +234,10 @@ func _build_card(upgrade: UpgradeData, hero: Hero, size: Vector2) -> Panel:
 	desc.position = Vector2(4, 42)
 	card.add_child(desc)
 	var taken := int(hero.upgrade_stacks.get(upgrade.id, 0))
-	var stacks := _label("%d/%d" % [taken + 1, upgrade.max_stacks], 8, Color(0.55, 0.55, 0.62))
+	var counter := "%d/%d" % [taken + 1, upgrade.max_stacks]
+	if element != -1:
+		counter = "TIER %d/3" % upgrade.tier
+	var stacks := _label(counter, 8, Color(0.55, 0.55, 0.62))
 	stacks.position = Vector2(4, size.y - 13)
 	card.add_child(stacks)
 	card.set_meta("rarity_color", rarity_color)

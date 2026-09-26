@@ -132,6 +132,8 @@ func _fire(hero: Hero, delta: float) -> void:
 		var dir := Vector2.from_angle(_rng.randf() * TAU)
 		if target != -1 and _rng.randf() < 0.7:
 			dir = (world.horde.pos[target] - hero.position).normalized().rotated(_rng.randf_range(-0.2, 0.2))
-		world.projectiles.spawn(hero.position + Vector2(0, -6), dir * 220.0, 4.0, 3.0, 1.6,
+		var shot := world.projectiles.spawn(hero.position + Vector2(0, -6), dir * 220.0, 4.0, 3.0, 1.6,
 			ProjectileSim.Team.PLAYER, hero.slot, ProjectileSim.Look.ARROW, 1, 30.0)
+		if shot >= 0 and hero.has_elements():
+			world.projectiles.set_elemental(shot)
 	_fire_budget[hero.slot] = minf(budget, 5.0)

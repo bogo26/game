@@ -28,6 +28,7 @@ func _activate(aim: Vector2) -> void:
 	var shot_bounces := bounces + int(mod(&"bounces"))
 	var splash := splash_radius * area_scale() if splash_radius > 0.0 else 0.0
 	var sim := world().projectiles
+	var elemental := slot == Slot.ATTACK and hero.has_elements()
 	for k in n:
 		var offset := 0.0
 		if n > 1:
@@ -46,6 +47,8 @@ func _activate(aim: Vector2) -> void:
 			break
 		if crit:
 			sim.set_crit(i)
+		if elemental:
+			sim.set_elemental(i)
 		if effect != ProjectileSim.Effect.NONE:
 			sim.set_effect(i, effect, effect_time + mod(&"effect_time"))
 		if splash > 0.0:

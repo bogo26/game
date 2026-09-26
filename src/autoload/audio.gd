@@ -14,7 +14,7 @@ const INTERVALS := {
 	&"hit": 0.035, &"kill": 0.05, &"pickup": 0.04, &"slash": 0.05, &"shoot_arrow": 0.05,
 	&"shoot_rivet": 0.06, &"shoot_knife": 0.05, &"spit": 0.12, &"tesla": 0.1, &"fireball": 0.08,
 	&"hurt": 0.1, &"explosion": 0.08, &"crit": 0.06, &"spikes": 0.1, &"fall": 0.08, &"break": 0.05,
-	&"nest": 0.15,
+	&"nest": 0.15, &"zap": 0.06, &"thunder": 0.15, &"freeze": 0.08, &"shatter": 0.08, &"plague": 0.2,
 }
 ## Per-sound volume trims (dB).
 const TRIMS := {&"hit": -6.0, &"kill": -5.0, &"pickup": -8.0, &"spit": -4.0, &"tesla": -6.0}

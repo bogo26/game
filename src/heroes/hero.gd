@@ -38,6 +38,8 @@ var blessings: Dictionary = {}
 var stats := Stats.new()
 ## Upgrade id -> times taken this run.
 var upgrade_stacks: Dictionary = {}
+## Elemental attack tiers [fire, ice, poison, lightning] (0-3), from upgrades.
+var elements := PackedInt32Array([0, 0, 0, 0])
 var max_hp := 100.0
 var hp := 100.0
 var armor := 0.0
@@ -168,10 +170,17 @@ func _refresh_stats() -> void:
 	ult_charge_mult = stats.get_value(Stats.ULT_CHARGE)
 	life_on_kill = stats.get_value(Stats.LIFE_ON_KILL)
 	revive_speed = stats.get_value(Stats.REVIVE_SPEED)
+	if not abilities.is_empty():
+		elements = Elements.tiers_of(attack())
 
 
 func is_dashing() -> bool:
 	return dash_time_left > 0.0
+
+
+## Whether the attack carries any element (fire, ice, poison, lightning).
+func has_elements() -> bool:
+	return elements[0] > 0 or elements[1] > 0 or elements[2] > 0 or elements[3] > 0
 
 
 ## Whether enemies and enemy projectiles can currently hurt this hero.

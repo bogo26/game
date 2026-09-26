@@ -40,6 +40,19 @@ const SHOT_POSE_TIME := 0.3
 ## Enemies pushed harder than this (px/s) toward a chasm go over the edge.
 const FALL_PUSH := 30.0
 const FALL_TIME := 0.45
+## Elemental statuses from attack upgrades (see Elements): chilled enemies
+## walk at CHILL_SPEED, and each poison stack slows 6%, down to half speed.
+const CHILL_SPEED := 0.6
+const POISON_SLOW_PER_STACK := 0.06
+const POISON_MIN_SPEED := 0.5
+## status_flags bits: what a status does beyond its basic effect.
+const FLAG_WILDFIRE := 1  ## burning: spreads to enemies it touches (World)
+const FLAG_INFERNO := 2   ## burning: explodes when it dies
+const FLAG_SHATTER := 4   ## frozen: shatters into a freezing nova when it dies
+const FLAG_PLAGUE := 8    ## poisoned: bursts into a toxic cloud when it dies
+enum DeathFx { INFERNO, SHATTER, PLAGUE }
+## Render tint codes (atlas shader, custom.b).
+enum Tint { NONE, CHILL, FROZEN, BURN, POISON }
 
 var count := 0
 var pos := PackedVector2Array()
@@ -58,6 +71,18 @@ var state := PackedInt32Array()        # behaviour state (exploder: 1 = fuse lit
 var mark := PackedFloat32Array()       # > 0: takes critical damage (Rogue marks)
 var fall := PackedFloat32Array()       # > 0: falling into a chasm (seconds left)
 var last_slot := PackedInt32Array()    # player slot that last hit or pushed it (-1 none)
+# Elemental statuses (attack upgrades):
+var burn := PackedFloat32Array()          # seconds left burning
+var burn_dps := PackedFloat32Array()
+var poison := PackedFloat32Array()        # seconds left poisoned
+var poison_stacks := PackedFloat32Array()
+var poison_dps := PackedFloat32Array()    # per stack
+var chill := PackedFloat32Array()         # seconds left chilled (slowed)
+var frost := PackedFloat32Array()         # chills since the last freeze
+var frozen := PackedFloat32Array()        # seconds left frozen solid (also stunned)
+var ice_power := PackedFloat32Array()     # hit damage behind the frost (shatter nova)
+var status_time := PackedFloat32Array()   # longest status left; 0 = none (fast skip)
+var status_flags := PackedByteArray()
 
 # Per-type tables (index = type id).
 var types: Array[EnemyData] = []
@@ -103,6 +128,12 @@ var hit_crit := PackedByteArray()
 var shots_fired := 0
 ## Enemies that went over a chasm edge since the World last checked (sound).
 var falls := 0
+## Elemental death effects since the last drain (the World plays them out):
+## position, DeathFx kind, power (the damage they're based on), credited slot.
+var death_fx_pos := PackedVector2Array()
+var death_fx_kind := PackedByteArray()
+var death_fx_power := PackedFloat32Array()
+var death_fx_slot := PackedInt32Array()
 ## Exploder blasts since the last drain (World damages heroes + draws FX).
 var blast_pos := PackedVector2Array()
 var blast_radius := PackedFloat32Array()
@@ -144,6 +175,17 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	mark.resize(CAPACITY)
 	fall.resize(CAPACITY)
 	last_slot.resize(CAPACITY)
+	burn.resize(CAPACITY)
+	burn_dps.resize(CAPACITY)
+	poison.resize(CAPACITY)
+	poison_stacks.resize(CAPACITY)
+	poison_dps.resize(CAPACITY)
+	chill.resize(CAPACITY)
+	frost.resize(CAPACITY)
+	frozen.resize(CAPACITY)
+	ice_power.resize(CAPACITY)
+	status_time.resize(CAPACITY)
+	status_flags.resize(CAPACITY)
 	count = 0
 	t_speed.clear()
 	t_radius.clear()
@@ -224,6 +266,17 @@ func spawn(type_id: int, p: Vector2, hp_multiplier: float = 1.0) -> int:
 	mark[i] = 0.0
 	fall[i] = 0.0
 	last_slot[i] = -1
+	burn[i] = 0.0
+	burn_dps[i] = 0.0
+	poison[i] = 0.0
+	poison_stacks[i] = 0.0
+	poison_dps[i] = 0.0
+	chill[i] = 0.0
+	frost[i] = 0.0
+	frozen[i] = 0.0
+	ice_power[i] = 0.0
+	status_time[i] = 0.0
+	status_flags[i] = 0
 	_type_count[type_id] += 1
 	hurt_max_half_width = maxf(hurt_max_half_width, t_hurt_half_width[type_id])
 	hurt_max_height = maxf(hurt_max_height, t_hurt_height[type_id])
@@ -299,8 +352,110 @@ func damage(i: int, amount: float, knockback: Vector2, source_slot: int, crit: b
 		kill_type.append(type[i])
 		kill_slot.append(source_slot)
 		_dead_pending += 1
+		if status_time[i] > 0.0:
+			_log_death_fx(pos[i], status_flags[i], burn[i] > 0.0, burn_dps[i], poison[i] > 0.0,
+				poison_dps[i], frozen[i] > 0.0, ice_power[i], last_slot[i])
 		return true
 	return false
+
+
+# --- elemental statuses --------------------------------------------------------------------
+
+## Scenery (barrels, urns) and enemies on their way down a chasm don't burn.
+func can_take_status(i: int) -> bool:
+	return hp[i] > 0.0 and fall[i] <= 0.0 and t_behavior[type[i]] != EnemyData.Behavior.OBJECT
+
+
+## Sets it on fire: `dps` for `seconds` (a stronger or longer burn replaces
+## a weaker one; they don't add up).
+func ignite(i: int, dps: float, seconds: float, slot: int, flags: int = 0) -> void:
+	if not can_take_status(i):
+		return
+	burn[i] = maxf(burn[i], seconds)
+	burn_dps[i] = maxf(burn_dps[i], dps)
+	_add_status(i, seconds, slot, flags)
+
+
+## Adds a poison stack (up to `max_stacks`); every stack deals `dps_per_stack`
+## and slows a little. Each dose refreshes the timer.
+func add_poison(i: int, dps_per_stack: float, seconds: float, max_stacks: int, slot: int,
+		flags: int = 0) -> void:
+	if not can_take_status(i):
+		return
+	poison[i] = maxf(poison[i], seconds)
+	poison_stacks[i] = minf(poison_stacks[i] + 1.0, float(max_stacks))
+	poison_dps[i] = maxf(poison_dps[i], dps_per_stack)
+	_add_status(i, seconds, slot, flags)
+
+
+## Chills it (slowed). With `freeze_hits` > 0, every that many chills freeze
+## it solid for `freeze_time` (bosses never freeze). Returns true if it froze.
+func add_chill(i: int, seconds: float, freeze_hits: int, freeze_time: float, power: float, slot: int,
+		flags: int = 0) -> bool:
+	if not can_take_status(i):
+		return false
+	chill[i] = maxf(chill[i], seconds)
+	ice_power[i] = maxf(ice_power[i], power)
+	_add_status(i, seconds, slot, flags)
+	if freeze_hits <= 0 or frozen[i] > 0.0 or t_behavior[type[i]] == EnemyData.Behavior.BOSS:
+		return false
+	frost[i] += 1.0
+	if frost[i] < float(freeze_hits):
+		return false
+	frost[i] = 0.0
+	frozen[i] = freeze_time
+	stun[i] = maxf(stun[i], freeze_time)
+	status_time[i] = maxf(status_time[i], freeze_time)
+	return true
+
+
+func is_frozen(i: int) -> bool:
+	return frozen[i] > 0.0
+
+
+func is_burning(i: int) -> bool:
+	return burn[i] > 0.0
+
+
+func _add_status(i: int, seconds: float, slot: int, flags: int) -> void:
+	status_time[i] = maxf(status_time[i], seconds)
+	status_flags[i] |= flags
+	if slot >= 0:
+		last_slot[i] = slot
+
+
+func clear_death_fx() -> void:
+	death_fx_pos.clear()
+	death_fx_kind.clear()
+	death_fx_power.clear()
+	death_fx_slot.clear()
+
+
+## Removes the first `n` logged death effects (played).
+func drop_death_fx(n: int) -> void:
+	death_fx_pos = death_fx_pos.slice(n)
+	death_fx_kind = death_fx_kind.slice(n)
+	death_fx_power = death_fx_power.slice(n)
+	death_fx_slot = death_fx_slot.slice(n)
+
+
+func _log_death_fx(p: Vector2, flags: int, burning: bool, burn_power: float, poisoned: bool,
+		poison_power: float, is_ice: bool, frost_power: float, slot: int) -> void:
+	if burning and flags & FLAG_INFERNO:
+		_push_death_fx(p, DeathFx.INFERNO, burn_power, slot)
+	if is_ice and flags & FLAG_SHATTER:
+		_push_death_fx(p, DeathFx.SHATTER, frost_power, slot)
+	if poisoned and flags & FLAG_PLAGUE:
+		_push_death_fx(p, DeathFx.PLAGUE, poison_power, slot)
+
+
+func _push_death_fx(p: Vector2, kind: DeathFx, power: float, slot: int) -> void:
+	if death_fx_pos.size() >= 128:
+		return
+	death_fx_pos.append(p)
+	death_fx_kind.append(kind)
+	death_fx_power.append(power)
+	death_fx_slot.append(slot)
 
 
 func apply_stun(i: int, seconds: float) -> void:
@@ -392,6 +547,15 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	var MK := mark
 	var FALLS := fall
 	var terr := grid.terrain
+	var STT := status_time
+	var BRN := burn
+	var BDPS := burn_dps
+	var PSN := poison
+	var PSTK := poison_stacks
+	var PDPS := poison_dps
+	var CHL := chill
+	var FRST := frost
+	var FRZ := frozen
 	var speed_t := t_speed
 	var radius_t := t_radius
 	var behavior_t := t_behavior
@@ -441,6 +605,44 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 			else:
 				FALLS[i] = falling
 			continue
+		if STT[i] > 0.0:
+			# Elemental statuses: burn and poison damage over time, timers.
+			STT[i] = maxf(0.0, STT[i] - dt)
+			var dot := 0.0
+			var b := BRN[i]
+			if b > 0.0:
+				BRN[i] = b - dt
+				dot += BDPS[i] * dt
+			var ps := PSN[i]
+			if ps > 0.0:
+				dot += PDPS[i] * PSTK[i] * dt
+				PSN[i] = ps - dt
+				if ps - dt <= 0.0:
+					PSTK[i] = 0.0
+			var ch := CHL[i]
+			if ch > 0.0:
+				CHL[i] = ch - dt
+				if ch - dt <= 0.0:
+					FRST[i] = 0.0
+			var fz := FRZ[i]
+			if fz > 0.0:
+				FRZ[i] = fz - dt
+			if dot > 0.0:
+				var before := HP[i]
+				HP[i] = before - dot
+				var slot := last_slot[i]
+				if slot >= 0 and slot < damage_by_slot.size():
+					damage_by_slot[slot] += minf(dot, before)
+				if before - dot <= 0.0:
+					kill_pos.append(p)
+					kill_type.append(t)
+					kill_slot.append(slot)
+					_dead_pending += 1
+					_log_death_fx(p, status_flags[i], b > 0.0, BDPS[i], ps > 0.0, PDPS[i], fz > 0.0,
+						ice_power[i], slot)
+					continue
+			if STT[i] <= 0.0:
+				status_flags[i] = 0  # all statuses over: forget their death effects
 		var r := radius_t[t]
 		var fl := FL[i]
 		if fl > 0.0:
@@ -520,6 +722,11 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 				spd *= SLOW_FACTOR
 			if ci >= 0 and ci < ncells and terr[ci] == LevelGrid.Terrain.WATER:
 				spd *= LevelGrid.WATER_SPEED
+			if STT[i] > 0.0:
+				if CHL[i] > 0.0:
+					spd *= CHILL_SPEED
+				if PSTK[i] > 0.0:
+					spd *= maxf(POISON_MIN_SPEED, 1.0 - POISON_SLOW_PER_STACK * PSTK[i])
 			desired *= spd
 
 		# Separation: half of the enemies refresh their push each frame.
@@ -605,6 +812,15 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	state = STATE
 	mark = MK
 	fall = FALLS
+	status_time = STT
+	burn = BRN
+	burn_dps = BDPS
+	poison = PSN
+	poison_stacks = PSTK
+	poison_dps = PDPS
+	chill = CHL
+	frost = FRST
+	frozen = FRZ
 
 
 ## Removes enemies killed since the last update (swap with the last one).
@@ -643,6 +859,17 @@ func _remove_at(i: int) -> void:
 		mark[i] = mark[last]
 		fall[i] = fall[last]
 		last_slot[i] = last_slot[last]
+		burn[i] = burn[last]
+		burn_dps[i] = burn_dps[last]
+		poison[i] = poison[last]
+		poison_stacks[i] = poison_stacks[last]
+		poison_dps[i] = poison_dps[last]
+		chill[i] = chill[last]
+		frost[i] = frost[last]
+		frozen[i] = frozen[last]
+		ice_power[i] = ice_power[last]
+		status_time[i] = status_time[last]
+		status_flags[i] = status_flags[last]
 	count = last
 
 
@@ -729,6 +956,11 @@ func render(layer: InstanceLayer) -> void:
 	var SLW := slow
 	var STN := stun
 	var FALLS := fall
+	var STT := status_time
+	var FRZ := frozen
+	var BRN := burn
+	var PSN := poison
+	var CHL := chill
 	var frame0 := t_frame0
 	var frames := t_frames
 	var fps := t_fps
@@ -762,7 +994,19 @@ func render(layer: InstanceLayer) -> void:
 			frame += int(AN[i] * fps[t]) % frames[t]
 		buf[o + 8] = float(frame)
 		buf[o + 9] = 1.0 if FL[i] > 0.0 else 0.0
-		buf[o + 10] = 1.0 if SLW[i] > 0.0 else 0.0
+		var tint := Tint.NONE
+		if STT[i] > 0.0:
+			if FRZ[i] > 0.0:
+				tint = Tint.FROZEN
+			elif BRN[i] > 0.0:
+				tint = Tint.BURN
+			elif PSN[i] > 0.0:
+				tint = Tint.POISON
+			elif CHL[i] > 0.0:
+				tint = Tint.CHILL
+		if tint == Tint.NONE and SLW[i] > 0.0:
+			tint = Tint.CHILL
+		buf[o + 10] = float(tint)
 		w += 1
 	layer.buffer = buf
 	layer.commit(w)

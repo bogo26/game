@@ -111,18 +111,59 @@ UPGRADES = [
      ["ability ultimate count 6", "ability ultimate max_active 6"]),
 ]
 
+# Elemental chains: three tiers each; every tier needs the one before it and
+# the last is the big one. (id, name, description, element, tier, effects)
+ELEMENTS = [
+    ("fire_1", "Ember Strikes", "Attacks set enemies on fire: 50% of the hit per second for 3s",
+     "fire", 1, ["ability attack fire 1"]),
+    ("fire_2", "Wildfire", "Burns are 60% hotter and last 4s. Fire spreads to enemies they touch",
+     "fire", 2, ["ability attack fire 1"]),
+    ("fire_3", "Inferno", "Burning enemies explode when they die, setting everything nearby ablaze",
+     "fire", 3, ["ability attack fire 1"]),
+    ("ice_1", "Frostbite", "Attacks chill enemies: 40% slower for 2.5s",
+     "ice", 1, ["ability attack ice 1"]),
+    ("ice_2", "Permafrost", "Every 3rd hit on a chilled enemy freezes it solid for 1.5s",
+     "ice", 2, ["ability attack ice 1"]),
+    ("ice_3", "Shatter", "Frozen enemies take double damage and shatter when they die, freezing others",
+     "ice", 3, ["ability attack ice 1"]),
+    ("poison_1", "Venom", "Attacks poison: 25% of the hit per second for 4s, and slows. Stacks 4 times",
+     "poison", 1, ["ability attack poison 1"]),
+    ("poison_2", "Virulence", "Poison stacks up to 8 times and lasts 6s",
+     "poison", 2, ["ability attack poison 1"]),
+    ("poison_3", "Plague", "Poisoned enemies burst into toxic clouds that poison everything inside",
+     "poison", 3, ["ability attack poison 1"]),
+    ("lightning_1", "Static Charge", "Hits stagger enemies and zap the nearest one for 50% damage",
+     "lightning", 1, ["ability attack lightning 1"]),
+    ("lightning_2", "Arc Lightning", "Zaps chain through 3 enemies for 60% damage and stun them",
+     "lightning", 2, ["ability attack lightning 1"]),
+    ("lightning_3", "Thunderstrike", "Every 5th hit calls down a thunderbolt: triple damage, stun, chains 6",
+     "lightning", 3, ["ability attack lightning 1"]),
+]
+# Tier -> (rarity, weight bonus): once a chain is started its next tier shows
+# up about as often as a common card.
+ELEMENT_TIERS = {1: (RARE, 1.0), 2: (RARE, 2.5), 3: (EPIC, 8.0)}
+
 
 def q(s):
     return '"%s"' % s.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def main():
-    out = ['[gd_resource type="Resource" script_class="UpgradeLibrary" load_steps=%d format=3]' % (len(UPGRADES) + 3), ""]
+    out = ['[gd_resource type="Resource" script_class="UpgradeLibrary" load_steps=%d format=3]'
+           % (len(UPGRADES) + len(ELEMENTS) + 3), ""]
     out.append('[ext_resource type="Script" path="res://src/upgrades/upgrade_library.gd" id="1_library"]')
     out.append('[ext_resource type="Script" path="res://src/upgrades/upgrade_data.gd" id="2_upgrade"]')
     out.append("")
     ids = set()
-    for (uid, name, desc, rarity, stacks, hero, effects) in UPGRADES:
+    rows = [(uid, name, desc, rarity, stacks, hero, effects, {}) for
+            (uid, name, desc, rarity, stacks, hero, effects) in UPGRADES]
+    for (uid, name, desc, element, tier, effects) in ELEMENTS:
+        rarity, bonus = ELEMENT_TIERS[tier]
+        extra = {"element": element, "tier": tier, "weight_bonus": bonus}
+        if tier > 1:
+            extra["requires"] = "%s_%d" % (element, tier - 1)
+        rows.append((uid, name, desc, rarity, 1, "", effects, extra))
+    for (uid, name, desc, rarity, stacks, hero, effects, extra) in rows:
         assert uid not in ids, uid
         ids.add(uid)
         out.append('[sub_resource type="Resource" id="Resource_%s"]' % uid)
@@ -134,15 +175,23 @@ def main():
         out.append("max_stacks = %d" % stacks)
         out.append('hero_id = &"%s"' % hero)
         out.append("effects = PackedStringArray(%s)" % ", ".join(q(e) for e in effects))
+        if "requires" in extra:
+            out.append('requires = &"%s"' % extra["requires"])
+        if "element" in extra:
+            out.append('element = &"%s"' % extra["element"])
+            out.append("tier = %d" % extra["tier"])
+            out.append("weight_bonus = %s" % repr(float(extra["weight_bonus"])))
         out.append("")
+    for (uid, _n, _d, _r, _s, _h, _e, extra) in rows:
+        assert extra.get("requires", uid) in ids, "%s requires an unknown upgrade" % uid
     out.append("[resource]")
     out.append('script = ExtResource("1_library")')
-    refs = ", ".join('SubResource("Resource_%s")' % u[0] for u in UPGRADES)
+    refs = ", ".join('SubResource("Resource_%s")' % u[0] for u in rows)
     out.append('upgrades = Array[ExtResource("2_upgrade")]([%s])' % refs)
     path = os.path.join(os.path.dirname(__file__), "..", "src", "upgrades", "data", "upgrade_library.tres")
     with open(path, "w") as f:
         f.write("\n".join(out) + "\n")
-    print("wrote %d upgrades" % len(UPGRADES))
+    print("wrote %d upgrades" % len(rows))
 
 
 if __name__ == "__main__":

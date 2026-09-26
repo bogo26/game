@@ -5,7 +5,7 @@ extends Node2D
 ## the horde for ground effects and one above heroes. Replaced/augmented by
 ## sprite particles in the art pass.
 
-enum Kind { RING, DISC, SLASH, LINE, TELEGRAPH, ZONE, WARN_LINE }
+enum Kind { RING, DISC, SLASH, LINE, TELEGRAPH, ZONE, WARN_LINE, BOLT }
 
 const MAX_EFFECTS := 256
 
@@ -60,6 +60,11 @@ func slash(p: Vector2, radius: float, angle: float, arc: float, color: Color, du
 
 func line(a: Vector2, b: Vector2, color: Color, duration: float = 0.1) -> void:
 	_add(Kind.LINE, a, b, 1.0, duration, 0.0, 0.0, color)
+
+
+## Lightning between two points: a jagged line that flickers.
+func bolt(a: Vector2, b: Vector2, color: Color, duration: float = 0.12) -> void:
+	_add(Kind.BOLT, a, b, 1.0, duration, 0.0, 0.0, color)
 
 
 ## Warning line that stays solid until it fires (charges).
@@ -131,6 +136,16 @@ func _draw() -> void:
 				draw_circle(p, r * t, Color(c, 0.22), true, -1.0, false)
 			Kind.WARN_LINE:
 				draw_line(p, _pos2[i].round(), Color(c, 0.35 + 0.4 * t), r, false)
+			Kind.BOLT:
+				c.a *= 1.0 - t * t
+				var b := _pos2[i].round()
+				var side := (b - p).orthogonal().normalized()
+				var points := PackedVector2Array([p])
+				for k in range(1, 4):
+					points.append((p.lerp(b, k / 4.0) + side * randf_range(-4.0, 4.0)).round())
+				points.append(b)
+				draw_polyline(points, Color(c, c.a * 0.35), 3.0, false)
+				draw_polyline(points, c, 1.0, false)
 			Kind.ZONE:
 				var fade := clampf((1.0 - t) / 0.2, 0.0, 1.0)
 				draw_circle(p, r, Color(c, c.a * 0.25 * fade), true, -1.0, false)
