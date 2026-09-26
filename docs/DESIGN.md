@@ -92,6 +92,7 @@ Spawn director:
 - **Runs:** each player's picks are stored in `GameState` and re-applied when the next level builds the heroes again.
 - **Stats (`src/core/stats.gd`):** `value = (base + flat) × (1 + pct)`. The stat list is max HP, armor, move speed, damage, attack speed, crit chance, crit damage, pickup range, regen, ultimate charge rate, life on kill and revive speed.
 - **Pick screen controls:** each player picks in their own area: one centred panel, two halves, or four quadrants. Gamepads use left/right + A. Keyboard players use A/D or arrows + Enter, or the mouse. Bots pick after 0.6 s.
+- **Accidental-pick guard:** human input is ignored for the first 0.35 s after the cards appear, so a player mashing A (dash) or left-click (attack) can't pick one by accident.
 - Upgrades last for the whole run and reset on game over.
 - XP needed per level: `6·L^1.35 + 4·L`, scaled by `1 + 0.35 × (players − 1)` (see `src/core/xp_curve.gd`).
 
@@ -130,7 +131,11 @@ Spawn director:
   - HP is 1800 × level multiplier × player-count scaling. It is immune to stun and slow.
 - **Screens:** Main menu → Character select → Game (levels) → End screen (victory/defeat + stats) → Play again / Main menu.
   - **Main menu:** Start Run, Test Room (drop-in sandbox), Quit. Menus use Godot focus navigation, so keyboard, any gamepad or mouse all work.
-  - **Character select:** 4 quadrants. Press A/Enter to join, left/right to browse the 8-hero roster (unreleased heroes show "Coming soon"), A to ready and B to un-ready or leave. The run starts 1.5 s after everyone is ready.
+  - **Character select:** 4 quadrants.
+    - Press A/Enter to join (holding that button doesn't also ready you up).
+    - Left/right to browse the 8-hero roster.
+    - A/Enter to ready, B/Esc to un-ready or leave.
+    - When everyone who joined is ready, any of them presses A/Enter (or Start on a gamepad) to begin. There is no countdown.
   - **`Game`:** builds a `World` per level, shows "LEVEL n" and "LEVEL CLEAR!" banners, and banks stats. A team wipe means defeat; the boss's death means victory.
   - **Pause:** Start or Esc opens it for any player, with Resume and Quit to menu. The press that closes it can't also trigger a dash.
 - **Shared camera:** follows the middle of the group with fixed zoom, and players can't leave the screen. The leash blocks the player who is running away rather than dragging the others along.
@@ -226,7 +231,7 @@ docs/         this document
 
 ### Input
 - `InputRouter` (autoload) owns four `PlayerInput` slots and polls hardware directly, not through the InputMap. That keeps any mix of keyboard and gamepads separated per player.
-- It reports join presses from unassigned devices.
+- It reports join presses from unassigned devices. The button used to join counts as already held, so it doesn't also trigger "ready" in menus or a dash in game.
 - It handles hot-plug: an unplugged pad pauses the game, and a new device pressing A takes over the disconnected player.
 - Menus navigate per player through `PlayerInput.ui_pressed()`, not Godot's global focus.
 

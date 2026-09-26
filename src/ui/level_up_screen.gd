@@ -9,6 +9,9 @@ signal closed
 
 const CARD_COUNT := 3
 const BOT_PICK_DELAY := 0.6
+## Human input is ignored briefly when cards appear, so a button mashed for
+## combat (A is also dash) can't pick a card by accident.
+const INPUT_GRACE := 0.35
 const MARGIN := 6.0
 const TITLE_HEIGHT := 20.0
 
@@ -20,6 +23,7 @@ class Picker:
 	var picked := false
 	var chosen: UpgradeData
 	var bot_timer := 0.0
+	var grace := INPUT_GRACE
 	var panel: Panel
 	var cards: Array[Panel] = []
 	var status: Label
@@ -112,6 +116,9 @@ func _handle_input(pk: Picker, delta: float) -> void:
 		pk.bot_timer += delta
 		if pk.bot_timer >= BOT_PICK_DELAY:
 			_confirm(pk, randi() % n)
+		return
+	if pk.grace > 0.0:
+		pk.grace -= delta
 		return
 	if input.ui_pressed(PlayerInput.Action.UI_LEFT):
 		pk.selected = (pk.selected - 1 + n) % n
@@ -246,7 +253,7 @@ func _refresh(pk: Picker) -> void:
 func _on_card_input(event: InputEvent, pk: Picker, index: int) -> void:
 	var click := event as InputEventMouseButton
 	if click and click.pressed and click.button_index == MOUSE_BUTTON_LEFT \
-			and pk.hero.input.uses_mouse and not pk.picked:
+			and pk.hero.input.uses_mouse and not pk.picked and pk.grace <= 0.0:
 		_confirm(pk, index)
 
 

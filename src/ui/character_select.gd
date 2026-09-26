@@ -1,7 +1,8 @@
 extends Control
 ## Character select. Up to 4 players join with their own device (A / Enter),
 ## browse the roster with left/right, and ready up with A / Enter; B / Esc
-## un-readies or leaves. The run starts once every joined player is ready.
+## un-readies or leaves. Once every joined player is ready, any of them starts
+## the run with A / Enter (or Start on a gamepad) - there is no timer.
 ## With nobody joined, B / Esc returns to the main menu.
 
 const ROSTER: Array[StringName] = [
@@ -11,7 +12,6 @@ const HERO_DATA := "res://src/heroes/data/%s.tres"
 const HERO_SHEET := "res://assets/sprites/heroes/%s.png"
 const GAME_SCENE := "res://src/main/game.tscn"
 const MAIN_MENU := "res://src/ui/main_menu.tscn"
-const START_DELAY := 1.5
 const MARGIN := 6.0
 const TITLE_HEIGHT := 22.0
 const SLOT_TAGS: Array[String] = ["ATK", "SPC", "MOV", "ULT"]
@@ -31,7 +31,9 @@ class SlotView:
 var _choice: Array[int] = [0, 1, 2, 3]
 var _is_ready: Array[bool] = [false, false, false, false]
 var _views: Array[SlotView] = []
-var _countdown := -1.0
+## Scene started when the players begin the run (tests clear it).
+var game_scene := GAME_SCENE
+var started := false
 var _title: Label
 var _footer: Label
 var _back_prev: Dictionary = {}
@@ -75,7 +77,7 @@ func _process(delta: float) -> void:
 		if p.is_assigned():
 			_handle_player(i, p)
 	_handle_unassigned_back()
-	_update_countdown(delta)
+	_update_footer()
 
 
 func _on_join_requested(device: int) -> void:
@@ -91,10 +93,15 @@ func _on_join_requested(device: int) -> void:
 
 
 func _handle_player(slot: int, p: PlayerInput) -> void:
+	if started:
+		return
 	if _is_ready[slot]:
 		if p.just_pressed(PlayerInput.Action.UI_BACK):
 			_is_ready[slot] = false
 			_refresh(slot)
+			Audio.play(&"ui_move")
+		elif _start_pressed(p) and _all_ready():
+			_start_run(InputRouter.assigned_slots())
 		return
 	var changed := false
 	if p.ui_pressed(PlayerInput.Action.UI_LEFT):
@@ -128,30 +135,43 @@ func _handle_unassigned_back() -> void:
 			get_tree().change_scene_to_file(MAIN_MENU)
 
 
-func _update_countdown(delta: float) -> void:
+func _all_ready() -> bool:
 	var joined := InputRouter.assigned_slots()
-	var all_ready := not joined.is_empty()
+	if joined.is_empty():
+		return false
 	for slot in joined:
-		all_ready = all_ready and _is_ready[slot]
-	if not all_ready:
-		_countdown = -1.0
-		_footer.text = "Press ENTER / (A) to join  -  up to 4 players" if joined.size() < 4 else "Waiting for everyone to ready up"
-		return
-	if _countdown < 0.0:
-		_countdown = START_DELAY
-	_countdown -= delta
-	_footer.text = "Starting in %d..." % ceili(maxf(_countdown, 0.0))
-	if _countdown <= 0.0:
-		_start_run(joined)
+		if not _is_ready[slot]:
+			return false
+	return true
+
+
+## A / Enter, or Start on a gamepad (Esc is "back" for keyboard players).
+static func _start_pressed(p: PlayerInput) -> bool:
+	return p.just_pressed(PlayerInput.Action.UI_ACCEPT) \
+		or (p.device >= 0 and p.just_pressed(PlayerInput.Action.PAUSE))
+
+
+func _update_footer() -> void:
+	var joined := InputRouter.assigned_slots()
+	if joined.is_empty():
+		_footer.text = "Press ENTER / (A) to join  -  up to 4 players"
+	elif _all_ready():
+		_footer.text = "Everyone ready!  Press ENTER / (A) / START to begin"
+	elif joined.size() < 4:
+		_footer.text = "More players: press ENTER / (A) to join  -  ready up with ENTER / (A)"
+	else:
+		_footer.text = "Waiting for everyone to ready up"
 
 
 func _start_run(joined: Array[int]) -> void:
-	set_process(false)
+	started = true
+	Audio.play(&"ui_confirm")
 	GameState.reset_run()
 	for slot in joined:
 		GameState.slots[slot].hero_id = ROSTER[_choice[slot]]
 	GameState.level_index = 0
-	get_tree().change_scene_to_file(GAME_SCENE)
+	if game_scene != "":
+		get_tree().change_scene_to_file(game_scene)
 
 
 # --- widgets ---------------------------------------------------------------------------------
@@ -264,7 +284,7 @@ func _refresh(slot: int) -> void:
 		var a := abilities[i]
 		v.abilities[i].text = "%s %s: %s" % [SLOT_TAGS[i], a.display_name, a.description]
 	if _is_ready[slot]:
-		v.hint.text = "READY!   ESC / (B) to change"
+		v.hint.text = "READY!  %s to change" % ("ESC" if p.device == PlayerInput.DEVICE_KEYBOARD else "(B)")
 	elif p.uses_mouse or p.device == PlayerInput.DEVICE_KEYBOARD:
 		v.hint.text = "A/D browse   ENTER ready   ESC leave"
 	else:

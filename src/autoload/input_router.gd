@@ -72,6 +72,7 @@ func assign(slot: int, device: int) -> void:
 	p.clear()
 	p.device = device
 	p.connected = true
+	_treat_held_as_old(p)
 	Events.player_joined.emit(slot)
 
 
@@ -144,12 +145,21 @@ func _poll_join_requests() -> void:
 		# over that player instead of creating a new one.
 		var lost := _first_disconnected_slot()
 		if lost != -1:
+			players[lost].clear()
 			players[lost].device = d
 			players[lost].connected = true
-			players[lost].clear()
+			_treat_held_as_old(players[lost])
 			Events.player_device_restored.emit(lost)
 		else:
 			join_requested.emit(d)
+
+
+## The button a player joins with is usually still held on the next frame.
+## Record the device's current state as "already held" so it doesn't also
+## count as a fresh press (e.g. A = join would otherwise also ready up / dash).
+static func _treat_held_as_old(p: PlayerInput) -> void:
+	p.poll(0.0)
+	p.consume_presses()
 
 
 func _join_button_down(device: int) -> bool:
