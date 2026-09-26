@@ -56,6 +56,10 @@ var fixed_hp_multiplier := FIXED_HP_SOLO
 var level_hp_multiplier := 1.0
 ## Relative spawn weight per enemy type index.
 var weights := PackedFloat32Array()
+## Chance that a corridor or arena spawn arrives as an elite (0 = never; see
+## Elites), and each ordinary type's elite versions.
+var elite_chance := 0.0
+var _elite_types: Dictionary = {}  # base type index -> PackedInt32Array of elite type indices
 
 var _budget := 0.0
 var _recycle_in := RECYCLE_INTERVAL
@@ -76,6 +80,34 @@ func setup(p_horde: HordeSim, p_grid: LevelGrid, p_flow: FlowField, hints: Array
 	weights.fill(0.0)
 	if weights.size() > 0:
 		weights[0] = 1.0
+	_elite_types.clear()
+	for t in horde.types.size():
+		if horde.t_elite[t] != 0:
+			var base := horde.t_base[t]
+			if not _elite_types.has(base):
+				_elite_types[base] = PackedInt32Array()
+			_elite_types[base].append(t)
+
+
+## Maybe turns a spawn of type `t` into one of its elites (never more than
+## Elites.MAX_ALIVE at once).
+func maybe_elite(t: int) -> int:
+	if elite_chance <= 0.0 or not _elite_types.has(t) or _rng.randf() >= elite_chance:
+		return t
+	if elites_alive() >= Elites.MAX_ALIVE:
+		return t
+	var options: PackedInt32Array = _elite_types[t]
+	return options[_rng.randi_range(0, options.size() - 1)]
+
+
+func elites_alive() -> int:
+	var n := 0
+	for base: int in _elite_types:
+		for t in _elite_types[base]:
+			n += horde.count_of_type(t)
+	for k in _pending_type.size():
+		n += 1 if horde.t_elite[_pending_type[k]] != 0 else 0
+	return n
 
 
 func effective_hp_multiplier() -> float:
@@ -146,11 +178,12 @@ func tick(dt: float, view: Rect2, hero_positions: PackedVector2Array) -> void:
 			else find_arena_point(hero_positions)
 		if not p.is_finite():
 			continue
+		var t := maybe_elite(pick_type())
 		if mode == Mode.ARENA:
-			queue_spawn(pick_type(), p, effective_hp_multiplier())  # on screen: through a portal
+			queue_spawn(t, p, effective_hp_multiplier())  # on screen: through a portal
 			arena_remaining -= 1
 		else:
-			horde.spawn(pick_type(), p, effective_hp_multiplier())
+			horde.spawn(t, p, effective_hp_multiplier())
 		alive += 1
 		_budget -= 1.0
 	if mode == Mode.CORRIDOR:

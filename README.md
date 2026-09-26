@@ -76,9 +76,13 @@ Upgrades include four **elemental chains** for your attack: fire, ice, poison an
 
 **Test Room** on the main menu is a drop-in sandbox with an endless horde and one of everything. Add `-- --upgrades=fire_3,ice_2` to `./tools/dev.sh run` to start with those upgrades and the tiers before them.
 
+**Replaying:** pick Casual, Normal or Hard in character select (LB / RB or Q / E; Hard unlocks after a Normal win). Every run picks one of two layouts for each level and may mirror it, and from the second level on some enemies arrive as elites (Swift, Volatile, Splitting). The end screen shows everyone's numbers and awards, and records best times.
+
+Debug flags (after `--`): `--level=3`, `--bots=4`, `--heroes=rogue,mage`, `--layout=b`, `--mirror=hv`, `--elite-chance=0.3`, `--debug-levelups=2`, `--show-map`.
+
 ## Status
 
-Milestone 10 (map features) is done: minimap, terrain, props, chests, shrines, level themes and redesigned levels.
+Milestone 11 (player-experience pass) is done: run-flow fixes, readable telegraphs and spawns, hit and low-HP feedback, arena waves, team lives, an options screen with accessibility settings, button prompts for every controller, difficulty and records, map variety and elite enemies.
 
 Milestone 9 (exports) is prepared:
 - macOS + Windows presets, an app icon and `./tools/dev.sh export`.

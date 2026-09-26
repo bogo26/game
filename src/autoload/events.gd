@@ -34,3 +34,15 @@ signal team_level_up(team_level: int)
 signal level_started(level_index: int)
 signal level_completed(level_index: int)
 signal run_finished(victory: bool)
+
+
+## Cuts every connection from the global signal sources (this bus, the
+## InputRouter, Settings) to `target`. A level leaving the game calls this, so
+## one that's only queued for deletion can't still react (count a down twice).
+func disconnect_all(target: Object) -> void:
+	for source: Object in [self, InputRouter, Settings]:
+		for sig in source.get_signal_list():
+			for connection in source.get_signal_connection_list(sig["name"]):
+				var callable: Callable = connection["callable"]
+				if callable.get_object() == target:
+					source.disconnect(sig["name"], callable)

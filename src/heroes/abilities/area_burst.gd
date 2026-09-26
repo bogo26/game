@@ -88,7 +88,7 @@ func _land(p: Vector2) -> void:
 	if delay > 0.0:
 		Audio.play(&"explosion")
 	if revive_allies:
-		w.revive_all(0.5)
+		w.revive_all(0.5, hero.slot)
 	w.shake(4.0 if radius >= 60.0 or target == Target.SCREEN else 2.0)
 
 

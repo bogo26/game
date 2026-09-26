@@ -110,6 +110,9 @@ var t_blast_damage := PackedFloat32Array()
 var t_fuse := PackedFloat32Array()
 ## 1 for types that never walk on their own (bosses, breakable objects, nests).
 var t_static := PackedByteArray()
+var t_scale := PackedFloat32Array()      # drawn size (elites are bigger)
+var t_elite := PackedByteArray()         # Elites.Trait, 0 for ordinary enemies
+var t_base := PackedInt32Array()         # the ordinary kind an elite is made from (itself otherwise)
 var max_radius := 0.0
 ## Largest hurtbox among the enemies that exist right now: how far around a
 ## shot to look for bodies. A boss widens it only while it's alive.
@@ -122,6 +125,8 @@ var kill_type := PackedInt32Array()
 var kill_slot := PackedInt32Array()
 ## Damage dealt per player slot since the last drain (ultimate charge).
 var damage_by_slot := PackedFloat32Array([0, 0, 0, 0])
+## Biggest single hit per player slot since the World last read it.
+var biggest_hit_by_slot := PackedFloat32Array([0, 0, 0, 0])
 ## Hits since the last drain (position, damage) for sparks and numbers.
 var hit_pos := PackedVector2Array()
 var hit_amount := PackedFloat32Array()
@@ -134,6 +139,8 @@ var shots_fired := 0
 var view_rect := Rect2()
 ## Strength of the white hit flash (lower with "reduce flashing").
 var flash_strength := 1.0
+## Difficulty: multiplies every hit enemies deal (contact, shots, blasts).
+var damage_mult := 1.0
 ## Exploders whose fuse lit this frame (uids), and ranged enemies that started
 ## winding up a shot (positions), for the World's warnings.
 var fuse_uids := PackedInt32Array()
@@ -219,6 +226,9 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	t_blast_damage.clear()
 	t_fuse.clear()
 	t_static.clear()
+	t_scale.clear()
+	t_elite.clear()
+	t_base.clear()
 	max_radius = 0.0
 	for data in types:
 		t_speed.append(data.speed)
@@ -241,11 +251,25 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 		t_blast_damage.append(data.explosion_damage)
 		t_fuse.append(data.fuse_time)
 		t_static.append(1 if data.is_static() else 0)
+		t_scale.append(data.draw_scale)
+		t_elite.append(data.elite_trait)
 		max_radius = maxf(max_radius, data.radius)
+	for t in types.size():
+		var base := type_index(types[t].base_id) if types[t].base_id != &"" else t
+		t_base.append(base if base >= 0 else t)
 	_type_count.resize(types.size())
 	_type_count.fill(0)
 	_refresh_hurt_reach()
 	hash.setup(grid.size_px(), HASH_CELL, CAPACITY)
+
+
+## Enemies of type `t` (alive or not yet removed).
+func count_of_type(t: int) -> int:
+	return _type_count[t]
+
+
+func is_elite(i: int) -> bool:
+	return t_elite[type[i]] != 0
 
 
 func type_index(id: StringName) -> int:
@@ -359,6 +383,8 @@ func damage(i: int, amount: float, knockback: Vector2, source_slot: int, crit: b
 		vel[i] += knockback * t_knockback[type[i]]
 	if source_slot >= 0 and source_slot < damage_by_slot.size():
 		damage_by_slot[source_slot] += minf(amount, h)
+		if amount > biggest_hit_by_slot[source_slot]:
+			biggest_hit_by_slot[source_slot] = amount
 	if remaining <= 0.0:
 		kill_pos.append(pos[i])
 		kill_type.append(type[i])
@@ -714,7 +740,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 						wind = cooldown_t[t] - WINDUP_TIME
 						if projectiles != null and grid.line_of_sight(p, tp):
 							var aim := (tp - p) / maxf(dist, 0.001)
-							projectiles.spawn(p + Vector2(0, -8), aim * shot_speed_t[t], shot_damage_t[t], 3.0,
+							projectiles.spawn(p + Vector2(0, -8), aim * shot_speed_t[t], shot_damage_t[t] * damage_mult, 3.0,
 								attack_range * 1.6 / shot_speed_t[t], ProjectileSim.Team.ENEMY, -1,
 								ProjectileSim.Look.SPIT)
 							shots_fired += 1
@@ -745,7 +771,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 					if fuse <= 0.0:
 						blast_pos.append(p)
 						blast_radius.append(blast_radius_t[t])
-						blast_damage.append(blast_damage_t[t])
+						blast_damage.append(blast_damage_t[t] * damage_mult)
 						HP[i] = 0.0
 						kill_pos.append(p)
 						kill_type.append(t)
@@ -967,7 +993,7 @@ func contact_damage_at(center: Vector2, body_radius: float) -> float:
 			var rr := body_radius + t_radius[t]
 			if center.distance_squared_to(pos[j]) <= rr * rr:
 				worst = maxf(worst, t_damage[t])
-	return worst
+	return worst * damage_mult
 
 
 # --- rendering -------------------------------------------------------------------------
@@ -1009,12 +1035,13 @@ func render(layer: InstanceLayer) -> void:
 		if t_behavior[t] == EnemyData.Behavior.BOSS:
 			continue  # drawn by its controller node
 		var o := w * InstanceLayer.STRIDE
-		var size := 1.0
+		var fade := 1.0
 		if FALLS[i] > 0.0:
-			size = FALLS[i] / FALL_TIME  # shrinks and fades into the chasm
+			fade = FALLS[i] / FALL_TIME  # shrinks and fades into the chasm
+		var size := t_scale[t] * fade
 		buf[o] = FC[i] * size
 		buf[o + 5] = size
-		buf[o + 11] = size
+		buf[o + 11] = fade
 		buf[o + 3] = roundf(p.x)
 		buf[o + 7] = roundf(p.y)
 		var frame := frame0[t]
@@ -1043,7 +1070,8 @@ func render(layer: InstanceLayer) -> void:
 			tint = Tint.CHILL
 		if beh == EnemyData.Behavior.RANGED and state[i] == 1 and STN[i] <= 0.0:
 			tint = Tint.CHARGING
-		buf[o + 10] = float(tint)
+		# Elites add their trait x 10: the shader draws their outline from it.
+		buf[o + 10] = float(tint + t_elite[t] * 10)
 		w += 1
 	layer.buffer = buf
 	layer.commit(w)

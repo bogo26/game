@@ -6,8 +6,18 @@ const MAX_PLAYERS := 4
 ## Pick rounds that don't come from a team level-up.
 const TREASURE_ROUND := 0
 const BONUS_ROUND := -1
-## Team lives at the start of every level.
+## Team lives at the start of every level (on Normal; see DIFFICULTY).
 const LIVES_PER_LEVEL := 1
+
+enum Difficulty { CASUAL, NORMAL, HARD }
+const DIFFICULTY_NAMES: Array[String] = ["Casual", "Normal", "Hard"]
+## Per difficulty: enemy HP, enemy damage, spawn rate, team lives per level
+## and how often elites appear.
+const DIFFICULTY: Array[Dictionary] = [
+	{"hp": 0.75, "damage": 0.7, "spawn": 0.8, "lives": 2, "elites": 0.5},
+	{"hp": 1.0, "damage": 1.0, "spawn": 1.0, "lives": LIVES_PER_LEVEL, "elites": 1.0},
+	{"hp": 1.3, "damage": 1.3, "spawn": 1.2, "lives": 0, "elites": 2.0},
+]
 const PLAYER_COLORS: Array[Color] = [
 	Color("e8504a"),  # P1 red
 	Color("4c93f2"),  # P2 blue
@@ -32,6 +42,21 @@ class PlayerSlot:
 	var upgrades: Array[StringName] = []
 	## Ultimate charge carried from one level to the next.
 	var ult_charge := 0.0
+	## This run's numbers (end screen and awards).
+	var kills := 0
+	var damage_dealt := 0.0
+	var damage_taken := 0.0
+	var downs := 0
+	var revives := 0
+	var biggest_hit := 0.0
+
+	func reset_stats() -> void:
+		kills = 0
+		damage_dealt = 0.0
+		damage_taken = 0.0
+		downs = 0
+		revives = 0
+		biggest_hit = 0.0
 
 	func _init(p_slot: int) -> void:
 		slot = p_slot
@@ -64,6 +89,15 @@ var debug_picks_given := false
 ## Team lives left this level: a wipe with one left is a Second Wind (everyone
 ## gets back up) instead of the end of the run. Refilled every level.
 var team_lives := 0
+var difficulty: Difficulty = Difficulty.NORMAL
+## Records between runs (best times, wins, Hard unlocked, hero stars).
+var profile := Profile.new()
+## What the last finished run set (end screen): see Profile.record_run().
+var last_run_news: Dictionary = {}
+## The end screen's "Change heroes": character select keeps everyone joined.
+var keep_team := false
+## Picks each level's layout and mirroring for this run (RunConfig.layout_for).
+var run_seed := 0
 ## Second Winds used this run (end screen).
 var lives_used := 0
 ## Run statistics (shown on the end screen).
@@ -80,6 +114,15 @@ func _init() -> void:
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	profile = Profile.load_profile()
+
+
+func difficulty_value(key: String) -> float:
+	return float(DIFFICULTY[difficulty][key])
+
+
+func lives_per_level() -> int:
+	return int(DIFFICULTY[difficulty]["lives"])
 
 
 func player_color(slot: int) -> Color:
@@ -126,16 +169,18 @@ func reset_run() -> void:
 	level_index = 0
 	pending_rounds.clear()
 	debug_picks_given = false
-	team_lives = LIVES_PER_LEVEL
+	team_lives = lives_per_level()
 	lives_used = 0
 	run_kills = 0
 	run_time = 0.0
 	levels_cleared = 0
 	last_run_victory = false
 	run_active = true
+	run_seed = randi()
 	for s in slots:
 		s.upgrades.clear()
 		s.ult_charge = 0.0
+		s.reset_stats()
 	Events.xp_changed.emit(xp, xp_to_next(), team_level)
 
 

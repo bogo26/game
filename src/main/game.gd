@@ -52,8 +52,8 @@ func _load_level() -> void:
 		world.queue_free()
 	# Never carry a pause into the new level (only an unplugged pad keeps it).
 	get_tree().paused = InputRouter.has_disconnected_player()
-	var data := run.levels[GameState.level_index]
-	GameState.team_lives = GameState.LIVES_PER_LEVEL
+	var data := _layout(GameState.level_index)
+	GameState.team_lives = GameState.lives_per_level()
 	world = (load(WORLD_SCENE) as PackedScene).instantiate()
 	world.level_data = data
 	world.run_mode = true
@@ -68,6 +68,24 @@ func _load_level() -> void:
 	Audio.play_music(&"dungeon")
 	var title := "FINAL LEVEL" if data.is_boss_level else "LEVEL %d" % (GameState.level_index + 1)
 	_show_banner(title, data.display_name)
+
+
+## This run's layout for a level (see RunConfig.layout_for); --layout=a|b and
+## --mirror=none|h|v|hv pin it (debugging, screenshots).
+func _layout(index: int) -> LevelData:
+	var pinned_layout := ""
+	var pinned_mirror := ""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--layout="):
+			pinned_layout = arg.get_slice("=", 1)
+		elif arg.begins_with("--mirror="):
+			pinned_mirror = arg.get_slice("=", 1)
+	if pinned_layout == "" and pinned_mirror == "":
+		return run.layout_for(index, GameState.run_seed)
+	var data := run.levels[index]
+	if pinned_layout == "b" and index < run.alternates.size() and run.alternates[index]:
+		data = run.alternates[index]
+	return data.mirrored(pinned_mirror.contains("h"), pinned_mirror.contains("v") and not data.is_boss_level)
 
 
 func _show_banner(title: String, subtitle: String) -> void:
@@ -150,6 +168,11 @@ func _stop_interruptions() -> void:
 func _end(victory: bool) -> void:
 	GameState.last_run_victory = victory
 	GameState.run_active = false
+	var heroes: Array = []
+	for s in GameState.slots:
+		if s.hero_id != &"" and InputRouter.get_player(s.slot).is_assigned():
+			heroes.append(s.hero_id)
+	GameState.last_run_news = GameState.profile.record_run(victory, GameState.difficulty, GameState.run_time, heroes)
 	get_tree().paused = false
 	get_tree().change_scene_to_file(END_SCENE)
 

@@ -51,6 +51,13 @@ enum OnDeath {
 @export var atlas_row := 0
 @export var walk_frames := 4
 @export var anim_fps := 8.0
+## Drawn this much bigger (elites).
+@export var draw_scale := 1.0
+
+@export_group("Elite")
+## Elites.Trait (0 = an ordinary enemy) and the kind it's an elite of.
+@export var elite_trait := 0
+@export var base_id: StringName = &""
 
 
 ## Doesn't walk on its own: moved by a controller (boss) or fixed in place.

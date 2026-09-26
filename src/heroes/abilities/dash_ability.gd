@@ -134,6 +134,8 @@ func _tick_active(delta: float) -> void:
 				_healed[ally.slot] = true
 				if ally.is_downed():
 					ally.add_revive_progress(Hero.REVIVE_TIME * 0.5)
+					if not ally.is_downed():
+						GameState.slots[hero.slot].revives += 1
 				else:
 					ally.heal(heal_amount)
 				w.fx.disc(ally.position + Vector2(0, -6), 10.0, Color(1, 0.95, 0.5, 0.6), 0.3)

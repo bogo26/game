@@ -146,6 +146,8 @@ var blessing_left := 0.0
 var blessing_color := Color.WHITE
 ## Barrel blasts waiting to go off: [position, radius, damage, slot, delay].
 var _pending_blasts: Array[Array] = []
+## Volatile elites that died: [position, seconds until they blow].
+var _volatile_blasts: Array[Array] = []
 ## Exploders with a lit fuse (uids) and where they were last seen in the horde.
 var _lit_fuses := PackedInt32Array()
 var _lit_hints := PackedInt32Array()
@@ -199,6 +201,7 @@ func _ready() -> void:
 	var enemy_types: Array[EnemyData] = []
 	for path in ENEMY_TYPES:
 		enemy_types.append(load(path) as EnemyData)
+	enemy_types.append_array(Elites.variants(enemy_types))
 	flow.setup(grid)
 	horde.setup(grid, flow, enemy_types)
 	horde.projectiles = projectiles
@@ -266,6 +269,7 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	flow.finish()
+	Events.disconnect_all(self)
 
 
 func spawn_hero(slot: int) -> Hero:
@@ -334,6 +338,7 @@ func _process(delta: float) -> void:
 	_apply_projectile_hits()
 	_update_zones(dt)
 	_update_barrel_blasts(dt)
+	_update_volatile_blasts(dt)
 	var t_projectiles := Time.get_ticks_usec()
 
 	_emit_hit_effects()
@@ -463,11 +468,15 @@ func heal_heroes(center: Vector2, radius: float, fraction: float) -> void:
 			fx.disc(hero.position + Vector2(0, -6), 8.0, Color(0.5, 1.0, 0.5, 0.6), 0.3)
 
 
-func revive_all(hp_fraction: float) -> void:
+## Revives every downed hero; `credit_slot` (a Cleric's Divine Light) is
+## credited with the revives.
+func revive_all(hp_fraction: float, credit_slot: int = -1) -> void:
 	for hero in heroes:
 		if hero.is_downed():
 			hero.revive(hp_fraction)
 			fx.ring(hero.position, 20.0, Color(1, 1, 0.6), 0.5)
+			if credit_slot >= 0 and credit_slot != hero.slot:
+				GameState.slots[credit_slot].revives += 1
 
 
 func add_minion(minion: Minion) -> void:
@@ -557,6 +566,11 @@ func _update_revives(dt: float) -> void:
 			hero.add_revive_progress(dt * speed)
 			if hero.is_downed():  # a rising tone while it fills
 				Audio.play(&"revive_tick", -3.0, 0.8 + 0.7 * hero.revive_progress / Hero.REVIVE_TIME)
+			else:  # back up: everyone who stood by gets the credit
+				for other in heroes:
+					if other != hero and not other.is_downed() \
+							and other.position.distance_to(hero.position) <= Hero.REVIVE_RADIUS:
+						GameState.slots[other.slot].revives += 1
 		else:
 			hero.revive_progress = maxf(0.0, hero.revive_progress - dt * REVIVE_DECAY)
 			if _someone_standing():
@@ -713,6 +727,43 @@ func _break_object(p: Vector2, t: int, killer: int) -> void:
 				pickups.spawn(p + Vector2(0, 3), PickupSim.Kind.HEART, 1)
 
 
+## An elite died: Volatile ones blow up a moment later, Splitting ones break
+## into ordinary enemies of their kind.
+func _elite_died(p: Vector2, t: int) -> void:
+	match horde.t_elite[t]:
+		Elites.Trait.VOLATILE:
+			_volatile_blasts.append([p, Elites.VOLATILE_DELAY])
+			warn_fx.telegraph(p, Elites.VOLATILE_RADIUS + Hero.RADIUS, FxLayer.DANGER, Elites.VOLATILE_DELAY)
+			Audio.play(&"fuse")
+		Elites.Trait.SPLITTING:
+			var base := horde.t_base[t]
+			for k in Elites.SPLIT_COUNT:
+				var spot := grid.nearest_open(p + Vector2.from_angle(TAU * k / Elites.SPLIT_COUNT) * 10.0)
+				horde.spawn(base, spot, spawner.effective_hp_multiplier())
+			particles.burst(p - Vector2(0, 8), 16, _enemy_color(t), 110.0, 0.5, 3)
+
+
+func _update_volatile_blasts(dt: float) -> void:
+	var k := 0
+	while k < _volatile_blasts.size():
+		var blast := _volatile_blasts[k]
+		blast[1] = float(blast[1]) - dt
+		if float(blast[1]) > 0.0:
+			k += 1
+			continue
+		_volatile_blasts.remove_at(k)
+		var p: Vector2 = blast[0]
+		var r := Elites.VOLATILE_RADIUS
+		for hero in heroes:
+			if hero.position.distance_to(p) <= r + Hero.RADIUS and grid.line_of_sight(p, hero.position):
+				hero.take_hit(Elites.VOLATILE_DAMAGE * horde.damage_mult)
+		fx.disc(p, r, Color(1.0, 0.55, 0.2, 0.7), 0.25)
+		fx.ring(p, r * 1.15, Color(1.0, 0.9, 0.5), 0.3)
+		particles.burst(p, 18, Color(1.0, 0.6, 0.2), 140.0, 0.5, 4, Vector2.ZERO, TAU, 0.0, 3.0)
+		shake(2.5)
+		Audio.play(&"explosion")
+
+
 func _update_barrel_blasts(dt: float) -> void:
 	var i := 0
 	while i < _pending_blasts.size():
@@ -747,7 +798,7 @@ func _update_spikes(dt: float) -> void:
 func _stab(group: int) -> void:
 	for hero in heroes:
 		if hero.is_targetable() and spikes.is_in_group(hero.position, group):
-			hero.take_hit(SpikeTraps.HERO_DAMAGE)
+			hero.take_hit(SpikeTraps.HERO_DAMAGE * horde.damage_mult)
 	var damage := SpikeTraps.ENEMY_DAMAGE * spawner.effective_hp_multiplier()
 	for i in horde.count:
 		if horde.hp[i] > 0.0 and horde.is_mobile(i) and spikes.is_in_group(horde.pos[i], group):
@@ -845,7 +896,7 @@ func _update_zones(dt: float) -> void:
 
 
 func _enemy_color(type_index: int) -> Color:
-	return ENEMY_COLORS.get(horde.types[type_index].id, Color(0.8, 0.8, 0.8))
+	return ENEMY_COLORS.get(horde.types[horde.t_base[type_index]].id, Color(0.8, 0.8, 0.8))
 
 
 func _emit_hit_effects() -> void:
@@ -879,6 +930,7 @@ func _emit_hit_effects() -> void:
 
 func _on_hero_damaged(slot: int, amount: float) -> void:
 	Audio.play(&"hurt", 0.0, HURT_PITCH[slot % HURT_PITCH.size()])
+	GameState.slots[slot].damage_taken += amount
 	var hero := hero_for_slot(slot)
 	if hero:
 		var big := amount >= hero.max_hp * BIG_HIT_SHARE
@@ -968,23 +1020,33 @@ func _process_kills() -> void:
 			var hero := hero_for_slot(killer)
 			if hero:
 				hero.on_kill()
+				GameState.slots[killer].kills += 1
 		if killer != HordeSim.SELF_KILL:
 			var drop := grid.nearest_open(p) if grid.is_solid_at(p) else p  # fell into a chasm
 			pickups.spawn(drop, PickupSim.Kind.XP, horde.t_xp[t])
-			if _rng.randf() < HEART_DROP_CHANCE:
+			var heart_chance := Elites.HEART_CHANCE if horde.t_elite[t] != 0 else HEART_DROP_CHANCE
+			if _rng.randf() < heart_chance:
 				pickups.spawn(drop + Vector2(4, 0), PickupSim.Kind.HEART, 1)
+		if horde.t_elite[t] != 0:
+			_elite_died(p, t)
 		Events.enemy_killed.emit(p, t, killer)
 	horde.clear_kill_log()
 
 
 func _apply_ult_charge() -> void:
 	var dealt := horde.damage_by_slot
+	var biggest := horde.biggest_hit_by_slot
 	for hero in heroes:
 		if hero.slot < dealt.size() and dealt[hero.slot] > 0.0:
 			hero.add_ult_charge(dealt[hero.slot])
 			hero.on_damage_dealt(dealt[hero.slot])
+			var stats := GameState.slots[hero.slot]
+			stats.damage_dealt += dealt[hero.slot]
+			stats.biggest_hit = maxf(stats.biggest_hit, biggest[hero.slot])
 	dealt.fill(0.0)
 	horde.damage_by_slot = dealt
+	biggest.fill(0.0)
+	horde.biggest_hit_by_slot = biggest
 
 
 func _apply_pickups() -> void:
@@ -1067,6 +1129,7 @@ func tip(id: StringName, text: String) -> void:
 
 
 func _on_hero_downed_tip(slot: int) -> void:
+	GameState.slots[slot].downs += 1
 	if heroes.size() > 1 and _someone_standing():
 		tip(&"revive", "P%d is down! Stand next to them to revive them" % (slot + 1))
 

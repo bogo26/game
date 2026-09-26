@@ -18,59 +18,98 @@ func test_run_config_lists_the_run() -> void:
 
 
 func test_every_level_is_connected_and_complete() -> void:
-	for data in RunConfig.load_default().levels:
-		var level := _build(data)
-		var g := level.grid
-		assert_false(level.player_spawns.is_empty(), "%s has a player spawn" % data.display_name)
-		for room: int in level.room_cells:
-			assert_true(level.room_doors.has(room), "%s arena %d has doors" % [data.display_name, room])
-		if data.is_boss_level:
-			assert_false(level.boss_spawns.is_empty(), "boss level has a boss spawn")
-			assert_true(level.room_at_position(level.boss_spawns[0]) != 0, "boss spawns inside the arena")
-		else:
-			assert_false(level.exit_cells.is_empty(), "%s has an exit" % data.display_name)
-			assert_true(data.arena_quotas.size() >= level.room_cells.size(), "quota per arena")
-		# Every floor cell is reachable from the spawn (doors open).
-		var start := g.cell_of(level.player_spawns[0])
-		var seen := {start: true}
-		var queue: Array[Vector2i] = [start]
-		while not queue.is_empty():
-			var c: Vector2i = queue.pop_back()
+	# Every layout a run can pick, in every way it can be mirrored.
+	for base in RunConfig.load_default().all_layouts():
+		for flips: Array in [[false, false], [true, false], [false, true], [true, true]]:
+			if flips[1] and base.is_boss_level:
+				continue  # the boss level only mirrors left-right
+			var data := base.mirrored(flips[0], flips[1])
+			data.display_name = "%s (%s%s)" % [base.resource_path.get_file(), "h" if flips[0] else "",
+				"v" if flips[1] else ""]
+			_check_level(data)
+
+
+func test_mirroring_moves_everything_consistently() -> void:
+	var data: LevelData = RunConfig.load_default().levels[0]
+	var plain := _build(data)
+	var flipped := _build(data.mirrored(true, true))
+	assert_eq(flipped.grid.width, plain.grid.width)
+	assert_eq(flipped.grid.height, plain.grid.height)
+	assert_eq(flipped.room_cells.size(), plain.room_cells.size(), "same arenas")
+	assert_eq(flipped.props.size(), plain.props.size(), "same props")
+	var p := plain.grid.cell_of(plain.player_spawns[0])
+	var q := flipped.grid.cell_of(flipped.player_spawns[0])
+	assert_eq(q, Vector2i(plain.grid.width - 1 - p.x, plain.grid.height - 1 - p.y), "the spawn moved to the mirrored cell")
+	plain.free()
+	flipped.free()
+
+
+func test_runs_pick_their_layouts_from_the_seed() -> void:
+	var run := RunConfig.load_default()
+	var a := run.layout_for(0, 12345).layout
+	assert_eq(run.layout_for(0, 12345).layout, a, "the same seed gives the same level")
+	var different := false
+	for seed_value in range(1, 40):
+		if run.layout_for(0, seed_value).layout != a:
+			different = true
+	assert_true(different, "other runs get other layouts")
+	for seed_value in range(1, 40):
+		assert_true(run.layout_for(3, seed_value).is_boss_level, "the boss level stays the boss level")
+
+
+func _check_level(data: LevelData) -> void:
+	var level := _build(data)
+	var g := level.grid
+	assert_false(level.player_spawns.is_empty(), "%s has a player spawn" % data.display_name)
+	for room: int in level.room_cells:
+		assert_true(level.room_doors.has(room), "%s arena %d has doors" % [data.display_name, room])
+	if data.is_boss_level:
+		assert_false(level.boss_spawns.is_empty(), "boss level has a boss spawn")
+		assert_true(level.room_at_position(level.boss_spawns[0]) != 0, "boss spawns inside the arena")
+	else:
+		assert_false(level.exit_cells.is_empty(), "%s has an exit" % data.display_name)
+		assert_true(data.arena_quotas.size() >= level.room_cells.size(), "quota per arena")
+	# Every floor cell is reachable from the spawn (doors open).
+	var start := g.cell_of(level.player_spawns[0])
+	var seen := {start: true}
+	var queue: Array[Vector2i] = [start]
+	while not queue.is_empty():
+		var c: Vector2i = queue.pop_back()
+		for d: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
+			var n := c + d
+			if not seen.has(n) and not g.is_solid(n.x, n.y):
+				seen[n] = true
+				queue.append(n)
+	var floor_cells := 0
+	for y in g.height:
+		for x in g.width:
+			if not g.is_solid(x, y):
+				floor_cells += 1
+	assert_eq(seen.size(), floor_cells, "%s: all floor reachable" % data.display_name)
+	# With its doors shut an arena is sealed: walking from inside never
+	# leaves it (so the fight can't leak out and the room outline is right).
+	for room: int in level.room_cells:
+		var doors: Array = level.room_doors.get(room, [])
+		var inside: Vector2i = Vector2i(-1, -1)
+		for c: Vector2i in level.room_cells[room]:
+			if not g.is_solid(c.x, c.y):
+				inside = c
+				break
+		var reached := {inside: true}
+		var todo: Array[Vector2i] = [inside]
+		var leaked := false
+		while not todo.is_empty():
+			var c: Vector2i = todo.pop_back()
 			for d: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 				var n := c + d
-				if not seen.has(n) and not g.is_solid(n.x, n.y):
-					seen[n] = true
-					queue.append(n)
-		var floor_cells := 0
-		for y in g.height:
-			for x in g.width:
-				if not g.is_solid(x, y):
-					floor_cells += 1
-		assert_eq(seen.size(), floor_cells, "%s: all floor reachable" % data.display_name)
-		# With its doors shut an arena is sealed: walking from inside never
-		# leaves it (so the fight can't leak out and the room outline is right).
-		for room: int in level.room_cells:
-			var doors: Array = level.room_doors.get(room, [])
-			var inside: Vector2i = Vector2i(-1, -1)
-			for c: Vector2i in level.room_cells[room]:
-				if not g.is_solid(c.x, c.y):
-					inside = c
-					break
-			var reached := {inside: true}
-			var todo: Array[Vector2i] = [inside]
-			var leaked := false
-			while not todo.is_empty():
-				var c: Vector2i = todo.pop_back()
-				for d: Vector2i in [Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
-					var n := c + d
-					if reached.has(n) or g.is_solid(n.x, n.y) or n in doors:
-						continue
-					reached[n] = true
-					todo.append(n)
-					if level.room_of_cell[n.y * g.width + n.x] != room:
-						leaked = true
-			assert_false(leaked, "%s: arena %d is sealed by its doors" % [data.display_name, room])
-		level.free()
+				if reached.has(n) or g.is_solid(n.x, n.y) or n in doors:
+					continue
+				reached[n] = true
+				todo.append(n)
+				if level.room_of_cell[n.y * g.width + n.x] != room:
+					leaked = true
+		assert_false(leaked, "%s: arena %d is sealed by its doors" % [data.display_name, room])
+	level.free()
 
 
 func _run_world(data: LevelData, heroes: Array[StringName]) -> World:
@@ -161,10 +200,18 @@ func test_boss_fight_spawns_and_ends_the_run() -> void:
 
 func test_bots_can_finish_every_level() -> void:
 	# Four god-mode bots with real abilities follow the objectives through the
-	# whole run: arenas, exits and the boss. Checks navigation + objectives.
+	# whole run: arenas, exits and the boss - and through every second layout,
+	# mirrored both ways. Checks navigation + objectives.
 	var run := RunConfig.load_default()
-	for index in run.levels.size():
-		var data: LevelData = run.levels[index]
+	var playthroughs: Array[LevelData] = []
+	playthroughs.append_array(run.levels)
+	for alternate in run.alternates:
+		if alternate:
+			var mirrored := alternate.mirrored(true, true)
+			mirrored.display_name += " (second layout, mirrored)"
+			playthroughs.append(mirrored)
+	for index in playthroughs.size():
+		var data: LevelData = playthroughs[index]
 		var world := _run_world(data, [&"knight", &"ranger", &"mage", &"cleric"])
 		world.bots = BotDriver.new(world, 11 + index)
 		world.bots.use_abilities = true

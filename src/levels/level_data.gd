@@ -36,3 +36,24 @@ extends Resource
 
 @export_group("Boss")
 @export var is_boss_level := false
+
+
+## A copy with the layout flipped left-right and/or upside down (runs vary
+## their levels this way). Everything in a layout is position-only, so a
+## mirrored level plays the same, just the other way round.
+func mirrored(flip_h: bool, flip_v: bool) -> LevelData:
+	var copy := duplicate() as LevelData
+	if not flip_h and not flip_v:
+		return copy
+	var rows := Level._parse_rows(layout)
+	var width := 0
+	for row in rows:
+		width = maxi(width, row.length())
+	var out := PackedStringArray()
+	for row in rows:
+		var padded := row + " ".repeat(width - row.length())
+		out.append(padded.reverse() if flip_h else padded)
+	if flip_v:
+		out.reverse()
+	copy.layout = "\n".join(out)
+	return copy

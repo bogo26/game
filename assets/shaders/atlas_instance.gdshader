@@ -2,7 +2,8 @@ shader_type canvas_item;
 // Draws one atlas cell per MultiMesh instance (see src/sim/instance_layer.gd).
 // INSTANCE_CUSTOM: r = cell index, g = hit flash (0..1), b = tint code
 // (0 none, 1 chilled/slowed, 2 frozen, 3 burning, 4 poisoned, 5 winding up an
-// attack; HordeSim.Tint; 6 = enemy shot, ProjectileSim), a = alpha.
+// attack; HordeSim.Tint; 6 = enemy shot, ProjectileSim) plus 10 x the elite
+// trait (Elites.Trait), a = alpha.
 
 uniform vec2 atlas_cells = vec2(8.0, 8.0);
 
@@ -16,10 +17,25 @@ void vertex() {
 	UV = (vec2(col, row) + UV) / atlas_cells;
 }
 
+// Elite outline colours by trait (Elites.COLORS): swift, volatile, splitting.
+const vec3 ELITE_COLORS[3] = vec3[3](vec3(0.45, 0.95, 1.0), vec3(1.0, 0.55, 0.15), vec3(0.6, 1.0, 0.35));
+
 void fragment() {
 	vec4 c = COLOR;
+	float code = floor(v_custom.b + 0.5);
+	float elite = floor(code / 10.0);
+	float tint = code - elite * 10.0;
+	if (elite > 0.5 && c.a < 0.5) {
+		// Elites glow: an outline in their trait's colour around the sprite.
+		vec2 px = TEXTURE_PIXEL_SIZE;
+		float around = texture(TEXTURE, UV + vec2(px.x, 0.0)).a + texture(TEXTURE, UV - vec2(px.x, 0.0)).a
+			+ texture(TEXTURE, UV + vec2(0.0, px.y)).a + texture(TEXTURE, UV - vec2(0.0, px.y)).a;
+		if (around > 0.5) {
+			float pulse = 0.75 + 0.25 * sin(TIME * 6.0);
+			c = vec4(ELITE_COLORS[int(elite) - 1] * pulse + vec3(0.25, 0.2, 0.0), 1.0);
+		}
+	}
 	c.rgb = mix(c.rgb, vec3(1.0), v_custom.g);
-	float tint = floor(v_custom.b + 0.5);
 	if (tint == 1.0) {
 		c.rgb = c.rgb * vec3(0.55, 0.85, 1.35) + vec3(0.05, 0.12, 0.25);
 	} else if (tint == 2.0) {

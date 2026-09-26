@@ -182,6 +182,10 @@ func _on_hero_damaged(slot: int, _amount: float) -> void:
 		_hurt_flash[slot] = HURT_FLASH
 
 
+func _exit_tree() -> void:
+	Events.disconnect_all(self)
+
+
 func _on_xp_changed(current: int, needed: int, level: int) -> void:
 	_xp = current
 	_needed = maxi(needed, 1)

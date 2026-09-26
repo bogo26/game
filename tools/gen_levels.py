@@ -402,6 +402,177 @@ def boss():
     return c
 
 
+# --- second layouts (the run picks one per level, then may mirror it) ----------------------
+
+def level1b():
+    """Crypt Entrance, the north gate: from a southern hall through a spike
+    gauntlet to a round arena, east through a pillared octagon (shrine to the
+    north, a treasure crypt with a nest to the south) to an octagonal arena of
+    spikes, and up to the exit."""
+    c = Canvas(112, 60, seed=111)
+    start = c.rect_cells(4, 40, 20, 54)
+    c._carve(start)
+    c.put(12, 47, "P")
+    for (x, y) in ((5, 41), (19, 41), (5, 53), (19, 53)):
+        c.put(x, y, "u")
+    a1 = c.disc_cells(14, 22, 11)                # arena 1: round, four pillars, barrels
+    c.arena(1, a1)
+    c.hall(11, 33, 15, 39, "n")                  # north to it, through a spike gauntlet
+    c.fill(c.rect_cells(11, 35, 15, 37), "^")
+    for (x, y) in ((9, 17), (18, 17), (9, 26), (18, 26)):
+        c.pillar(x, y)
+    c.cluster(13, 14, pattern=((0, 0), (1, 0)))
+    c.cluster(5, 21, pattern=((0, 0), (0, 1)))
+    c.cluster(22, 22, pattern=((0, 0), (0, 1), (-1, 1)))
+    c.hall(24, 20, 45, 24, "w")                  # east to the octagon hall
+    hall = c.octagon_cells(44, 12, 66, 34, 5)
+    c._carve(hall)
+    for (x, y) in ((50, 17), (59, 17), (50, 28), (59, 28)):
+        c.pillar(x, y)
+    c.rect(53, 8, 57, 11)                        # shrine alcove
+    c.put(55, 9, "A")
+    c.put(47, 23, "S")
+    c.put(63, 23, "S")
+    c.scatter(hall, "u", 3)
+    c.hall(53, 35, 57, 42)                       # optional: south to the treasure crypt
+    crypt = c.rect_cells(46, 43, 64, 48)
+    c._carve(crypt)
+    c.put(55, 47, "C")
+    c.put(48, 45, "N")
+    c.put(63, 44, "u")
+    c.put(47, 48, "u")
+    a2 = c.octagon_cells(76, 14, 100, 36, 6)     # arena 2: octagon, spikes around a sarcophagus
+    c.arena(2, a2)
+    c.hall(66, 22, 77, 26, "e")                  # east to it
+    c.pillar(87, 24, 3, 2)
+    for (x0, y0, x1, y1) in ((85, 20, 91, 21), (85, 28, 91, 29), (81, 23, 82, 26), (96, 23, 97, 26)):
+        c.fill(c.rect_cells(x0, y0, x1, y1), "^")
+    c.cluster(80, 17)
+    c.cluster(95, 33, pattern=((0, 0), (1, 0), (1, -1)))
+    c.hall(86, 7, 90, 14, "s")                   # north to the exit
+    c.rect(78, 1, 98, 6)
+    c.fill(c.rect_cells(87, 2, 89, 4), "X")
+    return c
+
+
+def level2b():
+    """Flooded Halls, the cistern: north from the south-east through a flooded
+    corridor to a cistern arena with a moated island, west along a hall of
+    pools and nests, and into a flooded arena of nests before the exit."""
+    c = Canvas(118, 64, seed=222)
+    c.rect(100, 48, 114, 60)
+    c.put(107, 54, "P")
+    c.put(101, 59, "u")
+    c.put(113, 59, "u")
+    a1 = c.octagon_cells(90, 8, 116, 35, 6)      # arena 1: a cistern, an island in a moat
+    c.arena(1, a1)
+    c.hall(104, 36, 108, 47, "n")                # flooded corridor north to it
+    c.fill(c.rect_cells(104, 39, 108, 44), "~")
+    c.fill(c.disc_cells(103, 21, 8), "~")
+    c.fill(c.disc_cells(103, 21, 4), ".")
+    c.cluster(102, 20, pattern=((0, 0), (1, 0), (0, 1), (1, 1)))
+    c.cluster(94, 12)
+    c.cluster(112, 30, pattern=((0, 0), (0, -1)))
+    c.pillar(96, 28)
+    c.pillar(110, 12)
+    c.hall(62, 18, 91, 22, "e")                  # west from it: the hall of pools
+    long_hall = c.rect_cells(30, 12, 62, 30)
+    c._carve(long_hall)
+    c.fill(c.disc_cells(40, 21, 5), "~")
+    c.fill(c.disc_cells(40, 21, 1), ".")
+    c.fill(c.disc_cells(54, 21, 4), "~")
+    c.fill(c.disc_cells(54, 21, 1), ".")
+    c.put(54, 21, "N")
+    c.put(34, 27, "N")
+    for x in (46, 49):
+        c.pillar(x, 14)
+    c.put(32, 14, "S")
+    c.put(60, 28, "S")
+    c.scatter(long_hall, "u", 4)
+    c.rect(44, 8, 48, 11)                        # shrine alcove
+    c.put(46, 9, "A")
+    c.hall(34, 31, 38, 38)                       # optional: south, wading to the treasure
+    side = c.rect_cells(24, 39, 48, 45)
+    c._carve(side)
+    c.fill(side, "~")
+    c.fill(c.rect_cells(34, 39, 38, 45), ".")
+    c.fill(c.rect_cells(24, 43, 48, 44), ".")
+    c.put(26, 44, "C")
+    c.put(47, 43, "u")
+    a2 = c.rect_cells(2, 4, 26, 34)              # arena 2: flooded, nests on islands
+    c.arena(2, a2)
+    c.hall(26, 16, 31, 20, "w")                  # west to it
+    c.fill(a2, "~")
+    for (x, y) in ((8, 10), (20, 10), (8, 28), (20, 28), (14, 19)):
+        c.fill(c.disc_cells(x, y, 3), ".")
+    for (x, y) in ((8, 10), (20, 10), (8, 28), (20, 28)):
+        c.put(x, y, "N")
+    c.fill(c.rect_cells(2, 17, 26, 19), ".")     # a dry causeway through the middle
+    c.cluster(13, 21)
+    c.hall(12, 35, 16, 46, "n")                  # south to the exit
+    c.rect(4, 47, 24, 58)
+    c.fill(c.rect_cells(13, 51, 15, 53), "X")
+    return c
+
+
+def level3b():
+    """Bone Pits, the long drop: bridges over the abyss right from the start,
+    a cracked cave below, a ring arena around a pit (the treasure island above
+    it), a gallery of spikes, a cave arena of nests and the exit beneath it."""
+    c = Canvas(124, 80, seed=333)
+    start = c.cave_cells(6, 3, 30, 16, fill=0.36)
+    c._carve(start)
+    c.fill(c.disc_cells(18, 10, 2), ".")
+    c.put(18, 10, "P")
+    a1 = c.rect_cells(4, 26, 36, 41)             # arena 1: bridges over the abyss
+    c.arena(1, a1)
+    c.hall(16, 8, 20, 26, "s")                   # south to it (from inside the cave)
+    c.fill(c.rect_cells(4, 31, 36, 35), ":")
+    for x in (9, 20, 31):
+        c.fill(c.rect_cells(x, 31, x + 1, 35), ".")
+    c.cluster(7, 28)
+    c.cluster(26, 39, pattern=((0, 0), (1, 0)))
+    c.cluster(33, 28, pattern=((0, 0), (0, 1)))
+    cave = c.cave_cells(4, 50, 40, 76, fill=0.42)
+    c._carve(cave)
+    c.hall(18, 42, 22, 56, "n")                  # the cave, south of the bridges
+    c.fill(c.rect_cells(8, 62, 34, 63), ":")     # a crack across the cave...
+    c.fill(c.rect_cells(20, 62, 22, 63), ".")    # ...with a bridge
+    c.fill(c.rect_cells(20, 60, 22, 61), "^")    # guarded by spikes
+    c.scatter(cave, "u", 5)
+    c.scatter(cave, "S", 2)
+    c.put(*_open_spot(c, cave, (10, 70)), "N")
+    a2 = c.disc_cells(62, 62, 12)                # arena 2: a ring around a pit
+    c.arena(2, a2)
+    c.hall(38, 60, 51, 64, "e")                  # east to it
+    c.fill(c.disc_cells(62, 62, 4), ":")
+    for (x, y) in ((55, 55), (68, 55), (55, 68), (68, 68)):
+        c.cluster(x, y, pattern=((0, 0), (1, 0)))
+    island_room = c.rect_cells(52, 36, 72, 42)   # optional: the treasure island, north of it
+    c._carve(island_room)
+    c.fill(island_room, ":")
+    c.fill(c.rect_cells(60, 40, 62, 42), ".")    # a narrow bridge...
+    c.fill(c.rect_cells(55, 36, 66, 38), ".")    # ...to the island
+    c.fill(c.rect_cells(60, 38, 62, 40), ".")
+    c.put(57, 37, "C")
+    c.put(65, 37, "A")
+    c.hall(60, 43, 62, 50, "s")
+    c.hall(74, 60, 84, 64, "w")                  # east: the gallery of spikes
+    c.rect(80, 20, 84, 64)
+    c.fill(c.rect_cells(80, 38, 84, 44), "^")
+    c.put(82, 50, "S")
+    a3 = c.cave_cells(88, 4, 120, 40, fill=0.38, rounded=True)
+    c.arena(3, a3)                               # arena 3: a cave of nests
+    c.hall(84, 20, 92, 24, "e")
+    for spot in ((96, 12), (112, 22), (100, 32)):
+        c.put(*_open_spot(c, a3, spot), "N")
+    c.scatter(a3, "b", 4)
+    c.hall(100, 25, 104, 56, "n")                # south to the exit (stops at the cave)
+    c.rect(94, 57, 116, 70)
+    c.fill(c.rect_cells(104, 62, 106, 64), "X")
+    return c
+
+
 def _open_spot(c, cells, near):
     """The cell of `cells` nearest to `near` with room around it."""
     best, best_d = None, 1 << 30
@@ -426,6 +597,9 @@ LEVELS = [
         "enemy_weights": {"swarmer": 1.0, "brute": 0.15, "spitter": 0.12, "exploder": 0.12},
         "hp_multiplier": 1.8, "corridor_cap_fraction": 0.55, "corridor_spawn_rate": 24.0,
         "arena_quotas": [100, 110, 60], "arena_spawn_rate": 38.0, "theme": "bones", "tint": (1.0, 1.0, 1.0)}),
+    ("level_1b", "Crypt Entrance", level1b, None),
+    ("level_2b", "Flooded Halls", level2b, None),
+    ("level_3b", "Bone Pits", level3b, None),
     ("boss", "Demon's Throne", boss, {
         "enemy_weights": {"swarmer": 1.0, "exploder": 0.1},
         "hp_multiplier": 2.2, "corridor_cap_fraction": 0.0, "corridor_spawn_rate": 0.0,
@@ -450,7 +624,11 @@ def fmt(v):
 
 def main():
     out_dir = os.path.join(os.path.dirname(__file__), "..", "src", "levels", "data")
+    by_name = {}
     for (file_id, name, builder, settings) in LEVELS:
+        if settings is None:  # a second layout: same settings as the first
+            settings = by_name[name]
+        by_name.setdefault(name, settings)
         layout = builder().finish()
         lines = ['[gd_resource type="Resource" script_class="LevelData" load_steps=2 format=3]', "",
                  '[ext_resource type="Script" path="res://src/levels/level_data.gd" id="1_data"]', "",

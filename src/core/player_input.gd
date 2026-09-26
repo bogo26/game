@@ -17,8 +17,11 @@ enum Action {
 	UI_LEFT,
 	UI_RIGHT,
 	MAP,
+	## Menu tabs (LB / RB, or Q / E): the difficulty in character select.
+	UI_PREV_TAB,
+	UI_NEXT_TAB,
 }
-const ACTION_COUNT := 12
+const ACTION_COUNT := 14
 
 const DEVICE_NONE := -2
 const DEVICE_KEYBOARD := -1
@@ -123,20 +126,24 @@ const PAD_GLYPHS := {
 	PadFamily.XBOX: {
 		Action.ATTACK: "\uE007", Action.SPECIAL: "\uE006", Action.MOVEMENT: "\uE005", Action.ULTIMATE: "\uE004",
 		Action.PAUSE: "\uE008", Action.MAP: "\uE009", Action.UI_ACCEPT: "\uE000", Action.UI_BACK: "\uE001",
+		Action.UI_PREV_TAB: "\uE004", Action.UI_NEXT_TAB: "\uE005",
 	},
 	PadFamily.PLAYSTATION: {
 		Action.ATTACK: "\uE011", Action.SPECIAL: "\uE010", Action.MOVEMENT: "\uE00F", Action.ULTIMATE: "\uE00E",
 		Action.PAUSE: "\uE012", Action.MAP: "\uE013", Action.UI_ACCEPT: "\uE00A", Action.UI_BACK: "\uE00B",
+		Action.UI_PREV_TAB: "\uE00E", Action.UI_NEXT_TAB: "\uE00F",
 	},
 	PadFamily.NINTENDO: {
 		# SDL maps buttons by position: the bottom one (A on Xbox) is B on a Switch pad.
 		Action.ATTACK: "\uE01B", Action.SPECIAL: "\uE01A", Action.MOVEMENT: "\uE019", Action.ULTIMATE: "\uE018",
 		Action.PAUSE: "\uE01C", Action.MAP: "\uE01D", Action.UI_ACCEPT: "\uE015", Action.UI_BACK: "\uE014",
+		Action.UI_PREV_TAB: "\uE018", Action.UI_NEXT_TAB: "\uE019",
 	},
 }
 const KEY_GLYPHS := {
 	Action.ATTACK: "\uE01E", Action.SPECIAL: "\uE01F", Action.MOVEMENT: "[SPACE]", Action.ULTIMATE: "[Q]",
 	Action.PAUSE: "[ESC]", Action.MAP: "[TAB]", Action.UI_ACCEPT: "[ENTER]", Action.UI_BACK: "[ESC]",
+	Action.UI_PREV_TAB: "[Q]", Action.UI_NEXT_TAB: "[E]",
 }
 
 
@@ -225,6 +232,8 @@ func _read_keyboard_mouse() -> void:
 	_write(Action.UI_DOWN, down)
 	_write(Action.UI_LEFT, left)
 	_write(Action.UI_RIGHT, right)
+	_write(Action.UI_PREV_TAB, _key(KEY_Q))
+	_write(Action.UI_NEXT_TAB, _key(KEY_E))
 
 
 func _read_joypad(d: int, delta: float) -> void:
@@ -261,6 +270,8 @@ func _read_joypad(d: int, delta: float) -> void:
 	_write(Action.UI_DOWN, dpad.y > 0.0 or left_stick.y > UI_STICK_THRESHOLD)
 	_write(Action.UI_LEFT, dpad.x < 0.0 or left_stick.x < -UI_STICK_THRESHOLD)
 	_write(Action.UI_RIGHT, dpad.x > 0.0 or left_stick.x > UI_STICK_THRESHOLD)
+	_write(Action.UI_PREV_TAB, _btn(d, JOY_BUTTON_LEFT_SHOULDER))
+	_write(Action.UI_NEXT_TAB, _btn(d, JOY_BUTTON_RIGHT_SHOULDER))
 
 
 func _update_repeats(delta: float) -> void:

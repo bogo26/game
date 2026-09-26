@@ -3,7 +3,9 @@ extends Control
 ## browse the roster with left/right, and ready up with A / Enter; B / Esc
 ## un-readies or leaves. Once every joined player is ready, any of them starts
 ## the run with A / Enter (or Start on a gamepad) - there is no timer.
-## With nobody joined, B / Esc returns to the main menu.
+## With nobody joined, B / Esc returns to the main menu. Any joined player
+## picks the difficulty with LB / RB (Q / E); Hard unlocks with a Normal win.
+## A star by a hero's name shows the hardest difficulty won with them.
 
 const ROSTER: Array[StringName] = [
 	&"knight", &"ranger", &"mage", &"cleric", &"berserker", &"rogue", &"engineer", &"necromancer",
@@ -24,6 +26,8 @@ const HERO_TRAITS := {
 }
 const DIFFICULTY_COLORS := {"Easy": Color(0.45, 0.95, 0.5), "Medium": Color(1.0, 0.85, 0.35), "Hard": Color(1.0, 0.45, 0.4)}
 const PIP_ON := Color(0.95, 0.9, 0.7)
+## Stars for the hardest difficulty won with a hero: Casual, Normal, Hard.
+const STAR_COLORS: Array[Color] = [Color(0.8, 0.5, 0.25), Color(0.82, 0.86, 0.95), Color(1.0, 0.85, 0.3)]
 const PIP_OFF := Color(0.3, 0.3, 0.38)
 
 
@@ -32,6 +36,7 @@ class SlotView:
 	var header: Label
 	var portrait: TextureRect
 	var name_label: Label
+	var star: Label
 	var role_label: Label
 	var arrows: Label
 	var pips: Control
@@ -51,6 +56,7 @@ var menu_scene := MAIN_MENU
 var went_back := false
 var _title: Label
 var _footer: Label
+var _difficulty_label: Label
 var _back_prev: Dictionary = {}
 var _hero_cache: Dictionary = {}
 var _time := 0.0
@@ -60,8 +66,18 @@ func _ready() -> void:
 	get_tree().paused = false
 	Audio.play_music(&"menu")
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	InputRouter.unassign_all()
-	GameState.clear_players()
+	var keep := GameState.keep_team
+	GameState.keep_team = false
+	if keep:  # "Change heroes" after a run: everyone stays, with their last hero
+		for slot in InputRouter.assigned_slots():
+			var index := ROSTER.find(GameState.slots[slot].hero_id)
+			if index != -1:
+				_choice[slot] = index
+	else:
+		InputRouter.unassign_all()
+		GameState.clear_players()
+	if GameState.difficulty == GameState.Difficulty.HARD and not GameState.profile.hard_unlocked():
+		GameState.difficulty = GameState.Difficulty.NORMAL
 	var bg := ColorRect.new()
 	bg.color = Color(0.04, 0.035, 0.07)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -72,6 +88,9 @@ func _ready() -> void:
 	_footer = _label("", 8, Color(0.8, 0.8, 0.85))
 	_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_footer)
+	_difficulty_label = _label("", 8, Color.WHITE)
+	_difficulty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(_difficulty_label)
 	for i in InputRouter.MAX_PLAYERS:
 		_views.append(_build_slot(i))
 	InputRouter.join_requested.connect(_on_join_requested)
@@ -94,7 +113,36 @@ func _process(delta: float) -> void:
 			_handle_player(i, p)
 	_handle_unassigned_back()
 	_update_footer()
+	_update_difficulty_label()
 	_animate_portraits(delta)
+
+
+## Steps the run's difficulty (skipping Hard until it's unlocked).
+func change_difficulty(step: int) -> void:
+	var count := GameState.Difficulty.size()
+	var next := int(GameState.difficulty)
+	for attempt in count:
+		next = (next + step + count) % count
+		if next != GameState.Difficulty.HARD or GameState.profile.hard_unlocked():
+			break
+	GameState.difficulty = next as GameState.Difficulty
+	Audio.play(&"ui_move")
+
+
+func _update_difficulty_label() -> void:
+	var prev := "[Q]"
+	var next := "[E]"
+	for slot in InputRouter.assigned_slots():
+		var p := InputRouter.get_player(slot)
+		if not p.is_bot():
+			prev = p.glyph(PlayerInput.Action.UI_PREV_TAB)
+			next = p.glyph(PlayerInput.Action.UI_NEXT_TAB)
+			break
+	var text := "%s  %s  %s" % [prev, GameState.DIFFICULTY_NAMES[GameState.difficulty].to_upper(), next]
+	if not GameState.profile.hard_unlocked():
+		text = "(Hard: win on Normal)   " + text
+	_difficulty_label.text = text
+	_difficulty_label.label_settings.font_color = [Color(0.45, 0.95, 0.5), Color.WHITE, Color(1.0, 0.45, 0.4)][GameState.difficulty]
 
 
 ## Joined players' heroes run on the spot (run frames 2-5).
@@ -122,6 +170,10 @@ func _on_join_requested(device: int) -> void:
 func _handle_player(slot: int, p: PlayerInput) -> void:
 	if started:
 		return
+	if p.just_pressed(PlayerInput.Action.UI_PREV_TAB):
+		change_difficulty(-1)
+	elif p.just_pressed(PlayerInput.Action.UI_NEXT_TAB):
+		change_difficulty(1)
 	if _is_ready[slot]:
 		if p.just_pressed(PlayerInput.Action.UI_BACK):
 			_is_ready[slot] = false
@@ -253,6 +305,8 @@ func _build_slot(slot: int) -> SlotView:
 	v.name_label = _label("", 16, Color.WHITE)
 	v.name_label.position = Vector2(64, 16)
 	v.panel.add_child(v.name_label)
+	v.star = _label("*", 16, Color.WHITE)
+	v.panel.add_child(v.star)
 	v.role_label = _label("", 8, color)
 	v.role_label.position = Vector2(64, 34)
 	v.panel.add_child(v.role_label)
@@ -278,6 +332,8 @@ func _layout() -> void:
 	var view := get_viewport_rect().size
 	_title.position = Vector2(0, 3)
 	_title.size = Vector2(view.x, 18)
+	_difficulty_label.position = Vector2(view.x * 0.5, 6)
+	_difficulty_label.size = Vector2(view.x * 0.5 - MARGIN, 10)
 	_footer.position = Vector2(0, view.y - 12)
 	_footer.size = Vector2(view.x, 10)
 	var top := TITLE_HEIGHT
@@ -313,7 +369,7 @@ func _refresh(slot: int) -> void:
 	if joined and _is_ready[slot]:
 		bg = Color(color, 0.18).blend(Color(0.08, 0.075, 0.12, 0.9))
 	v.panel.add_theme_stylebox_override("panel", _box(bg, border, 2 if _is_ready[slot] else 1))
-	for child in [v.portrait, v.name_label, v.role_label, v.arrows, v.pips, v.difficulty]:
+	for child in [v.portrait, v.name_label, v.role_label, v.arrows, v.pips, v.difficulty, v.star]:
 		(child as CanvasItem).visible = joined
 	for line in v.abilities:
 		line.visible = joined
@@ -340,6 +396,11 @@ func _refresh(slot: int) -> void:
 	v.portrait.modulate = Color.WHITE
 	v.name_label.text = data.display_name.to_upper()
 	v.role_label.text = data.role
+	var rank := GameState.profile.hero_rank(hero_id)
+	v.star.visible = rank >= 0
+	if rank >= 0:
+		v.star.label_settings.font_color = STAR_COLORS[rank]
+		v.star.position = Vector2(64 + v.name_label.get_minimum_size().x + 4, 16)
 	var traits: Array = HERO_TRAITS.get(hero_id, [3, "Medium"])
 	v.difficulty.text = traits[1]
 	v.difficulty.label_settings.font_color = DIFFICULTY_COLORS.get(traits[1], Color.WHITE)

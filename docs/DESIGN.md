@@ -73,6 +73,25 @@ Downed state:
 | Exploder | Rushes in, telegraphs, explodes |
 | Big Demon (boss) | Phase-based attack patterns, node-based |
 
+**Elites** (`Elites`, from the second level on; always in the test room): about 1 in 40 spawns of the four kinds above arrives as an elite, at most 4 alive at once (×0.5 on Casual, ×2 on Hard).
+- An elite is drawn 1.5× bigger with a pulsing outline in its trait's colour (the instance shader draws it from a code in the tint channel), with its hurtbox and footprint scaled to match, ×6 HP, ×1.25 damage and half the knockback.
+- Traits: **Swift** (cyan, +60% speed), **Volatile** (orange: blows up 0.6 s after it dies, telegraphed, 25 damage in 36 px), **Splitting** (green: breaks into 3 ordinary enemies of its kind).
+- Each drops a big XP gem (10) and has a 30% chance of a heart.
+- Elites are extra enemy types made at setup from the base ones (`Elites.variants()`), so the horde needs nothing new per enemy.
+
+## Difficulty and records
+
+Chosen in character select with LB / RB (Q / E); Hard unlocks after a win on Normal.
+
+| | Enemy HP | Enemy damage | Spawn rate | Team lives per level | Elites |
+|---|---|---|---|---|---|
+| Casual | ×0.75 | ×0.7 | ×0.8 | 2 | ×0.5 |
+| Normal | ×1 | ×1 | ×1 | 1 | ×1 |
+| Hard | ×1.3 | ×1.3 | ×1.2 | 0 | ×2 |
+
+- Enemy damage is a real multiplier (`HordeSim.damage_mult`): contact, spit, exploder and elite blasts, spikes and every boss attack.
+- **Profile** (`Profile`, `user://profile.cfg`): runs played, wins and best time per difficulty, and the hardest difficulty won with each hero, shown as a bronze / silver / gold star by the hero's name in character select. The end screen announces "NEW BEST TIME!" and "HARD UNLOCKED!".
+
 Spawn director:
 - Spawns just outside the camera on walkable tiles, in waves plus a constant trickle. Off-screen spawns stay at least 110 px from every hero.
 - **Spawn portals:** anything that appears where players can see it (arena waves, nests, boss summons) comes through a portal first. `SpawnDirector.queue_spawn()` opens a swirling dark portal and the enemy steps out 0.5 s later. Enemies waiting in portals count toward the cap and the arena's enemies left, and an arena can't clear while any are waiting.
@@ -127,6 +146,7 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
 
 ## Levels and run flow
 
+- **Map variety:** levels 1–3 each have a second layout (`level_1b` ...: same size, quotas and theme, but different room shapes, route, and chest and shrine spots). Every run picks one per level from `GameState.run_seed` and mirrors it left-right and/or upside down (the boss level only left-right): `RunConfig.layout_for()`, `LevelData.mirrored()`. That's 8 versions of each normal level. `--layout=a|b` and `--mirror=none|h|v|hv` pin them for debugging. The level tests check every layout in every mirror, and bots play every second layout mirrored.
 - **Authoring:**
   - Levels are ASCII layouts in `LevelData` resources; the legend is in `level_data.gd`.
   - `tools/gen_levels.py` builds the run's layouts from shaped rooms, halls, terrain and props, and writes `src/levels/data/level_*.tres` / `boss.tres` with each level's difficulty settings and theme (see Map features).
@@ -166,7 +186,8 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
     - fire ring: a ring of turning dots around the boss
     - summon: the adds' spawn portals
   - HP is 1800 × level multiplier × player-count scaling. It is immune to stun and slow.
-- **Screens:** Main menu → Character select → Game (levels) → End screen (victory/defeat + stats) → Play again / Main menu.
+- **Screens:** Main menu → Character select → Game (levels) → End screen → Play again / Change heroes / Main menu.
+  - **End screen:** difficulty, levels, enemies, team level, time and Second Winds; any records set; and a table of every player's kills, damage dealt and taken, downs, revives given and biggest hit, with awards: Slayer (most kills), Medic (most revives), Tank (most damage taken), Sharpshooter (biggest hit) - only with teammates to beat - and Untouchable (never downed). **Play again** starts a new run right away with the same team, heroes and difficulty; **Change heroes** goes to character select with everyone still joined and their last hero picked.
   - **Main menu:** Start Run, Test Room (drop-in sandbox), Options, Quit. The main, pause and end menus use Godot focus navigation, so keyboard, any gamepad or mouse all work, with move/confirm sounds (`UiSounds`).
   - **Character select:** 4 quadrants. Each shows the hero running on the spot, toughness / damage / speed as pips, a difficulty tag (Easy / Medium / Hard) and the four abilities with that player's own buttons.
     - Press A/Enter to join (holding that button doesn't also ready you up).
@@ -338,6 +359,7 @@ docs/         this document
 | 8 | Art & juice: pixel-art pack, particles, shake, SFX/music | done (generated art; 0x72 pack swap pending your OK) |
 | 9 | Export: macOS + Windows builds | presets + icon ready; needs export templates installed to build |
 | 10 | Map features: minimap, terrain (water, chasms, spikes), barrels / urns / nests, chests and shrines, level themes + decor, redesigned levels | done |
+| 11 | Player-experience pass: run-flow fixes, readability (telegraphs, portals, outlines), game feel (feedback, hitstop, audio), pacing (waves, team lives, held picks, solo fairness), options + accessibility, onboarding (button icons, tips, controls card), replay (stats and awards, difficulty and records, map variety, elites) | done |
 
 ## Performance results
 

@@ -123,7 +123,7 @@ func tick(dt: float) -> void:
 			for hero in world.heroes:
 				if not _charge_hit.has(hero.slot) and hero.position.distance_to(p) < CHARGE_REACH:
 					_charge_hit[hero.slot] = true
-					hero.take_hit(CHARGE_DAMAGE)
+					hero.take_hit(CHARGE_DAMAGE * world.horde.damage_mult)
 			world.fx.disc(p + Vector2(0, -10), 10.0, Color(1, 0.4, 0.2, 0.4), 0.15)
 			if _charge_left <= 0.0 or moved < step * 0.3:
 				world.shake(3.0)
@@ -197,7 +197,7 @@ func _execute_attack(p: Vector2, target: Vector2) -> void:
 			for hero in world.heroes:
 				if hero.position.distance_to(p) <= SLAM_RADIUS + Hero.RADIUS \
 						and world.grid.line_of_sight(p, hero.position):
-					hero.take_hit(SLAM_DAMAGE)
+					hero.take_hit(SLAM_DAMAGE * world.horde.damage_mult)
 			world.fx.disc(p, SLAM_RADIUS, Color(1, 0.45, 0.2, 0.55), 0.3)
 			world.fx.ring(p, SLAM_RADIUS * 1.1, Color(1, 0.8, 0.4), 0.35)
 			world.shake(5.0)
@@ -242,7 +242,7 @@ func _end_action() -> void:
 
 func _fireball(p: Vector2, dir: Vector2, speed: float) -> void:
 	Audio.play(&"fireball")
-	world.projectiles.spawn(p + MUZZLE, dir * speed, FIREBALL_DAMAGE, 5.0, 4.0,
+	world.projectiles.spawn(p + MUZZLE, dir * speed, FIREBALL_DAMAGE * world.horde.damage_mult, 5.0, 4.0,
 		ProjectileSim.Team.ENEMY, -1, ProjectileSim.Look.FIRE)
 
 

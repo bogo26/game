@@ -108,12 +108,24 @@ func setup(p_world: World) -> void:
 	exit_open = rooms.is_empty() and not data.is_boss_level
 	var spawner := world.spawner
 	spawner.set_weights(data.enemy_weights)
-	spawner.level_hp_multiplier = data.hp_multiplier
+	spawner.level_hp_multiplier = data.hp_multiplier * GameState.difficulty_value("hp")
+	# Elites join the horde from the second level on (always in the test room).
+	var elites := not world.run_mode or GameState.level_index >= 1
+	spawner.elite_chance = Elites.CHANCE * GameState.difficulty_value("elites") if elites else 0.0
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--elite-chance="):  # debug: see (lots of) elites anywhere
+			spawner.elite_chance = arg.get_slice("=", 1).to_float()
+	world.horde.damage_mult = GameState.difficulty_value("damage")
 	spawner.corridor_cap_fraction = data.corridor_cap_fraction
-	spawner.spawn_rate = data.corridor_spawn_rate
+	spawner.spawn_rate = _rate(data.corridor_spawn_rate)
 	spawner.mode = SpawnDirector.Mode.CORRIDOR if data.corridor_spawn_rate > 0.0 else SpawnDirector.Mode.OFF
 	boss_hp_multiplier = spawner.unique_hp_multiplier()
 	_update_objective()
+
+
+## A spawn rate adjusted for the difficulty.
+static func _rate(rate: float) -> float:
+	return rate * GameState.difficulty_value("spawn")
 
 
 func room_by_id(id: int) -> Room:
@@ -223,7 +235,7 @@ func _activate(room: Room, leader: Hero) -> void:
 		room.wave_time = 0.0
 		room.breather = 0.0
 		world.spawner.start_arena(room.cells, room.waves[0] if not room.waves.is_empty() else 0,
-			data.arena_spawn_rate)
+			_rate(data.arena_spawn_rate))
 		_announce_wave(room)
 	_update_objective()
 
@@ -280,7 +292,7 @@ func _clear(room: Room) -> void:
 	level.set_doors_locked(room.id, false)
 	Audio.play(&"clear")
 	world.spawner.mode = SpawnDirector.Mode.CORRIDOR if data.corridor_spawn_rate > 0.0 else SpawnDirector.Mode.OFF
-	world.spawner.spawn_rate = data.corridor_spawn_rate
+	world.spawner.spawn_rate = _rate(data.corridor_spawn_rate)
 	world.pickups.spawn(room.center, PickupSim.Kind.HEART, 1)
 	world.fx.ring(room.center, 60.0, Color(1, 0.95, 0.6), 0.6)
 	if arenas_cleared() == rooms.size() and not data.is_boss_level:

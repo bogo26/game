@@ -56,6 +56,12 @@ func _run_all() -> void:
 	if settings:
 		settings.set("path", "user://test_settings.cfg")
 		settings.call("reset")
+	# ...and a fresh profile that saves somewhere else.
+	Profile.path = "user://test_profile.cfg"
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(Profile.path))
+	var state := root.get_node_or_null("GameState")
+	if state:
+		state.set("profile", Profile.new())
 	var filter := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--filter="):
