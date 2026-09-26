@@ -12,6 +12,10 @@ extends RefCounted
 ## Kills are recorded in kill_* arrays at damage time; World drains them.
 ## Alive enemies occupy indices [0, count); removal swaps with the last one,
 ## so use `uid` (stable) when an enemy must be remembered across frames.
+## `pos` is an enemy's feet. Two shapes hang off it: the footprint circle
+## (`t_radius`) for walls, crowding, contact and ground-level attacks, and the
+## hurtbox (`t_hurt_*`, a box standing on the feet, as big as the sprite's
+## body) that projectiles hit.
 
 const CAPACITY := 512
 const INDEX_BITS := 10  # CAPACITY must fit
@@ -20,6 +24,9 @@ const TILE := 16.0
 const INV_TILE := 1.0 / 16.0
 const HASH_CELL := 16.0
 const ATLAS_COLUMNS := 8
+## Atlas cells are 32x32 with the feet (an enemy's `pos`) at (16, 24).
+const SPRITE_CELL := Vector2i(32, 32)
+const SPRITE_FEET := Vector2(16, 24)
 
 const DIRECT_CHASE_TILES := 2
 const SEPARATION_STRENGTH := 7.0
@@ -51,6 +58,8 @@ var mark := PackedFloat32Array()       # > 0: takes critical damage (Rogue marks
 var types: Array[EnemyData] = []
 var t_speed := PackedFloat32Array()
 var t_radius := PackedFloat32Array()
+var t_hurt_half_width := PackedFloat32Array()
+var t_hurt_height := PackedFloat32Array()
 var t_hp := PackedFloat32Array()
 var t_damage := PackedFloat32Array()
 var t_knockback := PackedFloat32Array()
@@ -67,6 +76,10 @@ var t_blast_radius := PackedFloat32Array()
 var t_blast_damage := PackedFloat32Array()
 var t_fuse := PackedFloat32Array()
 var max_radius := 0.0
+## Largest hurtbox among the enemies that exist right now: how far around a
+## shot to look for bodies. A boss widens it only while it's alive.
+var hurt_max_half_width := 0.0
+var hurt_max_height := 0.0
 
 # Kill log since the last drain.
 var kill_pos := PackedVector2Array()
@@ -95,6 +108,7 @@ var flow: FlowField
 var projectiles: ProjectileSim
 
 var _dead_pending := 0
+var _type_count := PackedInt32Array()  # entries per type, dead-but-not-removed included
 var _next_uid := 1
 var _frame := 0
 var _sort_keys := PackedInt32Array()
@@ -122,6 +136,8 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	count = 0
 	t_speed.clear()
 	t_radius.clear()
+	t_hurt_half_width.clear()
+	t_hurt_height.clear()
 	t_hp.clear()
 	t_damage.clear()
 	t_knockback.clear()
@@ -141,6 +157,8 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	for data in types:
 		t_speed.append(data.speed)
 		t_radius.append(data.radius)
+		t_hurt_half_width.append(data.hurt_size.x * 0.5)
+		t_hurt_height.append(data.hurt_size.y)
 		t_hp.append(data.max_hp)
 		t_damage.append(data.contact_damage)
 		t_knockback.append(data.knockback_taken)
@@ -157,6 +175,9 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 		t_blast_damage.append(data.explosion_damage)
 		t_fuse.append(data.fuse_time)
 		max_radius = maxf(max_radius, data.radius)
+	_type_count.resize(types.size())
+	_type_count.fill(0)
+	_refresh_hurt_reach()
 	hash.setup(grid.size_px(), HASH_CELL, CAPACITY)
 
 
@@ -188,7 +209,19 @@ func spawn(type_id: int, p: Vector2, hp_multiplier: float = 1.0) -> int:
 	action[i] = randf() * 1.5
 	state[i] = 0
 	mark[i] = 0.0
+	_type_count[type_id] += 1
+	hurt_max_half_width = maxf(hurt_max_half_width, t_hurt_half_width[type_id])
+	hurt_max_height = maxf(hurt_max_height, t_hurt_height[type_id])
 	return i
+
+
+func _refresh_hurt_reach() -> void:
+	hurt_max_half_width = 0.0
+	hurt_max_height = 0.0
+	for t in _type_count.size():
+		if _type_count[t] > 0:
+			hurt_max_half_width = maxf(hurt_max_half_width, t_hurt_half_width[t])
+			hurt_max_height = maxf(hurt_max_height, t_hurt_height[t])
 
 
 func is_alive(i: int) -> bool:
@@ -202,8 +235,10 @@ func alive_count() -> int:
 ## Applies damage; returns true if this hit killed the enemy. `crit` only
 ## marks the hit for feedback (the caller already multiplied the damage).
 ## Marked enemies turn non-crit hits into crits (x MARK_DAMAGE_MULT); hits
-## that already crit aren't multiplied twice.
-func damage(i: int, amount: float, knockback: Vector2, source_slot: int, crit: bool = false) -> bool:
+## that already crit aren't multiplied twice. `at` is where the hit landed
+## (sparks, numbers); by default the middle of the body.
+func damage(i: int, amount: float, knockback: Vector2, source_slot: int, crit: bool = false,
+		at: Vector2 = Vector2.INF) -> bool:
 	var h := hp[i]
 	if h <= 0.0:
 		return false
@@ -214,7 +249,7 @@ func damage(i: int, amount: float, knockback: Vector2, source_slot: int, crit: b
 	hp[i] = remaining
 	flash[i] = FLASH_TIME
 	if hit_pos.size() < 256:
-		hit_pos.append(pos[i])
+		hit_pos.append(at if at.is_finite() else body_center(i))
 		hit_amount.append(amount)
 		hit_type.append(type[i])
 		hit_crit.append(1 if crit else 0)
@@ -239,6 +274,11 @@ func apply_stun(i: int, seconds: float) -> void:
 func apply_slow(i: int, seconds: float) -> void:
 	if t_behavior[type[i]] != EnemyData.Behavior.BOSS:
 		slow[i] = maxf(slow[i], seconds)
+
+
+## Middle of the enemy's hurtbox (its drawn body); `pos` is the feet.
+func body_center(i: int) -> Vector2:
+	return pos[i] - Vector2(0.0, t_hurt_height[type[i]] * 0.5)
 
 
 ## Current index of the enemy with this uid (indices move on removal), or -1.
@@ -493,6 +533,10 @@ func _compact() -> void:
 
 
 func _remove_at(i: int) -> void:
+	var t := type[i]
+	_type_count[t] -= 1
+	if _type_count[t] == 0:
+		_refresh_hurt_reach()
 	var last := count - 1
 	if i != last:
 		pos[i] = pos[last]

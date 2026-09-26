@@ -14,6 +14,10 @@ enum Action { WALK, WINDUP, CHARGE }
 enum Attack { FAN, SLAM, RING, SUMMON, CHARGE }
 
 const SPRITE := preload("res://assets/sprites/enemies/boss_demon.png")
+## 64x64 frames drawn with the feet (the node's position) at (32, 58).
+const SPRITE_OFFSET := Vector2(0, -26)
+## Fireballs leave from the chest.
+const MUZZLE := Vector2(0, -24)
 const BODY_RADIUS := 12.0
 const SPEEDS: Array[float] = [22.0, 28.0, 38.0]
 const ATTACK_GAPS: Array[float] = [2.4, 2.0, 1.5]
@@ -59,7 +63,7 @@ func setup(p_world: World, spawn_position: Vector2, hp_multiplier: float, add_hp
 func _ready() -> void:
 	sprite.texture = SPRITE
 	sprite.hframes = 4
-	sprite.offset = Vector2(0, -26)
+	sprite.offset = SPRITE_OFFSET
 
 
 func hp_ratio() -> float:
@@ -151,7 +155,13 @@ func _begin_attack(p: Vector2, target: Vector2) -> void:
 func _execute_attack(p: Vector2, target: Vector2) -> void:
 	match pending_attack:
 		Attack.FAN:
-			var dir := (target - p).normalized() if target.is_finite() else Vector2.DOWN
+			# Aim from the chest at the hero's body, so the middle fireball flies
+			# straight at them instead of over their head.
+			var dir := Vector2.DOWN
+			if target.is_finite():
+				var to := target + Hero.SPRITE_FEET_OFFSET - (p + MUZZLE)
+				if to.length_squared() > 1.0:
+					dir = to.normalized()
 			var count := 7 + 2 * phase
 			for k in count:
 				var a := lerpf(-0.6, 0.6, float(k) / float(count - 1))
@@ -186,7 +196,7 @@ func _end_action() -> void:
 
 func _fireball(p: Vector2, dir: Vector2, speed: float) -> void:
 	Audio.play(&"fireball")
-	world.projectiles.spawn(p + Vector2(0, -24), dir * speed, FIREBALL_DAMAGE, 5.0, 4.0,
+	world.projectiles.spawn(p + MUZZLE, dir * speed, FIREBALL_DAMAGE, 5.0, 4.0,
 		ProjectileSim.Team.ENEMY, -1, ProjectileSim.Look.FIRE)
 
 

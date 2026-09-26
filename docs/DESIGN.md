@@ -158,6 +158,8 @@ Nodes are too expensive for 300+ enemies at 120 fps, so hordes are **plain data*
 - **Spatial hash** (linked lists in packed arrays, 16 px cells), rebuilt every frame. It serves separation, contact damage, attack hit queries and projectile hits.
 - **Flow field:** multi-source BFS from all living players over the tile grid. It runs on a `WorkerThreadPool` thread with double buffering and refreshes about every 0.2 s. Every enemy follows the field toward the nearest player.
 - **Wall collision:** per-axis solid-tile lookups, with no physics engine.
+- **Two shapes per enemy.** An enemy's position is its feet. A small **footprint circle** there (`radius`) handles walls, crowding, contact damage and ground-level attacks (slashes, slams, zones). A **hurtbox** (`hurt_size`, a box standing on the feet and as big as the drawn body) is what projectiles hit, so a shot that visibly crosses the head connects and one passing under the feet doesn't. `tests/test_hurtboxes.gd` checks every hurtbox against its sprite. Projectiles search the hash down to the tallest body alive (a boss only widens the search while it lives).
+- Enemy shots hit a circle around the **middle of a hero's body**, not the feet; the boss aims its fireball fans at it.
 - `ProjectileSim`, `PickupSim` (XP gems) and `FxSim` (particles) follow the same pattern.
 - Heroes, bosses and summons (≤ 8 per player) are normal nodes.
 - **Fallback if typed GDScript misses the 3 ms budget:** port only `HordeSim` + `ProjectileSim` to a C++ GDExtension behind the same API.

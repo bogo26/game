@@ -8,6 +8,7 @@ id = &"swarmer"
 max_hp = 10.0
 speed = 42.0
 radius = 5.0
+hurt_size = Vector2(14, 15)
 contact_damage = 6.0
 xp = 1
 knockback_taken = 1.0

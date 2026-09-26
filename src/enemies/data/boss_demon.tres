@@ -8,6 +8,7 @@ id = &"boss_demon"
 max_hp = 1800.0
 speed = 0.0
 radius = 14.0
+hurt_size = Vector2(42, 52)
 contact_damage = 18.0
 xp = 0
 knockback_taken = 0.0

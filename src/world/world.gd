@@ -78,6 +78,7 @@ var elapsed := 0.0
 ## hero (camera, leash); `target_positions` only those enemies should chase.
 var hero_positions := PackedVector2Array()
 var target_positions := PackedVector2Array()
+var _hero_bodies := PackedVector2Array()
 var _hero_targetable := PackedByteArray()
 var _hero_ranges := PackedFloat32Array()
 var _hero_active := PackedByteArray()
@@ -132,7 +133,7 @@ func _ready() -> void:
 	if run_mode:
 		allow_drop_in = false
 		auto_revive_on_wipe = false
-	horde_layer.setup(HORDE_ATLAS, Vector2i(32, 32), Vector2(16, 24), HordeSim.CAPACITY)
+	horde_layer.setup(HORDE_ATLAS, HordeSim.SPRITE_CELL, HordeSim.SPRITE_FEET, HordeSim.CAPACITY)
 	projectile_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 8), ProjectileSim.CAPACITY)
 	pickup_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 11), PickupSim.CAPACITY)
 	particle_layer.setup(FX_ATLAS, Vector2i(16, 16), Vector2(8, 8), FxSim.CAPACITY, true)
@@ -224,7 +225,7 @@ func _process(delta: float) -> void:
 	_apply_contact_damage()
 	var t_horde := Time.get_ticks_usec()
 
-	projectiles.update(dt, horde, grid, hero_positions, _hero_targetable, Hero.RADIUS)
+	projectiles.update(dt, horde, grid, _hero_bodies, _hero_targetable, Hero.HURT_RADIUS)
 	_apply_projectile_hits()
 	_update_zones(dt)
 	var t_projectiles := Time.get_ticks_usec()
@@ -393,6 +394,7 @@ func shake(strength: float) -> void:
 func _snapshot_heroes() -> void:
 	var n := heroes.size()
 	hero_positions.resize(n)
+	_hero_bodies.resize(n)
 	_hero_targetable.resize(n)
 	_hero_ranges.resize(n)
 	_hero_active.resize(n)
@@ -400,6 +402,7 @@ func _snapshot_heroes() -> void:
 	for i in n:
 		var hero := heroes[i]
 		hero_positions[i] = hero.position
+		_hero_bodies[i] = hero.body_position()
 		_hero_targetable[i] = 1 if hero.is_targetable() else 0
 		_hero_ranges[i] = hero.pickup_range
 		_hero_active[i] = 0 if hero.is_downed() else 1
@@ -513,7 +516,7 @@ func _emit_hit_effects() -> void:
 		horde.shots_fired = 0
 	var crits := 0
 	for k in n:
-		var p := horde.hit_pos[k] + Vector2(0, -6)
+		var p := horde.hit_pos[k]
 		var amount := horde.hit_amount[k]
 		if horde.hit_crit[k] != 0:
 			# Crits always get a number, a gold star burst and a "tink".
@@ -553,7 +556,8 @@ func _process_kills() -> void:
 		var p := horde.kill_pos[k]
 		var t := horde.kill_type[k]
 		if k < MAX_PUFFS_PER_FRAME:
-			particles.burst(p + Vector2(0, -5), 6, _enemy_color(t), 60.0, 0.45, 3, Vector2.ZERO, TAU, 30.0)
+			var body := p - Vector2(0, horde.t_hurt_height[t] * 0.5)
+			particles.burst(body, 6, _enemy_color(t), 60.0, 0.45, 3, Vector2.ZERO, TAU, 30.0)
 		var killer := horde.kill_slot[k]
 		kills += 1
 		_corpse_pos.append(p)

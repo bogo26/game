@@ -8,6 +8,7 @@ id = &"spitter"
 max_hp = 16.0
 speed = 30.0
 radius = 6.0
+hurt_size = Vector2(14, 16)
 contact_damage = 5.0
 xp = 2
 knockback_taken = 0.8

@@ -11,6 +11,9 @@ enum State { ALIVE, DOWNED }
 signal attack_performed(aim: Vector2)
 
 const RADIUS := 5.0
+## Enemy shots hit within this distance of body_position(): a bit smaller than
+## the drawn body, so shots that only graze the outline miss.
+const HURT_RADIUS := 5.0
 const HIT_IFRAMES := 0.5
 const REVIVE_TIME := 3.0
 const REVIVE_RADIUS := 20.0
@@ -174,8 +177,14 @@ func is_targetable() -> bool:
 	return state == State.ALIVE and invulnerable_time <= 0.0 and not god_mode
 
 
+## Middle of the drawn body (`position` is the feet), following leaps and
+## size buffs: shots leave from here and enemy shots aim at it.
+func body_position() -> Vector2:
+	return position + SPRITE_FEET_OFFSET * buff_product(&"sprite_scale") - Vector2(0, air_height)
+
+
 func muzzle_position() -> Vector2:
-	return position + SPRITE_FEET_OFFSET + aim_dir * 5.0
+	return body_position() + aim_dir * 5.0
 
 
 # --- ticking -----------------------------------------------------------------------------

@@ -3,6 +3,8 @@ extends RefCounted
 ## All projectiles (player and enemy) as packed arrays. Player projectiles
 ## hit enemies through the horde's spatial hash; enemy projectiles hit heroes.
 ## Walls stop or bounce them; `pierce` lets one projectile hit several enemies.
+## Shots fly where they're drawn, so they collide with what's drawn: enemy
+## hurtboxes (the whole body, not the feet) and the middle of heroes' bodies.
 
 const CAPACITY := 1024
 const ATLAS_COLUMNS := 8
@@ -104,8 +106,9 @@ func clear() -> void:
 	count = 0
 
 
-## `hero_positions`/`hero_targetable` describe heroes enemy shots can hit.
-func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_positions: PackedVector2Array,
+## Enemy shots hit heroes within `hero_radius` of `hero_bodies` (the middle
+## of each hero's sprite, not the feet) whose `hero_targetable` flag is set.
+func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_bodies: PackedVector2Array,
 		hero_targetable: PackedByteArray, hero_radius: float) -> void:
 	hero_hits.clear()
 	impacts.clear()
@@ -121,14 +124,16 @@ func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_positions: PackedV
 	var hhp := horde.hp
 	var htype := horde.type
 	var huid := horde.uid
-	var hrad := horde.t_radius
+	var hurt_half := horde.t_hurt_half_width
+	var hurt_height := horde.t_hurt_height
 	var head := horde.hash.head
 	var nxt := horde.hash.next
 	var hcols := horde.hash.cols
 	var hrows := horde.hash.rows
 	var hinv := horde.hash.inv_cell
-	var reach_extra := horde.max_radius
-	var hero_count := hero_positions.size()
+	var reach_side := horde.hurt_max_half_width
+	var reach_down := horde.hurt_max_height
+	var hero_count := hero_bodies.size()
 
 	var i := 0
 	while i < count:
@@ -155,11 +160,14 @@ func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_positions: PackedV
 			P[i] = np
 			var r := radius[i]
 			if team[i] == Team.PLAYER:
-				var reach := r + reach_extra
-				var x0 := clampi(int((np.x - reach) * hinv), 0, hcols - 1)
-				var x1 := clampi(int((np.x + reach) * hinv), 0, hcols - 1)
-				var y0 := clampi(int((np.y - reach) * hinv), 0, hrows - 1)
-				var y1 := clampi(int((np.y + reach) * hinv), 0, hrows - 1)
+				# The hash holds feet and bodies stand on them, so a body the shot
+				# can touch has its feet between just above the shot and the
+				# tallest body's height below it.
+				var x0 := clampi(int((np.x - r - reach_side) * hinv), 0, hcols - 1)
+				var x1 := clampi(int((np.x + r + reach_side) * hinv), 0, hcols - 1)
+				var y0 := clampi(int((np.y - r) * hinv), 0, hrows - 1)
+				var y1 := clampi(int((np.y + r + reach_down) * hinv), 0, hrows - 1)
+				var r2 := r * r
 				var hit_done := false
 				for qy in range(y0, y1 + 1):
 					if hit_done:
@@ -170,9 +178,15 @@ func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_positions: PackedV
 						var j := head[qy * hcols + qx]
 						while j != -1:
 							if hhp[j] > 0.0 and huid[j] != last_hit[i]:
-								var rr := r + hrad[htype[j]]
-								if np.distance_squared_to(hpos[j]) <= rr * rr:
-									_hit_enemy(i, j, horde, v)
+								# Closest point of the body box to the shot.
+								var f := hpos[j]
+								var t := htype[j]
+								var bx := clampf(np.x, f.x - hurt_half[t], f.x + hurt_half[t])
+								var by := clampf(np.y, f.y - hurt_height[t], f.y)
+								var dx := np.x - bx
+								var dy := np.y - by
+								if dx * dx + dy * dy <= r2:
+									_hit_enemy(i, j, horde, v, Vector2(bx, by))
 									hhp = horde.hp  # damage() wrote to hp (copy-on-write)
 									if pierce[i] < 0:
 										dead = true
@@ -183,7 +197,7 @@ func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_positions: PackedV
 				for h in hero_count:
 					if hero_targetable[h] != 0:
 						var rr := r + hero_radius
-						if np.distance_squared_to(hero_positions[h]) <= rr * rr:
+						if np.distance_squared_to(hero_bodies[h]) <= rr * rr:
 							hero_hits.append(float(h))
 							hero_hits.append(damage[i])
 							dead = true
@@ -201,10 +215,11 @@ func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_positions: PackedV
 	life = L
 
 
-func _hit_enemy(i: int, j: int, horde: HordeSim, v: Vector2) -> void:
+## `at`: where the shot touched the body (sparks and numbers appear there).
+func _hit_enemy(i: int, j: int, horde: HordeSim, v: Vector2, at: Vector2) -> void:
 	var kb := v.normalized() * knockback[i] if v != Vector2.ZERO else Vector2.ZERO
 	var is_crit := crit[i] != 0
-	horde.damage(j, damage[i], kb, owner[i], is_crit)
+	horde.damage(j, damage[i], kb, owner[i], is_crit, at)
 	match effect[i]:
 		Effect.SLOW:
 			horde.apply_slow(j, effect_time[i])

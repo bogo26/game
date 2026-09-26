@@ -13,7 +13,12 @@ enum Behavior {
 @export var id: StringName = &"swarmer"
 @export var max_hp := 10.0
 @export var speed := 45.0
+## Footprint circle at the feet: walls, crowding and contact damage.
 @export var radius := 5.0
+## What shots can hit: a box (width, height) standing on the feet, centred on
+## them. Size it to the drawn body (tests/test_hurtboxes.gd checks it against
+## the art), so a shot that visibly crosses the head or body connects.
+@export var hurt_size := Vector2(14, 15)
 @export var contact_damage := 8.0
 @export var xp := 1
 ## Multiplier on knockback received (big enemies < 1).

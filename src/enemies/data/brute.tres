@@ -8,6 +8,7 @@ id = &"brute"
 max_hp = 70.0
 speed = 26.0
 radius = 9.0
+hurt_size = Vector2(22, 22)
 contact_damage = 14.0
 xp = 5
 knockback_taken = 0.3
