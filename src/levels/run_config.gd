@@ -1,8 +1,9 @@
 class_name RunConfig
 extends Resource
-## The sequence of levels in a run (src/levels/run_config.tres). Each level
-## may have a second layout; every run picks one per level and randomly
-## mirrors it (the boss level only left-right), so the run isn't memorised.
+## The sequence of levels in a run (src/levels/run_config.tres): levels 1-3,
+## the mini boss, levels 4-6 and the final boss. Each level may have a second
+## layout; every run picks one per level and randomly mirrors it (boss levels
+## only left-right), so the run isn't memorised.
 
 const PATH := "res://src/levels/run_config.tres"
 
@@ -32,6 +33,24 @@ func layout_for(index: int, seed_value: int) -> LevelData:
 	var flip_h := rng.randf() < 0.5
 	var flip_v := rng.randf() < 0.5 and not data.is_boss_level
 	return data.mirrored(flip_h, flip_v)
+
+
+## The banner title for level `index`: regular levels count on their own
+## ("LEVEL 4" comes after the mini boss), boss levels say which boss it is.
+func title(index: int) -> String:
+	var data := levels[index]
+	if data.is_boss_level:
+		return "FINAL BOSS" if data.is_final_boss else "MINI BOSS"
+	return "LEVEL %d" % level_number(index)
+
+
+## 1-based number of the regular level at `index`, not counting boss levels.
+func level_number(index: int) -> int:
+	var n := 0
+	for k in mini(index + 1, levels.size()):
+		if not levels[k].is_boss_level:
+			n += 1
+	return n
 
 
 static func load_default() -> RunConfig:

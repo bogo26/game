@@ -5,6 +5,11 @@ extends RefCounted
 ## stars in character select). Hard unlocks with a win on Normal.
 
 const DEFAULT_PATH := "user://profile.cfg"
+## Bumped when runs change length, so best times stay comparable: version 2
+## is the 8-level run (a mini boss after level 3, then levels 4-6 and the
+## final boss). Loading an older profile drops its best times but keeps wins,
+## Hard unlocked and the hero stars.
+const RUN_VERSION := 2
 ## Where the profile is saved (tests point this elsewhere).
 static var path := DEFAULT_PATH
 
@@ -23,13 +28,15 @@ static func load_profile() -> Profile:
 		return p
 	p.runs_played = int(cfg.get_value("runs", "played", 0))
 	p.wins = PackedInt32Array(cfg.get_value("runs", "wins", [0, 0, 0]))
-	p.best_time = PackedFloat32Array(cfg.get_value("runs", "best_time", [0.0, 0.0, 0.0]))
+	if int(cfg.get_value("runs", "version", 1)) >= RUN_VERSION:
+		p.best_time = PackedFloat32Array(cfg.get_value("runs", "best_time", [0.0, 0.0, 0.0]))
 	p.hero_best = cfg.get_value("heroes", "best", {})
 	return p
 
 
 func save() -> void:
 	var cfg := ConfigFile.new()
+	cfg.set_value("runs", "version", RUN_VERSION)
 	cfg.set_value("runs", "played", runs_played)
 	cfg.set_value("runs", "wins", Array(wins))
 	cfg.set_value("runs", "best_time", Array(best_time))

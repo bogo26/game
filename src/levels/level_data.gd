@@ -30,12 +30,21 @@ extends Resource
 @export var arena_spawn_rate := 28.0
 
 @export_group("Look")
-## Tile sheet: assets/tiles/tiles_<theme>.png (crypt, flooded, bones, throne).
+## Tile sheet: assets/tiles/tiles_<theme>.png (crypt, flooded, bones, ossuary,
+## fungal, frost, forge, throne).
 @export var theme: StringName = &"crypt"
 @export var tint := Color.WHITE
 
 @export_group("Boss")
+## A boss level: its one arena room (the boss room, holding B) is a boss fight
+## instead of waves. Beating a mini boss opens the level's exit portal (behind
+## the boss room); beating the final boss wins the run, so its level has no exit.
 @export var is_boss_level := false
+@export var is_final_boss := false
+## The boss waiting in the boss room (a scene whose root is a Boss).
+@export_file("*.tscn") var boss_scene := "res://src/enemies/boss/boss_demon.tscn"
+## What the objective calls the boss room before the fight: "Enter the <boss_room>".
+@export var boss_room := "throne room"
 
 
 ## A copy with the layout flipped left-right and/or upside down (runs vary

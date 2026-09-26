@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"bone_colossus"
+max_hp = 1100.0
+speed = 0.0
+radius = 13.0
+hurt_size = Vector2(48, 54)
+contact_damage = 16.0
+xp = 0
+knockback_taken = 0.0
+behavior = 3
+atlas_row = 0

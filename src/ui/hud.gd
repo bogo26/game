@@ -8,7 +8,7 @@ extends CanvasLayer
 ##   P4 bottom-right) with portrait, HP, special/movement cooldowns and the
 ##   ultimate meter; empty slots show a join prompt in drop-in mode
 ## - an arrow at the screen edge pointing at an off-screen objective
-## - boss HP bar during the boss fight, and the controller-disconnected notice
+## - the boss's name and HP bar during a boss fight, and the controller-disconnected notice
 ## - the minimap while a player holds MAP (plus a hint at the start of a level)
 
 const BAR_SIZE := Vector2(160, 4)
@@ -281,7 +281,7 @@ func _update_blessing_label(view: Vector2) -> void:
 
 func _update_boss_label(view: Vector2) -> void:
 	var boss := world.boss if world else null
-	_boss_label.text = "DEMON LORD" if boss and is_instance_valid(boss) else ""
+	_boss_label.text = boss.display_name.to_upper() if boss and is_instance_valid(boss) else ""
 	_boss_label.position = Vector2(0, view.y - 22)
 	_boss_label.size = Vector2(view.x, 10)
 

@@ -7,7 +7,7 @@ extends Node2D
 ## heroes. "Live" warnings are replaced every frame by their owner (exploder
 ## fuses follow the exploders and vanish when they die).
 
-enum Kind { RING, DISC, SLASH, LINE, TELEGRAPH, ZONE, WARN_LINE, BOLT, WARN_BAND, DOT_RING, PORTAL }
+enum Kind { RING, DISC, SLASH, LINE, TELEGRAPH, ZONE, WARN_LINE, BOLT, WARN_BAND, DOT_RING, PORTAL, WARN_ARC }
 
 ## Everything hostile warns in this colour (enemy shots use it too).
 const DANGER := Color(1.0, 0.24, 0.5)
@@ -89,6 +89,12 @@ func warn_band(a: Vector2, b: Vector2, width: float, color: Color, duration: flo
 ## telegraphs are dashed so they never read as an enemy's.
 func telegraph(p: Vector2, radius: float, color: Color, duration: float, dashed: bool = false) -> void:
 	_add(Kind.TELEGRAPH, p, p, radius, duration, 1.0 if dashed else 0.0, 0.0, color)
+
+
+## Warning wedge (a swing): `arc` radians wide facing `angle`, out to
+## `radius`, filling up until the blow lands - exactly where it will hit.
+func warn_arc(p: Vector2, radius: float, angle: float, arc: float, color: Color, duration: float) -> void:
+	_add(Kind.WARN_ARC, p, p, radius, duration, angle, arc, color)
 
 
 ## A ring of `dots` points turning around p (a ring of shots is coming).
@@ -179,6 +185,22 @@ func _draw() -> void:
 				draw_colored_polygon(quad, Color(c, 0.1 + 0.25 * t))
 				draw_line((p + side).round(), (b + side).round(), Color(c, 0.9), -1.0, false)
 				draw_line((p - side).round(), (b - side).round(), Color(c, 0.9), -1.0, false)
+			Kind.WARN_ARC:
+				var a0 := _angle[i] - _arc[i] * 0.5
+				var a1 := _angle[i] + _arc[i] * 0.5
+				var steps := _segments(r)
+				var fill := r * t
+				if fill >= 3.0:
+					# A fan from the centre (convex while the arc is under 180 degrees),
+					# its points a few pixels apart so it never degenerates.
+					var n := clampi(int(fill * _arc[i] / 3.0), 2, steps)
+					var fan := PackedVector2Array([p])
+					for k in n + 1:
+						fan.append(p + Vector2.from_angle(lerpf(a0, a1, float(k) / n)) * fill)
+					draw_colored_polygon(fan, Color(c, 0.22))
+				draw_arc(p, r, a0, a1, steps, Color(c, 0.9), 1.0, false)
+				draw_line(p, (p + Vector2.from_angle(a0) * r).round(), Color(c, 0.9), -1.0, false)
+				draw_line(p, (p + Vector2.from_angle(a1) * r).round(), Color(c, 0.9), -1.0, false)
 			Kind.DOT_RING:
 				var dots := int(_arc[i])
 				var turn := t * 1.2

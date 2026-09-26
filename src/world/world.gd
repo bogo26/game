@@ -28,6 +28,7 @@ const ENEMY_TYPES: Array[String] = [
 	"res://src/enemies/data/barrel.tres",
 	"res://src/enemies/data/urn.tres",
 	"res://src/enemies/data/nest.tres",
+	"res://src/enemies/data/bone_colossus.tres",
 ]
 const HORDE_ATLAS := preload("res://assets/sprites/enemies/horde_atlas.png")
 const FX_ATLAS := preload("res://assets/sprites/fx/fx_atlas.png")
@@ -39,6 +40,7 @@ const ENEMY_COLORS := {
 	&"swarmer": Color(0.42, 0.75, 0.3), &"brute": Color(0.6, 0.45, 0.68), &"spitter": Color(0.68, 0.35, 0.85),
 	&"exploder": Color(1.0, 0.55, 0.2), &"boss_demon": Color(0.9, 0.25, 0.2),
 	&"barrel": Color(0.75, 0.3, 0.2), &"urn": Color(0.69, 0.48, 0.29), &"nest": Color(0.55, 0.2, 0.35),
+	&"bone_colossus": Color(0.9, 0.86, 0.72),
 }
 const MAX_SPARKS_PER_FRAME := 40
 const MAX_PUFFS_PER_FRAME := 30
@@ -116,7 +118,7 @@ var elements: Elements
 ## Tiles the team has seen (minimap).
 var reveal := MapReveal.new()
 var spikes := SpikeTraps.new()
-var boss: BossDemon
+var boss: Boss
 ## Run statistics for this level.
 var kills := 0
 var elapsed := 0.0
@@ -260,6 +262,7 @@ func _ready() -> void:
 		director.objective_target = Vector2.INF
 	director.level_completed.connect(level_completed.emit)
 	director.boss_defeated.connect(boss_defeated.emit)
+	director.mini_boss_defeated.connect(_on_mini_boss_defeated)
 	director.arena_cleared.connect(_on_arena_cleared)
 	director.wave_started.connect(_on_wave_started)
 	if not GameState.debug_picks_given:
@@ -1110,6 +1113,11 @@ func _on_arena_cleared(_room_id: int) -> void:
 	level_up_delay = maxf(level_up_delay, PICKS_AFTER_CLEAR)
 	if director.exit_open:
 		tip(&"exit", "The exit is open: everyone into the portal!")
+
+
+## A mini boss fell: its room opens, and so does the exit behind it.
+func _on_mini_boss_defeated(boss_name: String) -> void:
+	hud.callout("%s SLAIN!" % boss_name.to_upper(), Color(1, 0.9, 0.5))
 
 
 func _on_wave_started(wave: int, waves: int) -> void:

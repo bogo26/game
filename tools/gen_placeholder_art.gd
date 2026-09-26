@@ -11,6 +11,7 @@ extends SceneTree
 ##   assets/sprites/fx/fx_atlas.png         16x16 cells; row 0 projectiles, row 1 pickups
 ##   assets/fonts/pixel5x8.png + .fnt       proportional 5x8 pixel font (BMFont), ASCII 32-126
 ##   assets/sprites/enemies/boss_demon.png  4 frames of 64x64: walk0, walk1, windup, charge
+##   assets/sprites/enemies/bone_colossus.png 4 frames of 64x64: walk0, walk1, windup, leap
 ##   assets/sprites/props/chest.png         2 frames of 16x16: closed, open
 ##   assets/sprites/props/shrine.png        2 frames of 16x24: active, used (orb is white: tinted in game)
 ##   assets/sprites/fx/glow.png             64x64 soft light (torch glow)
@@ -59,6 +60,7 @@ func _initialize() -> void:
 	_gen_fx_atlas()
 	_gen_font()
 	_gen_boss()
+	_gen_colossus()
 	_gen_props()
 	_gen_icon()
 	print("placeholder art generated")
@@ -127,6 +129,24 @@ const THEMES := {
 		"wall_top": "5c4c3e", "wall_hi": "7a6652", "wall_lo": "33281f", "brick": "4a3c30", "mortar": "281e16",
 		"face_hi": "6e5a48", "water": "3a3f26", "water_hi": "6a7040", "pit": "050403", "pit_hi": "2e241a",
 		"lava": false, "banner": "7a3a24", "banner_hi": "e0d0b0"},
+	# The mini boss's lair: walls of stacked bone over a dark floor.
+	"ossuary": {"style": "slab", "floor": "2c2826", "arena": "36292a", "moss": "4a4436",
+		"wall_top": "8a8070", "wall_hi": "b0a690", "wall_lo": "4e473c", "brick": "7a7060", "mortar": "3a342c",
+		"face_hi": "a09680", "water": "2a2a30", "water_hi": "5a5a70", "pit": "050404", "pit_hi": "3a2e26",
+		"lava": false, "banner": "5a2a2a", "banner_hi": "d8ccb0"},
+	# Levels 4-6: glowing fungus and toxic pools, ice and slush, iron and lava.
+	"fungal": {"style": "dirt", "floor": "2a2236", "arena": "32263c", "moss": "3fae8e",
+		"wall_top": "3e3252", "wall_hi": "5a4a74", "wall_lo": "221a30", "brick": "342a46", "mortar": "1c1628",
+		"face_hi": "524468", "water": "2c5a2a", "water_hi": "7ec84a", "pit": "04030a", "pit_hi": "2a1e3a",
+		"lava": false, "banner": "6a2a7a", "banner_hi": "8af0c0"},
+	"frost": {"style": "slab", "floor": "2c3a4c", "arena": "34405a", "moss": "8ab8d8",
+		"wall_top": "5a7894", "wall_hi": "8ab0cc", "wall_lo": "34485e", "brick": "4c6680", "mortar": "283a4c",
+		"face_hi": "7898b4", "water": "3a6a92", "water_hi": "b8e4ff", "pit": "040812", "pit_hi": "2a4a6e",
+		"lava": false, "banner": "2a4a8a", "banner_hi": "d8f0ff"},
+	"forge": {"style": "slab", "floor": "2a2624", "arena": "36282a", "moss": "3a302c",
+		"wall_top": "4a423e", "wall_hi": "6a5e56", "wall_lo": "282220", "brick": "3e3632", "mortar": "1c1614",
+		"face_hi": "5e524a", "water": "3a3020", "water_hi": "7a6a40", "pit": "b03c0c", "pit_hi": "ffb030",
+		"lava": true, "banner": "8a4a1a", "banner_hi": "f0a030"},
 	"throne": {"style": "slab", "floor": "2b1b22", "arena": "3a1c20", "moss": "4a2a2a",
 		"wall_top": "4c2a32", "wall_hi": "6c3e48", "wall_lo": "2a141a", "brick": "3e222a", "mortar": "1e0c10",
 		"face_hi": "643842", "water": "4a1018", "water_hi": "a0303a", "pit": "a8300c", "pit_hi": "ffc040",
@@ -1201,6 +1221,101 @@ func _draw_demon(img: Image, ox: int, frame: int) -> void:
 	for i in 6:
 		_rect(img, ox + 21 - i / 2 + lean, 10 - i + bob, 3, 1, horn)
 		_rect(img, ox + 41 + i / 2 + lean, 10 - i + bob, 3, 1, horn)
+
+
+# --- mini boss (64x64 frames: walk0, walk1, windup, leap; feet at y=58) ------------------
+
+func _gen_colossus() -> void:
+	var img := _img(256, 64)
+	for f in 4:
+		_draw_colossus(img, f * 64, f)
+		_outline(img, Rect2i(f * 64, 0, 64, 64))
+	_save(img, "res://assets/sprites/enemies/bone_colossus.png")
+
+
+## A hunched giant of bones with glowing eyes and a femur club.
+func _draw_colossus(img: Image, ox: int, frame: int) -> void:
+	var bone := Color("e0d6bc")
+	var hi := Color("f4ecd6")
+	var shade := Color("a89c80")
+	var dark := Color("4a4238")
+	var glow := Color("9cff5a")
+	var club := Color("cbbb96")
+	var bob := 1 if frame == 1 else 0
+	var leap := frame == 3
+	# Legs (stepping in turn, tucked in a leap) and big bone feet.
+	var lift_l := 2 if frame == 1 else 0
+	var lift_r := 0 if leap or frame == 1 else 2
+	var bottom := 51 if leap else 55
+	for leg: Array in [[22, lift_l], [37, lift_r]]:
+		var x: int = leg[0]
+		var lift: int = leg[1]
+		_rect(img, ox + x, 44, 6, bottom - 44 - lift, shade)
+		_rect(img, ox + x + 1, 44, 2, bottom - 44 - lift, bone)
+		_rect(img, ox + x - 1, 48, 8, 2, bone)  # knee
+		_rect(img, ox + x - 3, bottom + 1 - lift, 10, 3, bone)
+		_rect(img, ox + x - 3, bottom + 3 - lift, 10, 1, shade)
+	# Pelvis and spine.
+	_rect(img, ox + 21, 41 + bob, 23, 5, bone)
+	_rect(img, ox + 25, 43 + bob, 3, 2, dark)
+	_rect(img, ox + 37, 43 + bob, 3, 2, dark)
+	_rect(img, ox + 31, 34 + bob, 3, 8, shade)
+	# Ribcage: bone bars with dark gaps either side of the sternum.
+	_rect(img, ox + 17, 22 + bob, 31, 16, bone)
+	for y in [25, 28, 31, 34]:
+		_rect(img, ox + 19, y + bob, 12, 1, dark)
+		_rect(img, ox + 34, y + bob, 12, 1, dark)
+	_rect(img, ox + 44, 23 + bob, 3, 14, shade)
+	_rect(img, ox + 18, 23 + bob, 1, 14, hi)
+	# Shoulders with knobs.
+	_rect(img, ox + 12, 19 + bob, 41, 5, bone)
+	_rect(img, ox + 12, 19 + bob, 41, 1, hi)
+	_rect(img, ox + 9, 17 + bob, 8, 7, bone)
+	_rect(img, ox + 48, 17 + bob, 8, 7, bone)
+	_rect(img, ox + 9, 17 + bob, 8, 1, hi)
+	_rect(img, ox + 48, 17 + bob, 8, 1, hi)
+	# Arms and the club.
+	if frame == 2:  # wind-up: the club raised over its head in both hands
+		_rect(img, ox + 13, 8, 4, 12, bone)
+		_rect(img, ox + 47, 8, 4, 12, bone)
+		_rect(img, ox + 12, 5, 6, 4, shade)
+		_rect(img, ox + 46, 5, 6, 4, shade)
+		_rect(img, ox + 8, 3, 48, 3, club)
+		_rect(img, ox + 3, 1, 7, 7, club)
+		_rect(img, ox + 54, 1, 7, 7, club)
+		_rect(img, ox + 4, 2, 2, 2, bone)
+		_rect(img, ox + 55, 2, 2, 2, bone)
+	elif leap:  # airborne: arms flung up, the club held high behind it
+		_rect(img, ox + 11, 9, 4, 11, bone)
+		_rect(img, ox + 10, 6, 6, 4, shade)
+		_rect(img, ox + 49, 9, 4, 11, bone)
+		_rect(img, ox + 48, 6, 6, 4, shade)
+		_rect(img, ox + 50, 2, 3, 6, club)
+		_rect(img, ox + 48, 1, 7, 4, club)
+	else:  # hanging claws; the club dragging at its side
+		_rect(img, ox + 10, 23 + bob, 4, 11, bone)
+		_rect(img, ox + 9, 34 + bob, 4, 9, shade)
+		_rect(img, ox + 8, 43 + bob, 7, 4, bone)
+		_rect(img, ox + 51, 23 + bob, 4, 11, bone)
+		_rect(img, ox + 51, 34 + bob, 4, 7, shade)
+		_rect(img, ox + 51, 38 + bob, 3, 12, club)
+		_rect(img, ox + 48, 49 + bob, 9, 7, club)
+		_rect(img, ox + 49, 50 + bob, 2, 2, bone)
+	# Skull: glowing eyes, a jaw of teeth and a crown of bone spikes.
+	_rect(img, ox + 24, 7 + bob, 17, 10, bone)
+	_rect(img, ox + 24, 7 + bob, 17, 1, hi)
+	_rect(img, ox + 26, 17 + bob, 13, 4, shade)
+	_rect(img, ox + 27, 10 + bob, 4, 4, dark)
+	_rect(img, ox + 34, 10 + bob, 4, 4, dark)
+	var eye := Color.WHITE if frame == 2 else glow
+	_rect(img, ox + 28, 11 + bob, 2, 2, eye)
+	_rect(img, ox + 35, 11 + bob, 2, 2, eye)
+	_rect(img, ox + 32, 14 + bob, 1, 2, dark)
+	for x in range(27, 38, 2):
+		_px(img, ox + x, 18 + bob, dark)
+	for x in [27, 32, 37]:
+		_rect(img, ox + x, 4 + bob, 1, 3, bone)
+		_px(img, ox + x, 3 + bob, hi)
 
 
 # --- app icon (drawn at 32x32, scaled x8 with nearest filtering) ----------------------
