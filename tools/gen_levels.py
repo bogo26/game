@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Builds the run's level layouts and writes src/levels/data/level_*.tres.
+"""Builds the run's level layouts and writes src/levels/data/*.tres (levels
+1-6 and their second layouts, the mini boss's lair and the final boss's
+throne; src/levels/run_config.tres lists the run's order).
 
 Levels are designed here on a character canvas (legend in
 src/levels/level_data.gd) from shapes: rectangles, octagons, discs, caves,
@@ -402,6 +404,46 @@ def boss():
     return c
 
 
+def lair():
+    """The Ossuary (mini boss): an approach of spikes and bone niches up to
+    the Bone Colossus's hall - bone pits, bone columns and barrels - and,
+    behind it, the way on: the exit portal and a chest for the victors."""
+    c = Canvas(76, 70, seed=88)
+    c.rect(26, 58, 50, 67)
+    c.put(38, 63, "P")
+    for (x, y) in ((27, 59), (49, 59), (27, 66), (49, 66)):
+        c.put(x, y, "u")
+    c.rect(22, 61, 25, 63)                       # shrine alcove
+    c.put(23, 62, "A")
+    c.hall(35, 56, 41, 57)                       # the approach: a neck of barrels...
+    c.cluster(35, 56, pattern=((0, 0), (0, 1)))
+    c.cluster(41, 56, pattern=((0, 0), (0, 1)))
+    c.rect(29, 49, 47, 55)                       # ...an antechamber of spikes...
+    c.fill(c.rect_cells(29, 51, 47, 52), "^")
+    for x in (30, 46):
+        c.put(x, 50, "u")
+    c.put(32, 54, "S")
+    c.put(44, 54, "S")
+    c.hall(35, 47, 41, 48)                       # ...and the doors of the Colossus's hall
+    hall = c.octagon_cells(8, 12, 68, 46, 9)     # the Colossus's hall
+    c.arena(1, hall)
+    for (x, y) in ((20, 29), (56, 29)):
+        c.fill(c.disc_cells(x, y, 4), ":")
+    for (x, y) in ((27, 20), (48, 20), (27, 38), (48, 38)):
+        c.pillar(x, y)
+    c.cluster(33, 40)
+    c.cluster(42, 40, pattern=((0, 0), (1, 0), (1, 1)))
+    c.cluster(14, 36, pattern=((0, 0), (0, 1)))
+    c.cluster(62, 22, pattern=((0, 0), (0, 1)))
+    c.put(38, 18, "B")
+    c.hall(35, 7, 41, 13, "s")                   # behind it, the way on
+    c.rect(26, 1, 50, 7)
+    c.fill(c.rect_cells(37, 2, 39, 4), "X")
+    c.put(29, 4, "C")
+    c.put(47, 2, "u")
+    return c
+
+
 # --- second layouts (the run picks one per level, then may mirror it) ----------------------
 
 def level1b():
@@ -573,6 +615,433 @@ def level3b():
     return c
 
 
+# --- after the mini boss: levels 4-6 ----------------------------------------------------------
+
+def level4():
+    """Fungal Caverns: toxic pools slow every step and spore nests line the
+    way. A round garden of nests, the mycelium hall (a shrine in its north
+    wall), a moated octagon and a great cave arena before the exit; the
+    treasure waits in a flooded grotto south of the garden."""
+    c = Canvas(120, 72, seed=55)
+    start = c.cave_cells(2, 24, 22, 46, fill=0.36)
+    c._carve(start)
+    c.fill(c.disc_cells(11, 35, 2), ".")
+    c.put(11, 35, "P")
+    c.scatter(start, "u", 3)
+    a1 = c.disc_cells(40, 35, 12)                # arena 1: a garden of spore nests
+    c.arena(1, a1)
+    c.hall(14, 33, 29, 37, "e")                  # east to it
+    for (x, y) in ((34, 28), (46, 42)):
+        c.fill(c.disc_cells(x, y, 2), "~")
+    c.pillar(39, 34)
+    for spot in ((33, 42), (47, 28)):
+        c.put(*_open_spot(c, a1, spot), "N")
+    c.scatter(a1, "b", 3)
+    myc = c.cave_cells(30, 3, 88, 19, fill=0.38)  # the mycelium hall: pools and nests
+    c._carve(myc)
+    c.hall(38, 10, 42, 24, "s")                  # north from the garden into it
+    for (x, y) in ((52, 11), (72, 9)):
+        c.fill(c.disc_cells(x, y, 3), "~")
+    c.put(*_open_spot(c, myc, (60, 13)), "N")
+    c.put(*_open_spot(c, myc, (82, 12)), "N")
+    c.scatter(myc, "u", 4)
+    c.scatter(myc, "S", 2)
+    c.hall(62, 2, 64, 9)                         # shrine alcove
+    c.rect(61, 1, 65, 3)
+    c.put(63, 1, "A")
+    a2 = c.octagon_cells(62, 26, 90, 54, 7)      # arena 2: an island in a toxic moat
+    c.arena(2, a2)
+    c.hall(74, 12, 78, 27, "s")                  # south from the mycelium hall to it
+    c.fill(c.disc_cells(76, 40, 9), "~")
+    c.fill(c.disc_cells(76, 40, 5), ".")
+    c.fill(c.rect_cells(62, 39, 90, 41), ".")    # causeways over the moat
+    c.fill(c.rect_cells(75, 26, 77, 54), ".")
+    c.cluster(75, 39, pattern=((0, 0), (1, 0), (0, 1), (1, 1)))
+    c.pillar(67, 31)
+    c.pillar(84, 48)
+    c.cluster(85, 30)
+    c.cluster(66, 49, pattern=((0, 0), (1, 0)))
+    a3 = c.cave_cells(94, 4, 118, 58, fill=0.36, rounded=True)
+    a3 += c.rect_cells(94, 37, 99, 43) + c.rect_cells(103, 53, 109, 57)  # flat where the halls meet it
+    c.arena(3, a3)                               # arena 3: the great cave
+    c.hall(91, 38, 99, 42, "e")                  # east to it
+    for (x, y) in ((101, 14), (111, 44)):
+        c.fill(c.disc_cells(x, y, 3), "~")
+    c.fill(c.rect_cells(103, 26, 108, 31), "^")  # a patch of spore traps
+    c.put(*_open_spot(c, a3, (109, 11)), "N")
+    c.scatter(a3, "b", 4)
+    c.hall(104, 55, 108, 62, "n")                # south to the exit
+    c.rect(96, 62, 116, 70)
+    c.fill(c.rect_cells(105, 65, 107, 67), "X")
+    c.hall(38, 46, 42, 58, "n")                  # optional: south, wading to the treasure
+    grotto = c.rect_cells(24, 58, 56, 66)
+    c._carve(grotto)
+    c.fill(grotto, "~")
+    c.fill(c.rect_cells(38, 58, 42, 66), ".")
+    c.fill(c.rect_cells(24, 61, 42, 63), ".")
+    c.put(26, 62, "C")
+    c.put(54, 59, "u")
+    c.put(54, 65, "u")
+    return c
+
+
+def level5():
+    """Frozen Vaults: crevasses and slush. A hall split by a crevasse (three
+    ice bridges), a gallery of spike traps to the frozen crossroads (shrine to
+    the north, a treasure vault over the abyss to the south), a frozen lake
+    arena and a vault arena of traps and nests before the exit."""
+    c = Canvas(124, 76, seed=66)
+    start = c.rect_cells(4, 58, 20, 72)
+    c._carve(start)
+    c.put(12, 66, "P")
+    for (x, y) in ((5, 59), (19, 59), (5, 71), (19, 71)):
+        c.put(x, y, "u")
+    a1 = c.rect_cells(4, 24, 40, 43)             # arena 1: split by a crevasse
+    c.arena(1, a1)
+    c.hall(10, 44, 14, 57, "n")                  # north to it, over slush
+    c.fill(c.rect_cells(10, 48, 14, 53), "~")
+    c.fill(c.rect_cells(21, 24, 23, 43), ":")
+    for y in (27, 33, 39):
+        c.fill(c.rect_cells(21, y, 23, y + 1), ".")
+    for (x, y) in ((10, 29), (10, 37), (32, 29), (32, 37)):
+        c.pillar(x, y)
+    c.cluster(6, 26)
+    c.cluster(37, 41, pattern=((0, 0), (1, 0), (1, -1)))
+    c.cluster(28, 33, pattern=((0, 0), (0, 1)))
+    c.hall(41, 30, 64, 34)                       # east: the gallery of spikes
+    for x0 in (46, 54):
+        c.fill(c.rect_cells(x0, 30, x0 + 3, 34), "^")
+    c.put(60, 32, "S")
+    cross = c.octagon_cells(64, 10, 88, 38, 5)   # the frozen crossroads
+    c._carve(cross)
+    for (x, y) in ((69, 15), (82, 15), (69, 32), (82, 32)):
+        c.pillar(x, y)
+    c.fill(c.disc_cells(76, 24, 3), "~")
+    c.put(*_open_spot(c, cross, (72, 22)), "N")
+    c.scatter(cross, "u", 3)
+    c.put(84, 24, "S")
+    c.hall(74, 5, 78, 10)                        # shrine alcove
+    c.rect(73, 3, 79, 5)
+    c.put(76, 3, "A")
+    c.hall(74, 39, 78, 51)                       # optional: south, over the abyss to the treasure
+    vault = c.rect_cells(60, 52, 92, 60)
+    c._carve(vault)
+    c.fill(vault, ":")
+    c.fill(c.rect_cells(75, 52, 77, 57), ".")    # a narrow bridge...
+    c.fill(c.rect_cells(63, 56, 77, 57), ".")    # ...west to the chest
+    c.fill(c.rect_cells(61, 54, 65, 59), ".")
+    c.put(62, 57, "C")
+    c.put(64, 55, "u")
+    a2 = c.disc_cells(104, 18, 13)               # arena 2: a frozen lake
+    c.arena(2, a2)
+    c.hall(89, 16, 92, 20, "e")                  # east from the crossroads to it
+    c.fill(a2, "~")
+    for (x, y) in ((104, 18), (97, 11), (111, 11), (97, 25), (111, 25)):
+        c.fill(c.disc_cells(x, y, 3 if (x, y) == (104, 18) else 2), ".")
+    c.fill(c.rect_cells(91, 17, 117, 19), ".")   # an ice path across the lake
+    c.pillar(103, 17)
+    c.cluster(98, 24)
+    c.cluster(110, 10, pattern=((0, 0), (1, 0)))
+    a3 = c.octagon_cells(94, 38, 120, 62, 6)     # arena 3: the vault of traps
+    c.arena(3, a3)
+    c.hall(102, 32, 106, 40, "s")                # south from the lake to it
+    for (x, y) in ((100, 44), (114, 44), (100, 56), (114, 56)):
+        c.fill(c.disc_cells(x, y, 2), ":")
+    c.fill(c.rect_cells(106, 45, 108, 55), "^")
+    c.fill(c.rect_cells(101, 49, 113, 51), "^")
+    for spot in ((98, 50), (116, 50)):
+        c.put(*_open_spot(c, a3, spot), "N")
+    c.scatter(a3, "b", 4)
+    c.hall(105, 63, 109, 67, "n")                # south to the exit
+    c.rect(98, 66, 118, 74)
+    c.fill(c.rect_cells(107, 69, 109, 71), "X")
+    return c
+
+
+def level6():
+    """Molten Forge: lava and powder kegs on the way down to the throne. A
+    foundry split by lava channels, the bellows gallery of spike presses, the
+    anvil hall (a powder store with the treasure off its west door), a
+    smelter ringed around a lava pit, the furnace cave, and a last gauntlet
+    down to the exit."""
+    c = Canvas(128, 80, seed=77)
+    start = c.cave_cells(2, 2, 24, 22, fill=0.36)
+    c._carve(start)
+    c.fill(c.disc_cells(12, 12, 2), ".")
+    c.put(12, 12, "P")
+    c.scatter(start, "u", 3)
+    a1 = c.rect_cells(32, 3, 64, 24)             # arena 1: the foundry, lava channels
+    c.arena(1, a1)
+    c.hall(18, 11, 33, 15, "e")                  # east to it
+    for x in (41, 54):
+        c.fill(c.rect_cells(x, 3, x + 1, 24), ":")
+        for y in (8, 18):
+            c.fill(c.rect_cells(x, y, x + 1, y + 1), ".")
+    c.pillar(35, 6)
+    c.pillar(60, 20)
+    c.cluster(47, 5, pattern=((0, 0), (1, 0), (0, 1)))
+    c.cluster(48, 22, pattern=((0, 0), (1, 0), (1, -1)))
+    c.cluster(36, 20)
+    c.cluster(60, 6, pattern=((0, 0), (0, 1)))
+    c.hall(45, 25, 49, 40, "s")                  # south: the bellows gallery
+    c.fill(c.rect_cells(45, 28, 49, 29), "^")
+    c.fill(c.rect_cells(45, 32, 49, 33), "^")
+    a2 = c.octagon_cells(32, 36, 62, 62, 6)      # arena 2: the anvil hall
+    c.arena(2, a2)
+    for (x, y) in ((39, 42), (53, 42), (39, 54), (53, 54)):
+        c.pillar(x, y, 3, 2)
+    c.fill(c.disc_cells(47, 49, 2), ":")
+    for (x, y) in ((35, 48), (58, 48), (46, 39), (46, 59)):
+        c.cluster(x, y, pattern=((0, 0), (1, 0)))
+    c.hall(19, 46, 31, 50)                       # optional: west to the powder store
+    store = c.rect_cells(4, 40, 18, 56)
+    c._carve(store)
+    c.put(6, 48, "C")
+    c.put(*_open_spot(c, store, (13, 43)), "N")
+    for (x, y) in ((5, 41), (17, 41), (5, 55), (17, 55)):
+        c.cluster(x, y, pattern=((0, 0),))
+    c.cluster(12, 53, pattern=((0, 0), (1, 0), (0, -1)))
+    a3 = c.disc_cells(86, 49, 12)                # arena 3: the smelter, around a lava pit
+    c.arena(3, a3)
+    c.hall(63, 47, 76, 51, "e")                  # east from the anvil hall to it
+    c.rect(67, 52, 69, 54)                       # shrine alcove
+    c.put(68, 54, "A")
+    c.fill(c.disc_cells(86, 49, 4), ":")
+    for (x, y) in ((79, 42), (92, 42), (79, 56), (92, 56)):
+        c.cluster(x, y, pattern=((0, 0), (1, 0)))
+    a4 = c.cave_cells(80, 2, 124, 28, fill=0.36, rounded=True)
+    a4 += c.rect_cells(82, 23, 90, 28) + c.rect_cells(108, 23, 116, 28)  # flat where the halls meet it
+    c.arena(4, a4)                               # arena 4: the furnace cave
+    c.hall(84, 29, 88, 36, "n")                  # north from the smelter to it
+    for (x, y) in ((94, 12), (112, 10)):
+        c.fill(c.disc_cells(x, y, 3), ":")
+    c.fill(c.rect_cells(100, 17, 105, 21), "^")
+    for spot in ((88, 10), (118, 16)):
+        c.put(*_open_spot(c, a4, spot), "N")
+    c.scatter(a4, "b", 4)
+    c.hall(110, 29, 114, 62, "n")                # the last gauntlet, south to the exit
+    for y0 in (36, 44, 52):
+        c.fill(c.rect_cells(110, y0, 114, y0 + 1), "^")
+    c.put(112, 40, "S")
+    c.put(112, 48, "S")
+    c.rect(102, 62, 124, 76)
+    c.fill(c.rect_cells(112, 67, 114, 69), "X")
+    return c
+
+
+def level4b():
+    """Fungal Caverns, the sunken grove: from the south-east through a moated
+    octagon, up into the mycelium hall (the shrine in its north wall), west to
+    a round garden of nests (a flooded grotto with the treasure behind it) and
+    down into the great cave, with the exit beside it."""
+    c = Canvas(120, 72, seed=555)
+    start = c.cave_cells(96, 48, 118, 70, fill=0.36)
+    c._carve(start)
+    c.fill(c.disc_cells(107, 59, 2), ".")
+    c.put(107, 59, "P")
+    c.scatter(start, "u", 3)
+    a1 = c.octagon_cells(62, 40, 88, 66, 7)      # arena 1: an island in a toxic moat
+    c.arena(1, a1)
+    c.hall(89, 51, 101, 55, "w")                 # west to it
+    c.fill(c.disc_cells(75, 53, 8), "~")
+    c.fill(c.disc_cells(75, 53, 4), ".")
+    c.fill(c.rect_cells(62, 52, 88, 54), ".")    # causeways over the moat
+    c.fill(c.rect_cells(74, 40, 76, 66), ".")
+    c.cluster(74, 52, pattern=((0, 0), (1, 0), (0, 1), (1, 1)))
+    c.pillar(67, 45)
+    c.pillar(82, 60)
+    c.cluster(83, 44)
+    c.cluster(66, 61, pattern=((0, 0), (1, 0)))
+    myc = c.cave_cells(46, 3, 104, 25, fill=0.38)  # the mycelium hall: pools and nests
+    c._carve(myc)
+    c.hall(73, 16, 77, 39, "s")                  # north from the moat into it
+    for (x, y) in ((58, 12), (92, 10)):
+        c.fill(c.disc_cells(x, y, 3), "~")
+    c.put(*_open_spot(c, myc, (66, 10)), "N")
+    c.put(*_open_spot(c, myc, (86, 18)), "N")
+    c.scatter(myc, "u", 4)
+    c.scatter(myc, "S", 2)
+    c.hall(79, 2, 81, 8)                         # shrine alcove
+    c.rect(78, 1, 82, 3)
+    c.put(80, 1, "A")
+    a2 = c.disc_cells(30, 17, 12)                # arena 2: a garden of spore nests
+    c.arena(2, a2)
+    c.hall(43, 11, 56, 15, "w")                  # west from the mycelium hall to it
+    for (x, y) in ((24, 11), (36, 23)):
+        c.fill(c.disc_cells(x, y, 2), "~")
+    c.pillar(29, 16)
+    for spot in ((23, 22), (37, 11)):
+        c.put(*_open_spot(c, a2, spot), "N")
+    c.scatter(a2, "b", 3)
+    c.hall(12, 15, 17, 19)                       # optional: west, wading to the treasure
+    grotto = c.rect_cells(2, 4, 11, 30)
+    c._carve(grotto)
+    c.fill(grotto, "~")
+    c.fill(c.rect_cells(5, 4, 8, 30), ".")
+    c.fill(c.rect_cells(2, 15, 11, 19), ".")
+    c.put(6, 5, "C")
+    c.put(3, 29, "u")
+    c.put(10, 29, "u")
+    a3 = c.cave_cells(4, 34, 46, 70, fill=0.36, rounded=True)
+    a3 += c.rect_cells(27, 34, 33, 38) + c.rect_cells(40, 58, 46, 64)  # flat where the halls meet it
+    c.arena(3, a3)                               # arena 3: the great cave
+    c.hall(28, 30, 32, 38, "s")                  # south from the garden to it
+    for (x, y) in ((16, 44), (28, 62)):
+        c.fill(c.disc_cells(x, y, 3), "~")
+    c.fill(c.rect_cells(22, 48, 27, 53), "^")    # a patch of spore traps
+    c.put(*_open_spot(c, a3, (12, 58)), "N")
+    c.scatter(a3, "b", 4)
+    c.hall(40, 59, 50, 63, "w")                  # east to the exit
+    c.rect(50, 54, 58, 70)
+    c.fill(c.rect_cells(53, 61, 55, 63), "X")
+    return c
+
+
+def level5b():
+    """Frozen Vaults, the glacier stair: from the north-east over a frozen
+    lake arena, west along a gallery of spike traps to the frozen crossroads
+    (a shrine to the north), south to a hall split by a crevasse (a treasure
+    vault over the abyss below it) and east through a vault of traps to the
+    exit."""
+    c = Canvas(124, 76, seed=666)
+    start = c.rect_cells(102, 3, 120, 17)
+    c._carve(start)
+    c.put(111, 10, "P")
+    for (x, y) in ((103, 4), (119, 4), (103, 16), (119, 16)):
+        c.put(x, y, "u")
+    a1 = c.disc_cells(72, 16, 12)                # arena 1: a frozen lake
+    c.arena(1, a1)
+    c.hall(78, 8, 101, 12, "w")                  # west to it
+    c.fill(a1, "~")
+    for (x, y) in ((72, 16), (65, 9), (79, 9), (65, 23), (79, 23)):
+        c.fill(c.disc_cells(x, y, 3 if (x, y) == (72, 16) else 2), ".")
+    c.fill(c.rect_cells(60, 15, 84, 17), ".")    # an ice path across the lake
+    c.fill(c.rect_cells(78, 8, 84, 12), ".")     # ...and a shore by the east door
+    c.pillar(71, 15)
+    c.cluster(66, 22)
+    c.cluster(78, 8, pattern=((0, 0), (1, 0)))
+    c.hall(35, 14, 59, 18, "e")                  # west: the gallery of spikes
+    for x0 in (40, 49):
+        c.fill(c.rect_cells(x0, 14, x0 + 3, 18), "^")
+    c.put(55, 16, "S")
+    cross = c.octagon_cells(6, 4, 34, 30, 5)     # the frozen crossroads
+    c._carve(cross)
+    for (x, y) in ((11, 9), (28, 9), (11, 24), (28, 24)):
+        c.pillar(x, y)
+    c.fill(c.disc_cells(20, 17, 3), "~")
+    c.put(*_open_spot(c, cross, (16, 20)), "N")
+    c.scatter(cross, "u", 3)
+    c.put(8, 17, "S")
+    c.hall(19, 2, 21, 4)                         # shrine alcove
+    c.rect(18, 1, 22, 2)
+    c.put(20, 1, "A")
+    a2 = c.rect_cells(6, 38, 44, 56)             # arena 2: split by a crevasse
+    c.arena(2, a2)
+    c.hall(18, 31, 22, 40, "s")                  # south from the crossroads to it
+    c.fill(c.rect_cells(6, 46, 44, 48), ":")
+    for x in (12, 24, 36):
+        c.fill(c.rect_cells(x, 46, x + 1, 48), ".")
+    for (x, y) in ((14, 41), (30, 41), (14, 52), (30, 52)):
+        c.pillar(x, y)
+    c.cluster(8, 40)
+    c.cluster(41, 54, pattern=((0, 0), (1, 0), (1, -1)))
+    c.cluster(22, 51, pattern=((0, 0), (1, 0)))
+    a3 = c.octagon_cells(54, 40, 80, 66, 6)      # arena 3: the vault of traps
+    c.arena(3, a3)
+    c.hall(45, 50, 56, 54, "e")                  # east from the crevasse hall to it
+    for (x, y) in ((60, 46), (74, 46), (60, 60), (74, 60)):
+        c.fill(c.disc_cells(x, y, 2), ":")
+    c.fill(c.rect_cells(66, 47, 68, 59), "^")
+    c.fill(c.rect_cells(61, 52, 73, 54), "^")
+    for spot in ((67, 44), (67, 62)):
+        c.put(*_open_spot(c, a3, spot), "N")
+    c.scatter(a3, "b", 4)
+    c.hall(81, 51, 91, 55, "w")                  # east to the exit
+    c.rect(88, 46, 108, 60)
+    c.fill(c.rect_cells(97, 52, 99, 54), "X")
+    c.hall(24, 57, 28, 63)                       # optional: south, over the abyss to the treasure
+    vault = c.rect_cells(6, 63, 44, 71)
+    c._carve(vault)
+    c.fill(vault, ":")
+    c.fill(c.rect_cells(24, 63, 26, 67), ".")    # a narrow bridge...
+    c.fill(c.rect_cells(10, 66, 26, 67), ".")    # ...west to the chest
+    c.fill(c.rect_cells(7, 64, 11, 70), ".")
+    c.put(8, 68, "C")
+    c.put(10, 64, "u")
+    return c
+
+
+def level6b():
+    """Molten Forge, the crucible: from the south-east into a smelter ringed
+    around a lava pit, west along the bellows gallery to the anvil hall (the
+    powder store with the treasure off its west door), north past a shrine
+    to the foundry split by lava channels, and east through the furnace cave
+    to the exit."""
+    c = Canvas(128, 80, seed=777)
+    start = c.cave_cells(98, 56, 124, 76, fill=0.36)
+    c._carve(start)
+    spawn = _open_spot(c, start, (110, 66))
+    c.fill(c.disc_cells(spawn[0], spawn[1], 2), ".")
+    c.put(*spawn, "P")
+    c.scatter(start, "u", 3)
+    a1 = c.disc_cells(74, 62, 12)                # arena 1: the smelter, around a lava pit
+    c.arena(1, a1)
+    c.hall(87, 60, 104, 64, "w")                 # west to it
+    c.fill(c.disc_cells(74, 62, 4), ":")
+    for (x, y) in ((67, 55), (80, 55), (67, 69), (80, 69)):
+        c.cluster(x, y, pattern=((0, 0), (1, 0)))
+    a2 = c.octagon_cells(16, 46, 46, 72, 6)      # arena 2: the anvil hall
+    c.arena(2, a2)
+    c.hall(47, 57, 61, 61, "e")                  # west from the smelter: the bellows gallery
+    c.fill(c.rect_cells(51, 57, 52, 61), "^")
+    c.fill(c.rect_cells(56, 57, 57, 61), "^")
+    for (x, y) in ((23, 52), (37, 52), (23, 64), (37, 64)):
+        c.pillar(x, y, 3, 2)
+    c.fill(c.disc_cells(31, 59, 2), ":")
+    for (x, y) in ((19, 58), (42, 58), (30, 49), (30, 69)):
+        c.cluster(x, y, pattern=((0, 0), (1, 0)))
+    c.hall(13, 57, 15, 61)                       # optional: west to the powder store
+    store = c.rect_cells(2, 50, 12, 68)
+    c._carve(store)
+    c.put(4, 52, "C")
+    c.put(*_open_spot(c, store, (8, 63)), "N")
+    for (x, y) in ((3, 67), (11, 67), (11, 51)):
+        c.cluster(x, y, pattern=((0, 0),))
+    c.cluster(5, 58, pattern=((0, 0), (1, 0), (0, 1)))
+    a3 = c.rect_cells(14, 8, 48, 30)             # arena 3: the foundry, lava channels
+    c.arena(3, a3)
+    c.hall(29, 31, 33, 45, "s")                  # north from the anvil hall to it
+    c.fill(c.rect_cells(29, 35, 33, 36), "^")
+    c.fill(c.rect_cells(29, 40, 33, 41), "^")
+    c.rect(34, 37, 36, 39)                       # shrine alcove
+    c.put(36, 38, "A")
+    for x in (23, 37):
+        c.fill(c.rect_cells(x, 8, x + 1, 30), ":")
+        for y in (13, 24):
+            c.fill(c.rect_cells(x, y, x + 1, y + 1), ".")
+    c.pillar(17, 11)
+    c.pillar(44, 26)
+    c.cluster(29, 10, pattern=((0, 0), (1, 0), (0, 1)))
+    c.cluster(30, 28, pattern=((0, 0), (1, 0), (1, -1)))
+    c.cluster(18, 26)
+    c.cluster(44, 10, pattern=((0, 0), (0, 1)))
+    a4 = c.cave_cells(60, 2, 104, 40, fill=0.36, rounded=True)
+    a4 += c.rect_cells(60, 14, 66, 22) + c.rect_cells(98, 18, 104, 26)  # flat where the halls meet it
+    c.arena(4, a4)                               # arena 4: the furnace cave
+    c.hall(49, 16, 66, 20, "e")                  # east from the foundry to it
+    for (x, y) in ((74, 12), (90, 30)):
+        c.fill(c.disc_cells(x, y, 3), ":")
+    c.fill(c.rect_cells(80, 18, 85, 22), "^")
+    for spot in ((70, 30), (94, 10)):
+        c.put(*_open_spot(c, a4, spot), "N")
+    c.scatter(a4, "b", 4)
+    c.hall(105, 20, 112, 24, "w")                # the last stretch, east to the exit
+    c.put(108, 22, "S")
+    c.rect(110, 12, 124, 32)
+    c.fill(c.rect_cells(116, 21, 118, 23), "X")
+    return c
+
+
 def _open_spot(c, cells, near):
     """The cell of `cells` nearest to `near` with room around it."""
     best, best_d = None, 1 << 30
@@ -597,14 +1066,35 @@ LEVELS = [
         "enemy_weights": {"swarmer": 1.0, "brute": 0.15, "spitter": 0.12, "exploder": 0.12},
         "hp_multiplier": 1.8, "corridor_cap_fraction": 0.55, "corridor_spawn_rate": 24.0,
         "arena_quotas": [100, 110, 60], "arena_spawn_rate": 38.0, "theme": "bones", "tint": (1.0, 1.0, 1.0)}),
+    ("lair", "The Ossuary", lair, {
+        "enemy_weights": {"swarmer": 1.0, "brute": 0.08, "exploder": 0.06},
+        "hp_multiplier": 2.0, "corridor_cap_fraction": 0.3, "corridor_spawn_rate": 12.0,
+        "arena_quotas": [0], "arena_spawn_rate": 20.0, "theme": "ossuary", "tint": (1.0, 1.0, 1.0),
+        "is_boss_level": True, "boss_scene": "res://src/enemies/boss/bone_colossus.tscn", "boss_room": "ossuary"}),
+    ("level_4", "Fungal Caverns", level4, {
+        "enemy_weights": {"swarmer": 1.0, "brute": 0.14, "spitter": 0.16, "exploder": 0.14},
+        "hp_multiplier": 2.2, "corridor_cap_fraction": 0.55, "corridor_spawn_rate": 24.0,
+        "arena_quotas": [90, 110, 120], "arena_spawn_rate": 40.0, "theme": "fungal", "tint": (1.0, 1.0, 1.0)}),
+    ("level_5", "Frozen Vaults", level5, {
+        "enemy_weights": {"swarmer": 1.0, "brute": 0.24, "spitter": 0.12, "exploder": 0.12},
+        "hp_multiplier": 2.6, "corridor_cap_fraction": 0.6, "corridor_spawn_rate": 26.0,
+        "arena_quotas": [110, 100, 130], "arena_spawn_rate": 42.0, "theme": "frost", "tint": (1.0, 1.0, 1.0)}),
+    ("level_6", "Molten Forge", level6, {
+        "enemy_weights": {"swarmer": 1.0, "brute": 0.22, "spitter": 0.18, "exploder": 0.22},
+        "hp_multiplier": 3.0, "corridor_cap_fraction": 0.6, "corridor_spawn_rate": 28.0,
+        "arena_quotas": [100, 120, 90, 140], "arena_spawn_rate": 44.0, "theme": "forge", "tint": (1.0, 1.0, 1.0)}),
+    ("boss", "Demon's Throne", boss, {
+        "enemy_weights": {"swarmer": 1.0, "exploder": 0.1},
+        "hp_multiplier": 3.2, "corridor_cap_fraction": 0.0, "corridor_spawn_rate": 0.0,
+        "arena_quotas": [0, 0, 0, 0, 0, 0, 0, 0, 0], "arena_spawn_rate": 20.0,
+        "theme": "throne", "tint": (1.0, 1.0, 1.0), "is_boss_level": True, "is_final_boss": True,
+        "boss_scene": "res://src/enemies/boss/boss_demon.tscn", "boss_room": "throne room"}),
     ("level_1b", "Crypt Entrance", level1b, None),
     ("level_2b", "Flooded Halls", level2b, None),
     ("level_3b", "Bone Pits", level3b, None),
-    ("boss", "Demon's Throne", boss, {
-        "enemy_weights": {"swarmer": 1.0, "exploder": 0.1},
-        "hp_multiplier": 2.2, "corridor_cap_fraction": 0.0, "corridor_spawn_rate": 0.0,
-        "arena_quotas": [0, 0, 0, 0, 0, 0, 0, 0, 0], "arena_spawn_rate": 20.0,
-        "theme": "throne", "tint": (1.0, 1.0, 1.0), "is_boss_level": True}),
+    ("level_4b", "Fungal Caverns", level4b, None),
+    ("level_5b", "Frozen Vaults", level5b, None),
+    ("level_6b", "Molten Forge", level6b, None),
 ]
 
 

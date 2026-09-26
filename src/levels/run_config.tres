@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="RunConfig" load_steps=10 format=3]
+[gd_resource type="Resource" script_class="RunConfig" load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://src/levels/run_config.gd" id="1_run"]
 [ext_resource type="Script" path="res://src/levels/level_data.gd" id="2_data"]
@@ -9,8 +9,15 @@
 [ext_resource type="Resource" path="res://src/levels/data/level_1b.tres" id="7_l1b"]
 [ext_resource type="Resource" path="res://src/levels/data/level_2b.tres" id="8_l2b"]
 [ext_resource type="Resource" path="res://src/levels/data/level_3b.tres" id="9_l3b"]
+[ext_resource type="Resource" path="res://src/levels/data/lair.tres" id="10_lair"]
+[ext_resource type="Resource" path="res://src/levels/data/level_4.tres" id="11_l4"]
+[ext_resource type="Resource" path="res://src/levels/data/level_5.tres" id="12_l5"]
+[ext_resource type="Resource" path="res://src/levels/data/level_6.tres" id="13_l6"]
+[ext_resource type="Resource" path="res://src/levels/data/level_4b.tres" id="14_l4b"]
+[ext_resource type="Resource" path="res://src/levels/data/level_5b.tres" id="15_l5b"]
+[ext_resource type="Resource" path="res://src/levels/data/level_6b.tres" id="16_l6b"]
 
 [resource]
 script = ExtResource("1_run")
-levels = Array[ExtResource("2_data")]([ExtResource("3_l1"), ExtResource("4_l2"), ExtResource("5_l3"), ExtResource("6_boss")])
-alternates = Array[ExtResource("2_data")]([ExtResource("7_l1b"), ExtResource("8_l2b"), ExtResource("9_l3b"), null])
+levels = Array[ExtResource("2_data")]([ExtResource("3_l1"), ExtResource("4_l2"), ExtResource("5_l3"), ExtResource("10_lair"), ExtResource("11_l4"), ExtResource("12_l5"), ExtResource("13_l6"), ExtResource("6_boss")])
+alternates = Array[ExtResource("2_data")]([ExtResource("7_l1b"), ExtResource("8_l2b"), ExtResource("9_l3b"), null, ExtResource("14_l4b"), ExtResource("15_l5b"), ExtResource("16_l6b"), null])

@@ -71,7 +71,8 @@ Downed state:
 | Brute | Slow, tanky, heavy hits |
 | Spitter | Keeps distance and fires projectiles |
 | Exploder | Rushes in, telegraphs, explodes |
-| Big Demon (boss) | Phase-based attack patterns, node-based |
+| Bone Colossus (mini boss) | Guards the Ossuary halfway through the run: club sweeps, grave spikes, leaps; node-based |
+| Demon Lord (final boss) | Phase-based attack patterns, node-based |
 
 **Elites** (`Elites`, from the second level on; always in the test room): about 1 in 40 spawns of the four kinds above arrives as an elite, at most 4 alive at once (×0.5 on Casual, ×2 on Hard).
 - An elite is drawn 1.5× bigger with a pulsing outline in its trait's colour (the instance shader draws it from a code in the tint channel), with its hurtbox and footprint scaled to match, ×6 HP, ×1.25 damage and half the knockback.
@@ -91,6 +92,7 @@ Chosen in character select with LB / RB (Q / E); Hard unlocks after a win on Nor
 
 - Enemy damage is a real multiplier (`HordeSim.damage_mult`): contact, spit, exploder and elite blasts, spikes and every boss attack.
 - **Profile** (`Profile`, `user://profile.cfg`): runs played, wins and best time per difficulty, and the hardest difficulty won with each hero, shown as a bronze / silver / gold star by the hero's name in character select. The end screen announces "NEW BEST TIME!" and "HARD UNLOCKED!".
+  - Best times only compare runs of the same length: the profile stores a run version (`Profile.RUN_VERSION`, 2 = the 8-level run), and loading an older profile drops its best times but keeps wins, Hard unlocked and the stars.
 
 Spawn director:
 - Spawns just outside the camera on walkable tiles, in waves plus a constant trickle. Off-screen spawns stay at least 110 px from every hero.
@@ -105,7 +107,7 @@ Spawn director:
 
 - Enemies drop XP gems. XP is shared by the team.
 - On a team level-up the game pauses and **every player picks their own card at the same time** in their own screen quadrant, with their own controller. Play resumes when everyone has picked.
-- **Picks wait for arena fights to end:** while an arena fight is on, level-up rounds queue (the HUD shows "+2" next to the level) and open back to back 1 s after the arena is cleared. In corridors, from chests and during the boss fight they open at once.
+- **Picks wait for arena fights to end:** while an arena fight is on, level-up rounds queue (the HUD shows "+2" next to the level) and open back to back 1 s after the arena is cleared. In corridors, from chests and during boss fights they open at once.
 - Upgrades that only help with teammates (Guardian Angel) are never offered to a solo player (`UpgradeData.team_only`).
 - Upgrades are either stat modifiers (flat or %) or ability modifiers. They're written as short effect lines in `UpgradeData.effects`:
   - `stat damage pct 0.1`
@@ -146,18 +148,32 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
 
 ## Levels and run flow
 
-- **Map variety:** levels 1–3 each have a second layout (`level_1b` ...: same size, quotas and theme, but different room shapes, route, and chest and shrine spots). Every run picks one per level from `GameState.run_seed` and mirrors it left-right and/or upside down (the boss level only left-right): `RunConfig.layout_for()`, `LevelData.mirrored()`. That's 8 versions of each normal level. `--layout=a|b` and `--mirror=none|h|v|hv` pin them for debugging. The level tests check every layout in every mirror, and bots play every second layout mirrored.
+- **Map variety:** levels 1–6 each have a second layout (`level_1b` ...: same size, quotas and theme, but different room shapes, route, and chest and shrine spots). Every run picks one per level from `GameState.run_seed` and mirrors it left-right and/or upside down (boss levels only left-right): `RunConfig.layout_for()`, `LevelData.mirrored()`. That's 8 versions of each normal level. `--layout=a|b` and `--mirror=none|h|v|hv` pin them for debugging. The level tests check every layout in every mirror, and bots play every second layout mirrored.
 - **Authoring:**
   - Levels are ASCII layouts in `LevelData` resources; the legend is in `level_data.gd`.
-  - `tools/gen_levels.py` builds the run's layouts from shaped rooms, halls, terrain and props, and writes `src/levels/data/level_*.tres` / `boss.tres` with each level's difficulty settings and theme (see Map features).
+  - `tools/gen_levels.py` builds the run's layouts from shaped rooms, halls, terrain and props, and writes `src/levels/data/level_*.tres`, `lair.tres` (the mini boss) and `boss.tres` (the final boss) with each level's difficulty settings, theme and boss (see Map features).
   - The sandbox `test_room.tres` is hand-written.
 - **Rendering:** `Level` turns a layout into a `TileMapLayer` for rendering and a `LevelGrid` for collision and pathfinding.
-- **Run order:** `src/levels/run_config.tres` lists Crypt Entrance → Flooded Halls → Bone Pits → Demon's Throne (boss). Each level sets:
-  - enemy mix
-  - an HP multiplier (1.0 / 1.35 / 1.8 / 2.2)
+- **Run order:** 1 → 2 → 3 → mini boss → 4 → 5 → 6 → final boss. `src/levels/run_config.tres` lists:
+
+  | # | Banner | Level | Theme | Arenas | Enemy HP |
+  |---|---|---|---|---|---|
+  | 1 | LEVEL 1 | Crypt Entrance | crypt | 2 | ×1.0 |
+  | 2 | LEVEL 2 | Flooded Halls | flooded | 2 | ×1.35 |
+  | 3 | LEVEL 3 | Bone Pits | bones | 3 | ×1.8 |
+  | 4 | MINI BOSS | The Ossuary: the Bone Colossus | ossuary | boss room | ×2.0 |
+  | 5 | LEVEL 4 | Fungal Caverns: toxic pools, spore nests | fungal | 3 | ×2.2 |
+  | 6 | LEVEL 5 | Frozen Vaults: crevasses, slush, spike galleries | frost | 3 | ×2.6 |
+  | 7 | LEVEL 6 | Molten Forge: lava channels, powder kegs | forge | 4 | ×3.0 |
+  | 8 | FINAL BOSS | Demon's Throne: the Demon Lord | throne | boss room | ×3.2 |
+
+  Banners number the regular levels on their own (`RunConfig.title()`). Each level sets:
+  - enemy mix (brutes, spitters and exploders grow more common level by level)
+  - an HP multiplier (above)
   - corridor pressure
   - arena quotas
   - a theme (tile sheet and decorations) and an optional tint
+  - for boss levels: the boss (`boss_scene`), what the objective calls its room (`boss_room`) and whether it is the final boss
 - **`LevelDirector` runs the objectives:**
   - An **arena room** (digit tiles) activates when a living hero is 36+ px inside it. Stragglers are pulled in with the leader, every door touching the room turns solid, and the spawner switches to arena mode.
   - The quota comes in **waves**: 2 (45% / 55%) up to 60 enemies, 3 (30% / 33% / 37%) above. The next wave comes once 25% or less of the current one is left (or after 12 s), after a 2 s breather, with a "WAVE 2/3" callout and a horn.
@@ -165,7 +181,9 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
   - **Clearing an arena** (and so opening the exit) pulls every XP gem on the level to the nearest hero. Gems still lying around when a level ends are banked as XP, and each hero's ultimate charge carries over to the next level.
   - Clearing opens the doors, drops a heart, and returns the spawner to the corridor trickle.
   - The **exit portal** opens when every arena is cleared. The level completes after all living heroes stand in it for 1 s.
-  - The **boss level's** throne room spawns the Demon Lord instead of waves. Its death ends the run in victory.
+  - A **boss level's** one arena is its boss room, which spawns the level's boss instead of waves (and turns the spawner off). Picks open at once during the fight.
+    - **Mini boss** (the Ossuary): when the Bone Colossus dies its room clears like an arena (doors open, a heart, the XP vacuum), the music goes back to the dungeon track, the HUD calls out "BONE COLOSSUS SLAIN!", and the exit portal behind the hall opens (a chest waits beside it). The team walks on to level 4.
+    - **Final boss** (the Demon's Throne, no exit): the Demon Lord's death ends the run in victory.
 - **HUD:**
   - The objective text sits under the XP bar.
   - A yellow arrow at the screen edge points to off-screen objectives (the next arena or the exit). The next arena is the one closest **on foot** from the team (`LevelGrid.walk_distances`, a BFS where walls, closed doors and chasms block and props don't), not in a straight line.
@@ -173,19 +191,18 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
   - CORRIDOR: off-screen trickle at a fraction of the alive cap.
   - ARENA: spawns on the room's floor at least 96 px from heroes, until the quota is spent.
   - OFF.
-- **Boss (Demon Lord):**
-  - Its body is a `HordeSim` entry, so every ability, projectile and zone hits it.
-  - `BossDemon` moves it and runs three phases:
-    - fireball fans and ground slams
-    - plus fire rings and swarmer summons
-    - enraged: faster, plus telegraphed charges
-  - **Every attack is telegraphed** during its wind-up: the boss glows hot pink (a flash shader, which hit flashes can't wash out) and growls, and the warning is drawn above the horde:
-    - slam: its exact circle filling up
-    - charge: a band as wide as what it hits
-    - fan: one aim line per fireball, with the aim locked when the wind-up starts
-    - fire ring: a ring of turning dots around the boss
-    - summon: the adds' spawn portals
-  - HP is 1800 × level multiplier × player-count scaling. It is immune to stun and slow.
+- **Bosses** (`Boss`, `src/enemies/boss/`): a boss's body is a `HordeSim` entry of its own enemy type, so every ability, projectile and zone hits it. The boss node moves that body, draws a 64×64 sprite sheet (walk ×2, wind-up, action) and runs the attacks; the base class holds what they share (body, sprite and wind-up glow, summons through portals, phase fanfare, the death). Bosses are immune to stun, slow and freezing; HP is base × level multiplier × player-count scaling (see Spawn director).
+  - **Every attack is telegraphed** during its wind-up: the boss glows hot pink (a flash shader, which hit flashes can't wash out) and growls, and the warning is drawn above the horde.
+- **Mini boss (Bone Colossus, `BoneColossus`):** 1100 HP. A lumbering heap of bones with a club, fighting up close and from below.
+  - Phase 1 (100–50%): walks at the nearest hero; **club sweeps** (only when someone is in reach) and **grave spikes** that burst under every hero.
+  - Phase 2 (below 50%): enraged (faster, a roar and 8 risen swarmers); spikes also burst around each hero, it **leaps** onto the hero furthest away (bone shards burst from the landing), and it **raises the dead** (6 swarmers).
+  - Telegraphs: sweep: a wedge exactly as wide as the swing, filling up (`FxLayer.warn_arc`); spikes: a filling circle under each hero, where they stood when it wound up; leap: the landing circle, until it lands; raise: the spawn portals.
+  - In the air it deals no contact damage (its body counts as stunned).
+- **Final boss (Demon Lord, `BossDemon`):** 1800 HP, three phases:
+  - fireball fans and ground slams
+  - plus fire rings and swarmer summons
+  - enraged: faster, plus telegraphed charges
+  - Telegraphs: slam: its exact circle filling up; charge: a band as wide as what it hits; fan: one aim line per fireball, with the aim locked when the wind-up starts; fire ring: a ring of turning dots around the boss; summon: the adds' spawn portals.
 - **Screens:** Main menu → Character select → Game (levels) → End screen → Play again / Change heroes / Main menu.
   - **End screen:** difficulty, levels, enemies, team level, time and Second Winds; any records set; and a table of every player's kills, damage dealt and taken, downs, revives given and biggest hit, with awards: Slayer (most kills), Medic (most revives), Tank (most damage taken), Sharpshooter (biggest hit) - only with teammates to beat - and Untouchable (never downed). **Play again** starts a new run right away with the same team, heroes and difficulty; **Change heroes** goes to character select with everyone still joined and their last hero picked.
   - **Main menu:** Start Run, Test Room (drop-in sandbox), Options, Quit. The main, pause and end menus use Godot focus navigation, so keyboard, any gamepad or mouse all work, with move/confirm sounds (`UiSounds`).
@@ -196,7 +213,7 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
     - When everyone who joined is ready, any of them presses A/Enter (or Start on a gamepad) to begin. There is no countdown.
     - With nobody joined, B/Esc/Backspace returns to the main menu. The press that makes the last player leave doesn't count.
   - **Enter with Alt held** is the fullscreen shortcut and never counts as a confirm press, even if Alt is let go first.
-  - **`Game`:** builds a `World` per level, shows "LEVEL n" and "LEVEL CLEAR!" banners, and banks stats. A team wipe means defeat; the boss's death means victory.
+  - **`Game`:** builds a `World` per level, shows "LEVEL n" / "MINI BOSS" / "FINAL BOSS" and "LEVEL CLEAR!" banners, and banks stats. A team wipe means defeat; the final boss's death means victory.
   - **Pause:** Start or Esc opens it for any player: Resume, Controls (every player's buttons, abilities and hero blurb), Builds (every player's upgrades: elements at their highest tier, the rest with stack counts), Options, and Quit to menu, which needs a second press within 3 s. Pause screens draw above the level banners.
   - **Learning by playing:**
     - A **controls card** next to each player's HUD panel lists their four buttons at the start of a run (and in the test room); each line greys out once used, and the card fades once attack, special and movement have been used, or after 20 s.
@@ -209,7 +226,7 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
   - **Test Room:** with nobody joined, Esc (or Start/B on a pad) goes back to the menu.
 - **Shared camera:** follows the middle of the group with fixed zoom, and players can't leave the screen. The leash blocks the player who is running away rather than dragging the others along.
 - **Disconnects:** if an assigned controller is unplugged, the game pauses until it is reconnected, or until another controller presses A and takes over that player.
-- **Bots** (`BotDriver`) follow the current objective with A* over the level grid and use their abilities. The test suite has four god-mode bots finish every level including the boss, and `./tools/dev.sh run res://src/main/game.tscn -- --bots=4 --level=4` shows a bot boss fight.
+- **Bots** (`BotDriver`) follow the current objective with A* over the level grid and use their abilities. The test suite has four god-mode bots finish every level and second layout including both bosses, and `./tools/dev.sh run res://src/main/game.tscn -- --bots=4 --level=4` shows a bot mini boss fight (`--level=8` the final boss).
 
 ## Map features
 
@@ -218,7 +235,7 @@ What makes the levels play differently, beyond their shapes:
 | Layout char | Feature | How it plays |
 |---|---|---|
 | `~` | Water | Everyone walks at 60% speed. Bots avoid it when they can. |
-| `:` | Chasm (lava on the throne level) | Can't be walked on. Shots and line of sight cross it. An enemy shoved toward it harder than 30 px/s goes over the edge and dies. The last hero to hit or push it gets the kill, and its XP lands on the nearest floor. |
+| `:` | Chasm (lava in the forge and on the throne level) | Can't be walked on. Shots and line of sight cross it. An enemy shoved toward it harder than 30 px/s goes over the edge and dies. The last hero to hit or push it gets the kill, and its XP lands on the nearest floor. |
 | `^` | Spike trap | Retracted, then warning, then up, on a 3 s cycle, firing in diagonal waves. When the spikes shoot up they stab everyone on them: heroes take 14, enemies 24 × the level's enemy HP multiplier. |
 | `b` | Explosive barrel | Breaks in one hit, then blows up 0.05 s later: 40 × HP multiplier with big knockback. It breaks other barrels (chains) and never hurts heroes. |
 | `u` | Urn | Breaks in one hit and scatters 6 XP (sometimes a heart). |
@@ -229,7 +246,7 @@ What makes the levels play differently, beyond their shapes:
 - **Implementation.** Barrels, urns and nests are stationary `HordeSim` entries (`EnemyData` behaviours `OBJECT` / `NEST`), so every attack already hits them. They block walking on their tile (`LevelGrid.set_blocker`) until destroyed, but not shots. Objects aren't enemies: they give no kill credit, corpses or XP gems, don't count toward the spawner's cap, and bots and minions don't target them. Chests and shrines are `Interactable` nodes.
 - **Terrain.** `LevelGrid` keeps `solid` (walking: walls, closed doors, chasms, props) apart from `shot_solid` (projectiles and sight: walls and closed doors). It also stores terrain per tile and logs walkability changes, so the bots' A* only updates the cells that changed.
 - **Arena rooms.** Each arena is found by flood fill from its digit tiles, so everything inside its walls belongs to it: water, traps, chasms and props. The level test checks that shutting an arena's doors seals it.
-- **Themes.** Each level names a tile sheet (`assets/tiles/tiles_<theme>.png`: crypt, flooded, bones, throne). Water and chasm/lava tiles are animated. The level is decorated from a per-tile hash:
+- **Themes.** Each level names a tile sheet (`assets/tiles/tiles_<theme>.png`: crypt, flooded, bones, ossuary, fungal, frost, forge, throne). Water (toxic pools in the fungal caverns, slush in the frozen vaults) and chasm/lava tiles are animated, and lava (`Level.LAVA_THEMES`: forge, throne) glows. The level is decorated from a per-tile hash:
   - floor clutter per theme
   - cobwebs in room corners
   - banners, chains and cracks on walls
@@ -277,9 +294,10 @@ src/
   heroes/     Hero (body, 4 ability slots, downed/revive), HeroData, Ability (abstract) +
               reusable abilities (projectile, melee arc, area burst, dash, blink, zone, channel),
               data/<hero>.tres (generated by tools/gen_hero_data.py)
-  enemies/    EnemyData + data/*.tres, SpawnDirector (corridor/arena modes), boss/BossDemon
+  enemies/    EnemyData + data/*.tres, SpawnDirector (corridor/arena modes), Elites,
+              boss/ (Boss base, BossDemon final boss, BoneColossus mini boss)
   upgrades/   UpgradeData, UpgradePool, data/*.tres
-  levels/     Level (tiles + grid + arena rooms from LevelData), LevelDirector (arenas, exit, boss),
+  levels/     Level (tiles + grid + arena rooms from LevelData), LevelDirector (arenas, exit, bosses),
               RunConfig, data/*.tres (generated by tools/gen_levels.py)
   ui/         HUD, level-up screen, main menu, character select, pause menu, end screen
   main/       Game (run controller: levels, banners, victory/defeat)
@@ -360,6 +378,7 @@ docs/         this document
 | 9 | Export: macOS + Windows builds | presets + icon ready; needs export templates installed to build |
 | 10 | Map features: minimap, terrain (water, chasms, spikes), barrels / urns / nests, chests and shrines, level themes + decor, redesigned levels | done |
 | 11 | Player-experience pass: run-flow fixes, readability (telegraphs, portals, outlines), game feel (feedback, hitstop, audio), pacing (waves, team lives, held picks, solo fairness), options + accessibility, onboarding (button icons, tips, controls card), replay (stats and awards, difficulty and records, map variety, elites) | done |
+| 12 | Dungeon expansion: an 8-level run (levels 1–3, a mini boss, levels 4–6, the final boss), the Bone Colossus, Fungal Caverns / Frozen Vaults / Molten Forge with second layouts, four new themes | done |
 
 ## Performance results
 
@@ -388,9 +407,9 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
 - **Art:** all sprites, tiles and the UI font are generated by `tools/gen_placeholder_art.gd` (deterministic and license-free):
   - 8 heroes (idle/run/dash/downed)
   - 5 enemy kinds (walk + action frames)
-  - a 64×64 demon boss
+  - two 64×64 bosses: the demon and the bone colossus
   - projectiles, pickups and particle blobs
-  - dungeon tiles
+  - dungeon tiles in eight themes
   - the Pixel5x8 font
 
   The planned swap to the CC0 0x72 "DungeonTileset II" pack only changes the PNGs and the atlas coordinates.
@@ -413,7 +432,7 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - **Invulnerability looks different by cause:** blink after a hit, bright while dashing, a gold shimmer after a revive.
   - **Abilities:** the special and movement ability ping (a ring, plus a tick for the special) and flash their HUD bar when they come back; a press that can't do anything (on cooldown, no ult charge, channelling) flashes the bar red with a soft blip. The ultimate announces itself once per charge: a chime, a rumble and "ULT!".
   - **Downed:** a pulsing "!" and "P1" over the body, a dashed circle showing where to stand, and the revive progress as a ring; a rising tone while someone revives, and a "help" ping (at most every 3 s) while nobody does. The HUD's "DOWN! revive me" blinks.
-  - **Hitstop** (a world-level freeze, the HUD keeps running): 0.08 s on a boss phase change; 0.3 s then 0.6 s of slow motion on the boss's death. Ordinary hits never freeze the game.
+  - **Hitstop** (a world-level freeze, the HUD keeps running): 0.08 s on a boss phase change; 0.3 s then 0.6 s of slow motion on a boss's death. Ordinary hits never freeze the game.
 - **Damage numbers:** one node draws up to 40 numbers.
   - **Crits** always get a gold double-size number with "!" (e.g. `14!`), a gold star burst and a "tink" sound. Ordinary numbers can never push them off screen.
   - Ordinary hits get a white number from 12 damage up (double size from 40).
@@ -427,12 +446,12 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
 - **`Audio` autoload:**
   - Plays SFX through a 24-voice pool on an `SFX` bus. Six voices are reserved for cues players must not miss (down, revive, ult, level-up, heartbeat, help, boss wind-up and death, stings...), so a flood of hits can't cut them off.
   - Each sound has a minimum repeat interval (e.g. kills every 50 ms), so a horde never drowns everything out.
-  - Loops music on a `Music` bus and crossfades between tracks (0.6 s). The boss track starts when the throne room's fight does; victory and defeat have their own stings.
+  - Loops music on a `Music` bus and crossfades between tracks (0.6 s). The boss track starts when a boss room's fight does (and gives way to the dungeon track when the mini boss falls); victory and defeat have their own stings.
   - Volumes are set in the pause menu and saved to `user://settings.cfg`.
 - **Sound hooks:**
   - Every ability plays a sound by type; ultimates add a swell.
   - World events cover hits, kills, explosions, pickups, hurt/down/revive and level-ups.
-  - The level director plays door, clear and portal sounds; the boss plays roar, slam and fireball.
+  - The level director plays door, clear and portal sounds; the bosses play roar, wind-up, slam, spikes and fireball.
   - UI sounds on moves and confirms.
 - **Fullscreen:** F11 / Alt+Enter toggles it anywhere; the pause menu also has a fullscreen switch.
 

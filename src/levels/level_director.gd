@@ -3,13 +3,17 @@ extends RefCounted
 ## Runs a level's objectives: arena rooms lock when the team walks in and
 ## spawn their quota in 2-3 waves (the next one comes, after a breather, once
 ## most of the current one is beaten), until it's cleared (and their nests are
-## destroyed),
-## the exit portal opens once every arena is cleared, and the boss level's
-## throne room starts the boss fight. Wakes up nests (spawners) when heroes
-## come near. Also keeps the objective text/target the HUD shows.
+## destroyed), and the exit portal opens once every arena is cleared. A boss
+## level's boss room starts a fight with its boss instead: beating a mini boss
+## clears the room and opens the exit behind it; beating the final boss wins
+## the run. Wakes up nests (spawners) when heroes come near. Also keeps the
+## objective text/target the HUD shows.
 
 signal level_completed
+## The final boss died: the run is won.
 signal boss_defeated
+## A mini boss died: its room clears and the exit portal opens.
+signal mini_boss_defeated(boss_name: String)
 signal objective_changed(text: String)
 ## A wave of the active arena started (1-based) - for the HUD callout.
 signal wave_started(wave: int, waves: int)
@@ -18,7 +22,6 @@ signal arena_cleared(room_id: int)
 
 enum RoomState { IDLE, ACTIVE, CLEARED }
 
-const BOSS_SCENE := "res://src/enemies/boss/boss_demon.tscn"
 const EXIT_RADIUS := 30.0
 const EXIT_HOLD_TIME := 1.0
 ## Heroes must be this far inside an arena (from its doors) to trigger it.
@@ -72,7 +75,9 @@ var rooms: Array[Room] = []
 var active_room: Room
 var exit_open := false
 var completed := false
-var boss: BossDemon
+var boss: Boss
+## The level's boss once it has appeared (kept after it dies).
+var boss_name := ""
 var boss_hp_multiplier := 1.0
 ## Nests still standing (destroyed ones drop out on the next tick).
 var nests: Array[Nest] = []
@@ -148,6 +153,8 @@ func tick(dt: float) -> void:
 		return
 	if boss:
 		boss.tick(dt)
+		if completed:
+			return  # that was the final boss: the run is won
 	_tick_nests(dt)
 	if active_room:
 		_tick_active_room(dt)
@@ -295,7 +302,7 @@ func _clear(room: Room) -> void:
 	world.spawner.spawn_rate = _rate(data.corridor_spawn_rate)
 	world.pickups.spawn(room.center, PickupSim.Kind.HEART, 1)
 	world.fx.ring(room.center, 60.0, Color(1, 0.95, 0.6), 0.6)
-	if arenas_cleared() == rooms.size() and not data.is_boss_level:
+	if arenas_cleared() == rooms.size() and not data.is_final_boss:
 		exit_open = true
 		Audio.play(&"portal")
 	arena_cleared.emit(room.id)
@@ -371,8 +378,9 @@ func _hero_within(p: Vector2, distance: float) -> bool:
 # --- boss ------------------------------------------------------------------------------------
 
 func _spawn_boss(at: Vector2) -> void:
-	boss = (load(BOSS_SCENE) as PackedScene).instantiate()
+	boss = (load(data.boss_scene) as PackedScene).instantiate()
 	boss.setup(world, at, boss_hp_multiplier, world.spawner.effective_hp_multiplier())
+	boss_name = boss.display_name
 	world.entities.add_child(boss)
 	world.boss = boss
 	boss.defeated.connect(_on_boss_defeated)
@@ -383,8 +391,13 @@ func _spawn_boss(at: Vector2) -> void:
 func _on_boss_defeated() -> void:
 	boss = null
 	world.boss = null
+	if not data.is_final_boss:
+		# A mini boss: its room clears this frame, and that opens the exit.
+		Audio.play_music(&"dungeon")
+		mini_boss_defeated.emit(boss_name)
+		return
 	completed = true
-	objective = "The demon is slain!"
+	objective = "The %s is slain!" % boss_name
 	objective_target = Vector2.INF
 	objective_changed.emit(objective)
 	boss_defeated.emit()
@@ -423,11 +436,13 @@ func _check_exit(dt: float) -> void:
 
 
 func _update_objective() -> void:
+	if completed:
+		return  # the level is over (or the run won): its last word stands
 	objective_target = Vector2.INF
 	if active_room:
 		var room_nests := nest_positions(active_room.id)
 		if data.is_boss_level:
-			objective = "Defeat the Demon Lord!"
+			objective = "Defeat the %s!" % boss_name
 		elif not room_nests.is_empty():
 			objective = "Destroy the nests!  %d left" % room_nests.size()
 			objective_target = _nearest(room_nests)
@@ -443,7 +458,7 @@ func _update_objective() -> void:
 	else:
 		var next := _next_idle_room()
 		if data.is_boss_level:
-			objective = "Enter the throne room"
+			objective = "Enter the %s" % data.boss_room
 		else:
 			objective = "Clear the arenas  %d / %d" % [arenas_cleared(), rooms.size()]
 		if next:

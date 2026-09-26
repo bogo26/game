@@ -1,7 +1,8 @@
 extends Node
 ## Plays a run: builds a World for the current level of the RunConfig, shows
-## level banners, advances to the next level when the team reaches the exit,
-## and ends the run on a team wipe (defeat) or the boss's death (victory).
+## level banners, advances to the next level when the team reaches the exit
+## (a mini boss's level included: its exit opens once the boss falls), and
+## ends the run on a team wipe (defeat) or the final boss's death (victory).
 
 const WORLD_SCENE := "res://src/world/world.tscn"
 const END_SCENE := "res://src/ui/end_screen.tscn"
@@ -64,10 +65,9 @@ func _load_level() -> void:
 	world.team_wiped.connect(_on_team_wiped)
 	world.boss_defeated.connect(_on_boss_defeated)
 	world.quit_requested.connect(_quit_to_menu)
-	# The boss track starts when the throne room's fight does (LevelDirector).
+	# The boss track starts when the boss room's fight does (LevelDirector).
 	Audio.play_music(&"dungeon")
-	var title := "FINAL LEVEL" if data.is_boss_level else "LEVEL %d" % (GameState.level_index + 1)
-	_show_banner(title, data.display_name)
+	_show_banner(run.title(GameState.level_index), data.display_name)
 
 
 ## This run's layout for a level (see RunConfig.layout_for); --layout=a|b and
@@ -150,7 +150,7 @@ func _on_boss_defeated() -> void:
 	_stop_interruptions()
 	_bank_level_stats()
 	GameState.levels_cleared += 1
-	_show_banner("VICTORY!", "The Demon Lord is slain")
+	_show_banner("VICTORY!", "The %s is slain" % world.director.boss_name)
 	Audio.stop_music()
 	# After the boss's death cry.
 	get_tree().create_timer(0.7).timeout.connect(Audio.play.bind(&"victory"))

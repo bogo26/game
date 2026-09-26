@@ -1,5 +1,6 @@
 extends "res://tests/test_case.gd"
-## Level data sanity + the arena / exit / boss objective flow, headless.
+## Level data sanity + the arena / exit / boss objective flow, headless:
+## levels 1-3, the mini boss, levels 4-6 and the final boss.
 
 const WORLD_SCENE := "res://src/world/world.tscn"
 const DT := 1.0 / 60.0
@@ -13,8 +14,25 @@ func _build(data: LevelData) -> Level:
 
 func test_run_config_lists_the_run() -> void:
 	var run := RunConfig.load_default()
-	assert_eq(run.levels.size(), 4, "3 levels + boss")
-	assert_true(run.levels[run.levels.size() - 1].is_boss_level, "run ends with the boss")
+	var titles: Array[String] = []
+	for index in run.levels.size():
+		titles.append(run.title(index))
+	assert_eq(titles, ["LEVEL 1", "LEVEL 2", "LEVEL 3", "MINI BOSS", "LEVEL 4", "LEVEL 5", "LEVEL 6",
+		"FINAL BOSS"] as Array[String], "1-2-3, the mini boss, 4-5-6, the final boss")
+	var last := run.levels.size() - 1
+	for index in run.levels.size():
+		var data := run.levels[index]
+		assert_eq(data.is_final_boss, index == last, "%s: only the last level is the final boss" % data.display_name)
+		if index < run.alternates.size() and run.alternates[index]:
+			var alternate := run.alternates[index]
+			assert_eq(alternate.display_name, data.display_name, "a second layout is the same level")
+			assert_eq(alternate.arena_quotas, data.arena_quotas, "%s: same quotas" % data.display_name)
+			assert_eq(alternate.theme, data.theme, "%s: same theme" % data.display_name)
+	assert_eq(run.levels[3].boss_scene, "res://src/enemies/boss/bone_colossus.tscn", "the mini boss")
+	assert_eq(run.levels[last].boss_scene, "res://src/enemies/boss/boss_demon.tscn", "the final boss")
+	for index in last:
+		assert_true(run.levels[index + 1].hp_multiplier > run.levels[index].hp_multiplier,
+			"%s is tougher than %s" % [run.levels[index + 1].display_name, run.levels[index].display_name])
 
 
 func test_every_level_is_connected_and_complete() -> void:
@@ -54,7 +72,10 @@ func test_runs_pick_their_layouts_from_the_seed() -> void:
 			different = true
 	assert_true(different, "other runs get other layouts")
 	for seed_value in range(1, 40):
-		assert_true(run.layout_for(3, seed_value).is_boss_level, "the boss level stays the boss level")
+		for index in run.levels.size():
+			var picked := run.layout_for(index, seed_value)
+			assert_eq(picked.is_boss_level, run.levels[index].is_boss_level, "boss levels stay boss levels")
+			assert_eq(picked.display_name, run.levels[index].display_name, "and every level stays itself")
 
 
 func _check_level(data: LevelData) -> void:
@@ -65,10 +86,20 @@ func _check_level(data: LevelData) -> void:
 		assert_true(level.room_doors.has(room), "%s arena %d has doors" % [data.display_name, room])
 	if data.is_boss_level:
 		assert_false(level.boss_spawns.is_empty(), "boss level has a boss spawn")
+		assert_eq(level.room_cells.size(), 1, "%s: the boss room is its only arena" % data.display_name)
 		assert_true(level.room_at_position(level.boss_spawns[0]) != 0, "boss spawns inside the arena")
+		var boss := (load(data.boss_scene) as PackedScene).instantiate()
+		assert_true(boss is Boss, "%s: its boss is a Boss" % data.display_name)
+		boss.free()
+		# Beating a mini boss opens the exit behind its room; the final boss's level has none.
+		assert_eq(level.exit_cells.is_empty(), data.is_final_boss, "%s: an exit unless it's the final boss"
+			% data.display_name)
 	else:
 		assert_false(level.exit_cells.is_empty(), "%s has an exit" % data.display_name)
 		assert_true(data.arena_quotas.size() >= level.room_cells.size(), "quota per arena")
+	for cell in level.exit_cells:
+		assert_eq(level.room_of_cell[cell.y * g.width + cell.x], 0, "%s: the exit isn't in an arena"
+			% data.display_name)
 	# Every floor cell is reachable from the spawn (doors open).
 	var start := g.cell_of(level.player_spawns[0])
 	var seen := {start: true}
@@ -184,10 +215,12 @@ func test_boss_fight_spawns_and_ends_the_run() -> void:
 	var defeated := [false]
 	world.boss_defeated.connect(func() -> void: defeated[0] = true)
 	var room: LevelDirector.Room = world.director.rooms[0]
+	assert_eq(world.director.objective, "Enter the throne room")
 	for hero in world.heroes:
 		hero.position = world.grid.nearest_open(room.center + Vector2(0, 60))
 	_step(world, 2)
-	assert_true(world.boss != null, "boss spawned when the team entered")
+	assert_true(world.boss is BossDemon, "the Demon Lord spawned when the team entered")
+	assert_eq(world.director.objective, "Defeat the Demon Lord!")
 	_step(world, 240)  # let it attack for a few seconds
 	var i := world.horde.index_of_uid(world.boss.uid)
 	assert_true(i >= 0)
@@ -195,6 +228,48 @@ func test_boss_fight_spawns_and_ends_the_run() -> void:
 	_step(world, 3)
 	assert_true(defeated[0], "boss_defeated emitted")
 	assert_true(world.director.completed)
+	assert_eq(world.director.objective, "The Demon Lord is slain!", "the run is won: no more objectives")
+	assert_false(world.director.exit_open)
+	_teardown(world)
+
+
+func test_the_mini_boss_opens_the_way_on() -> void:
+	var run := RunConfig.load_default()
+	var data: LevelData = run.levels[3]
+	var world := _run_world(data, [&"knight", &"ranger"])
+	var won := [false]
+	var slain: Array[String] = []
+	var completed := [false]
+	world.boss_defeated.connect(func() -> void: won[0] = true)
+	world.director.mini_boss_defeated.connect(func(boss_name: String) -> void: slain.append(boss_name))
+	world.level_completed.connect(func() -> void: completed[0] = true)
+	var director := world.director
+	var room: LevelDirector.Room = director.rooms[0]
+	assert_eq(director.objective, "Enter the ossuary")
+	assert_false(director.exit_open, "the way on is shut behind the boss")
+	for hero in world.heroes:
+		hero.position = world.grid.nearest_open(room.center + Vector2(0, 60))
+	_step(world, 2)
+	assert_true(world.boss is BoneColossus, "the Bone Colossus spawned when the team entered")
+	assert_eq(director.objective, "Defeat the Bone Colossus!")
+	assert_false(world.picks_held(), "picks don't wait for a boss fight")
+	var door: Vector2i = room.doors[0]
+	assert_true(world.grid.is_solid(door.x, door.y), "the doors lock for the fight")
+	_step(world, 240)  # let it attack for a few seconds
+	var i := world.horde.index_of_uid(world.boss.uid)
+	world.horde.damage(i, 1e9, Vector2.ZERO, 0)
+	_step(world, 3)
+	assert_eq(slain, ["Bone Colossus"] as Array[String], "mini_boss_defeated emitted once")
+	assert_false(won[0], "a mini boss doesn't end the run")
+	assert_false(director.completed)
+	assert_eq(room.state, LevelDirector.RoomState.CLEARED, "its room is cleared")
+	assert_false(world.grid.is_solid(door.x, door.y), "the doors open")
+	assert_true(director.exit_open, "and so does the exit")
+	assert_eq(director.objective, "Reach the exit portal")
+	for hero in world.heroes:
+		hero.position = world.level.exit_center()
+	_step(world, 150)  # the boss's death froze time for a moment; then a second in the portal
+	assert_true(completed[0], "the portal takes the team on to level 4")
 	_teardown(world)
 
 

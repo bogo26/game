@@ -70,7 +70,7 @@ layout = "
 
 "
 enemy_weights = {&"swarmer": 1.0, &"exploder": 0.1}
-hp_multiplier = 2.2
+hp_multiplier = 3.2
 corridor_cap_fraction = 0.0
 corridor_spawn_rate = 0.0
 arena_quotas = PackedInt32Array(0, 0, 0, 0, 0, 0, 0, 0, 0)
@@ -78,3 +78,6 @@ arena_spawn_rate = 20.0
 theme = &"throne"
 tint = Color(1.0, 1.0, 1.0, 1.0)
 is_boss_level = true
+is_final_boss = true
+boss_scene = "res://src/enemies/boss/boss_demon.tscn"
+boss_room = "throne room"

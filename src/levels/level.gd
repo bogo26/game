@@ -32,8 +32,14 @@ const FLOOR_DECOR := {
 	&"crypt": [0.05, {Decor.BONES: 2, Decor.SKULL: 1, Decor.RUBBLE: 3, Decor.CRACKS: 3, Decor.MOSS: 1, Decor.PUDDLE: 1}],
 	&"flooded": [0.07, {Decor.PUDDLE: 4, Decor.MOSS: 5, Decor.RUBBLE: 2, Decor.CRACKS: 1}],
 	&"bones": [0.09, {Decor.BONES: 5, Decor.SKULL: 3, Decor.RUBBLE: 2, Decor.CRACKS: 2}],
+	&"ossuary": [0.1, {Decor.SKULL: 5, Decor.BONES: 4, Decor.CRACKS: 2, Decor.RUBBLE: 1}],
+	&"fungal": [0.08, {Decor.MOSS: 5, Decor.PUDDLE: 3, Decor.RUBBLE: 1, Decor.BONES: 1}],
+	&"frost": [0.05, {Decor.CRACKS: 4, Decor.PUDDLE: 2, Decor.RUBBLE: 2, Decor.SKULL: 1}],
+	&"forge": [0.05, {Decor.RUBBLE: 4, Decor.CRACKS: 3, Decor.SKULL: 1, Decor.BONES: 1}],
 	&"throne": [0.04, {Decor.SKULL: 2, Decor.BONES: 1, Decor.CRACKS: 3, Decor.RUBBLE: 2}],
 }
+## Themes whose chasms are lava (they light up their surroundings).
+const LAVA_THEMES: Array[StringName] = [&"forge", &"throne"]
 const TILE_SHEET := "res://assets/tiles/tiles_%s.png"
 const GLOW_TEXTURE := preload("res://assets/sprites/fx/glow.png")
 const TORCH_SPACING := 6
@@ -317,7 +323,7 @@ func _place_decor(chars: Array[PackedStringArray], w: int, h: int) -> void:
 ## Lava lights up its surroundings: one soft glow per few lava tiles.
 func _lava_glows(chars: Array[PackedStringArray], w: int, h: int) -> Array[Vector2]:
 	var out: Array[Vector2] = []
-	if theme != &"throne":
+	if theme not in LAVA_THEMES:
 		return out
 	for y in range(0, h, 3):
 		for x in range(0, w, 3):

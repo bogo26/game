@@ -261,7 +261,7 @@ func test_heroes_get_a_player_colour_outline_and_tag() -> void:
 
 func test_every_boss_wind_up_draws_a_warning() -> void:
 	var world := _make_world(_data(HALL))
-	var boss: BossDemon = (load(LevelDirector.BOSS_SCENE) as PackedScene).instantiate()
+	var boss: BossDemon = (load("res://src/enemies/boss/boss_demon.tscn") as PackedScene).instantiate()
 	var at := Vector2(500, 200)
 	boss.setup(world, at, 1.0, 1.0)
 	world.entities.add_child(boss)
@@ -283,6 +283,35 @@ func test_every_boss_wind_up_draws_a_warning() -> void:
 	var pending := world.spawner.pending_count()
 	boss.wind_up(BossDemon.Attack.SUMMON, at, target)
 	assert_eq(world.spawner.pending_count(), pending + 8, "summoned adds wait in portals")
+	boss.get_parent().remove_child(boss)
+	boss.free()
+	_teardown(world)
+
+
+func test_every_colossus_wind_up_draws_a_warning() -> void:
+	var world := _make_world(_data(HALL))
+	var boss: BoneColossus = (load("res://src/enemies/boss/bone_colossus.tscn") as PackedScene).instantiate()
+	var at := Vector2(500, 200)
+	boss.setup(world, at, 1.0, 1.0)
+	world.entities.add_child(boss)
+	world.heroes[0].position = at + Vector2(40, 10)
+	var target := world.heroes[0].position
+	var expected := {
+		BoneColossus.Attack.SWEEP: FxLayer.Kind.WARN_ARC,
+		BoneColossus.Attack.SPIKES: FxLayer.Kind.TELEGRAPH,
+		BoneColossus.Attack.LEAP: FxLayer.Kind.TELEGRAPH,
+	}
+	for attack: int in expected:
+		world.warn_fx.clear()
+		boss.wind_up(attack as BoneColossus.Attack, at, target)
+		assert_true(world.warn_fx._kind.has(expected[attack]), "attack %d warns" % attack)
+		assert_true(boss.is_winding_up(), "and the Colossus glows while it winds up")
+	world.warn_fx.clear()
+	boss.wind_up(BoneColossus.Attack.SPIKES, at, target)
+	assert_eq(world.warn_fx._kind.count(FxLayer.Kind.TELEGRAPH), 1, "a circle under the one hero")
+	var pending := world.spawner.pending_count()
+	boss.wind_up(BoneColossus.Attack.RAISE, at, target)
+	assert_eq(world.spawner.pending_count(), pending + BoneColossus.RAISE_COUNT, "the raised dead wait in portals")
 	boss.get_parent().remove_child(boss)
 	boss.free()
 	_teardown(world)

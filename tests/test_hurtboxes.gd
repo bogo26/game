@@ -6,8 +6,8 @@ extends "res://tests/test_case.gd"
 const WORLD_SCENE := "res://src/world/world.tscn"
 const DT := 1.0 / 60.0
 const HORDE_ATLAS_PATH := "res://assets/sprites/enemies/horde_atlas.png"
-const BOSS_SPRITE_PATH := "res://assets/sprites/enemies/boss_demon.png"
-const BOSS_FRAMES := 4
+## Each boss's sheet is named after its enemy id (see Boss for the frame layout).
+const BOSS_SPRITE_PATH := "res://assets/sprites/enemies/%s.png"
 ## A hurtbox must cover this share of every frame's opaque pixels...
 const MIN_COVERAGE := 0.85
 ## ...and may stick out past the sprite by at most this many pixels.
@@ -214,17 +214,21 @@ func _check_frame(data: EnemyData, img: Image, cell: Rect2i, feet: Vector2, labe
 
 func test_hurtboxes_match_the_art() -> void:
 	var atlas := _load_image(HORDE_ATLAS_PATH)
-	var boss := _load_image(BOSS_SPRITE_PATH)
-	assert_true(atlas != null and boss != null, "sprite sheets load")
-	if atlas == null or boss == null:
+	assert_true(atlas != null, "sprite sheets load")
+	if atlas == null:
 		return
 	for path in World.ENEMY_TYPES:
 		var data := load(path) as EnemyData
 		var frames := 0
 		if data.behavior == EnemyData.Behavior.BOSS:
-			var size := Vector2i(boss.get_width() / BOSS_FRAMES, boss.get_height())
-			var feet := Vector2(size) * 0.5 - BossDemon.SPRITE_OFFSET
-			for f in BOSS_FRAMES:
+			var boss := _load_image(BOSS_SPRITE_PATH % data.id)
+			assert_true(boss != null, "%s has a sprite sheet" % data.id)
+			if boss == null:
+				continue
+			var size := Vector2i(boss.get_width() / Boss.FRAMES, boss.get_height())
+			assert_eq(size, Vector2i(Boss.FRAME_SIZE, Boss.FRAME_SIZE), "%s frames" % data.id)
+			var feet := Vector2(size) * 0.5 - Boss.SPRITE_OFFSET
+			for f in Boss.FRAMES:
 				if _check_frame(data, boss, Rect2i(Vector2i(f * size.x, 0), size), feet, "%s frame %d" % [data.id, f]):
 					frames += 1
 		else:

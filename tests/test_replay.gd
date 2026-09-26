@@ -121,6 +121,25 @@ func test_profile_records() -> void:
 	assert_eq(loaded.hero_rank(&"mage"), GameState.Difficulty.NORMAL)
 
 
+func test_best_times_from_shorter_runs_are_dropped() -> void:
+	# A profile saved before the run grew to 8 levels (no version).
+	var cfg := ConfigFile.new()
+	cfg.set_value("runs", "played", 5)
+	cfg.set_value("runs", "wins", [0, 2, 0])
+	cfg.set_value("runs", "best_time", [0.0, 480.0, 0.0])
+	cfg.set_value("heroes", "best", {"knight": GameState.Difficulty.NORMAL})
+	cfg.save(Profile.path)
+	var p := Profile.load_profile()
+	assert_eq(p.runs_played, 5)
+	assert_eq(p.wins[GameState.Difficulty.NORMAL], 2, "wins still count")
+	assert_true(p.hard_unlocked(), "and so does Hard")
+	assert_eq(p.hero_rank(&"knight"), GameState.Difficulty.NORMAL, "and the stars")
+	assert_near(p.best_time[GameState.Difficulty.NORMAL], 0.0, 0.001, "a 4-level best time can't be beaten")
+	var news := p.record_run(true, GameState.Difficulty.NORMAL, 1500.0, [&"knight"])
+	assert_true(news["best_time"], "so the first 8-level win sets one")
+	assert_near(Profile.load_profile().best_time[GameState.Difficulty.NORMAL], 1500.0, 0.001, "and it's kept")
+
+
 func test_hard_waits_for_a_normal_win() -> void:
 	GameState.profile = Profile.new()
 	var select: Node = (load(SELECT_SCENE) as PackedScene).instantiate()

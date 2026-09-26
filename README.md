@@ -55,8 +55,18 @@ The macOS build runs on your own Mac; other people have to right-click → Open 
 
 1. `./tools/dev.sh run`, then pick **Start Run**.
 2. Every player presses **A** (gamepad) or **Enter** (keyboard) to join. Browse heroes with left/right and press A/Enter to ready up.
-3. Fight through 3 levels: clear the lockdown arena rooms, then reach the exit portal. Hold **Tab** / **Back** for the map.
-4. Beat the Demon Lord in the throne room.
+3. Fight down through the dungeon: **1 → 2 → 3 → mini boss → 4 → 5 → 6 → final boss**. In each level, clear the lockdown arena rooms, then reach the exit portal. Hold **Tab** / **Back** for the map.
+
+   | Level | | |
+   |---|---|---|
+   | 1 | Crypt Entrance | spike traps, barrels, urns |
+   | 2 | Flooded Halls | water, nests |
+   | 3 | Bone Pits | chasms and bridges |
+   | Mini boss | The Ossuary | the **Bone Colossus**: club sweeps, grave spikes, and once enraged, leaps and risen dead. Beat it to open the way on. |
+   | 4 | Fungal Caverns | toxic pools, spore nests |
+   | 5 | Frozen Vaults | crevasses, slush, spike galleries |
+   | 6 | Molten Forge | lava channels, powder kegs, four arenas |
+   | Final boss | Demon's Throne | the **Demon Lord**: beat it to win the run |
 
 Things to use in the levels:
 - **Barrels** explode and chain; they hurt enemies, never heroes.
@@ -76,11 +86,13 @@ Upgrades include four **elemental chains** for your attack: fire, ice, poison an
 
 **Test Room** on the main menu is a drop-in sandbox with an endless horde and one of everything. Add `-- --upgrades=fire_3,ice_2` to `./tools/dev.sh run` to start with those upgrades and the tiers before them.
 
-**Replaying:** pick Casual, Normal or Hard in character select (LB / RB or Q / E; Hard unlocks after a Normal win). Every run picks one of two layouts for each level and may mirror it, and from the second level on some enemies arrive as elites (Swift, Volatile, Splitting). The end screen shows everyone's numbers and awards, and records best times.
+**Replaying:** pick Casual, Normal or Hard in character select (LB / RB or Q / E; Hard unlocks after a Normal win). Every run picks one of two layouts for each regular level and may mirror it, and from the second level on some enemies arrive as elites (Swift, Volatile, Splitting). The end screen shows everyone's numbers and awards, and records best times.
 
-Debug flags (after `--`): `--level=3`, `--bots=4`, `--heroes=rogue,mage`, `--layout=b`, `--mirror=hv`, `--elite-chance=0.3`, `--debug-levelups=2`, `--show-map`.
+Debug flags (after `--`): `--level=3` (the run's 1-based position: `--level=4` is the mini boss, `--level=8` the final boss), `--bots=4`, `--heroes=rogue,mage`, `--layout=b`, `--mirror=hv`, `--elite-chance=0.3`, `--debug-levelups=2`, `--show-map`.
 
 ## Status
+
+Milestone 12 (dungeon expansion) is done: the run is now 1-2-3, a mini boss (the Bone Colossus), 4-5-6 and the final boss, with three new levels (each with a second layout), four new tile themes and a shared `Boss` base for both bosses.
 
 Milestone 11 (player-experience pass) is done: run-flow fixes, readable telegraphs and spawns, hit and low-HP feedback, arena waves, team lives, an options screen with accessibility settings, button prompts for every controller, difficulty and records, map variety and elite enemies.
 
