@@ -118,7 +118,7 @@ func _tick_skeleton(dt: float) -> void:
 			move = _aim
 		elif _attack_cd <= 0.0:
 			_attack_cd = attack_interval
-			horde.damage(_target, damage, _aim * 40.0, owner_hero.slot)
+			world.hit_enemy(_target, damage, _aim * 40.0, owner_hero.slot, owner_hero)
 			world.fx.slash(position + Vector2(0, -6) + _aim * 3.0, 9.0, _aim.angle(), 1.6, Color(0.9, 0.9, 0.8, 0.8), 0.1)
 	else:
 		var to_owner := owner_hero.position - position
@@ -148,8 +148,12 @@ func _tick_turret() -> void:
 	var to := world.horde.pos[_target] - position
 	_aim = to.normalized()
 	Audio.play(&"shoot_rivet", -4.0)
-	world.projectiles.spawn(position + Vector2(0, -8) + _aim * 5.0, _aim * 300.0, damage, 3.0, 0.8,
+	var crit := owner_hero.roll_crit()
+	var shot := world.projectiles.spawn(position + Vector2(0, -8) + _aim * 5.0, _aim * 300.0,
+		damage * (owner_hero.crit_mult if crit else 1.0), 3.0, 0.8,
 		ProjectileSim.Team.PLAYER, owner_hero.slot, ProjectileSim.Look.RIVET, 0, 20.0)
+	if crit and shot >= 0:
+		world.projectiles.set_crit(shot)
 
 
 func _tick_tesla() -> void:
@@ -167,7 +171,7 @@ func _tick_tesla() -> void:
 		hit[horde.uid[current]] = true
 		var p := horde.pos[current] + Vector2(0, -6)
 		_lightning(from, p)
-		horde.damage(current, damage, Vector2.ZERO, owner_hero.slot)
+		world.hit_enemy(current, damage, Vector2.ZERO, owner_hero.slot, owner_hero)
 		horde.apply_stun(current, 0.15)
 		from = p
 		current = _next_chain_target(p, hit)

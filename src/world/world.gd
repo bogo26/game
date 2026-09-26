@@ -37,6 +37,7 @@ const ENEMY_COLORS := {
 const MAX_SPARKS_PER_FRAME := 40
 const MAX_PUFFS_PER_FRAME := 30
 const NUMBER_THRESHOLD := 12.0
+const CRIT_COLOR := Color(1.0, 0.72, 0.15)
 const REVIVE_DECAY := 0.5
 ## Test rooms: seconds after a team wipe before everyone gets back up.
 const TEST_ROOM_WIPE_RESET := 3.0
@@ -298,16 +299,31 @@ func damage_enemies_in_rect(rect: Rect2, damage: float, knock_from: Vector2, kno
 	return _damage_scratch(knock_from, damage, knockback, source_slot, stun_time, slow_time)
 
 
+## Deals one hit to enemy `j` from a player slot: rolls that hero's crit
+## (always a crit on marked enemies) and logs it for feedback. Returns true
+## on a kill.
+func hit_enemy(j: int, damage: float, push: Vector2, source_slot: int, source: Hero = null) -> bool:
+	if source == null and source_slot >= 0:
+		source = hero_for_slot(source_slot)
+	var crit := false
+	if source:
+		crit = horde.mark[j] > 0.0 or source.roll_crit()
+		if crit:
+			damage *= source.crit_mult
+	return horde.damage(j, damage, push, source_slot, crit)
+
+
 func _damage_scratch(center: Vector2, damage: float, knockback: float, source_slot: int,
 		stun_time: float, slow_time: float) -> int:
 	var hits := 0
+	var source := hero_for_slot(source_slot) if source_slot >= 0 else null
 	for j in _scratch:
 		var push := Vector2.ZERO
 		if knockback != 0.0:
 			var away := horde.pos[j] - center
 			push = away.normalized() * knockback if away.length_squared() > 0.01 else Vector2.UP * knockback
 		if damage > 0.0:
-			horde.damage(j, damage, push, source_slot)
+			hit_enemy(j, damage, push, source_slot, source)
 		elif push != Vector2.ZERO:
 			horde.vel[j] += push
 		if stun_time > 0.0:
@@ -495,14 +511,23 @@ func _emit_hit_effects() -> void:
 	if horde.shots_fired > 0:
 		Audio.play(&"spit")
 		horde.shots_fired = 0
+	var crits := 0
 	for k in n:
 		var p := horde.hit_pos[k] + Vector2(0, -6)
 		var amount := horde.hit_amount[k]
+		if horde.hit_crit[k] != 0:
+			# Crits always get a number, a gold star burst and a "tink".
+			crits += 1
+			numbers.add_crit(p, amount)
+			if crits <= MAX_SPARKS_PER_FRAME / 2:
+				particles.burst(p, 6, CRIT_COLOR, 130.0, 0.3, 2)
+			continue
 		if k < MAX_SPARKS_PER_FRAME:
 			particles.burst(p, 2, Color(1, 0.95, 0.8), 70.0, 0.18, 1)
 		if amount >= NUMBER_THRESHOLD:
-			var big := amount >= 40.0
-			numbers.add(p, amount, Color(1, 0.85, 0.3) if big else Color(1, 1, 1), big)
+			numbers.add(p, amount, Color(1, 1, 1), amount >= 40.0)
+	if crits > 0:
+		Audio.play(&"crit")
 	horde.clear_hit_log()
 
 

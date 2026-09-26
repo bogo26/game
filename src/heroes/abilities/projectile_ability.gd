@@ -36,10 +36,16 @@ func _activate(aim: Vector2) -> void:
 			else:
 				offset = lerpf(-spread * 0.5, spread * 0.5, float(k) / float(n - 1))
 		var dir := aim.rotated(offset)
-		var i := sim.spawn(origin, dir * shot_speed, scaled_damage(damage), radius, lifetime,
+		var dmg := scaled_damage(damage)
+		var crit := hero.roll_crit()
+		if crit:
+			dmg *= hero.crit_mult
+		var i := sim.spawn(origin, dir * shot_speed, dmg, radius, lifetime,
 			ProjectileSim.Team.PLAYER, hero.slot, look, shot_pierce, knockback, shot_bounces)
 		if i < 0:
 			break
+		if crit:
+			sim.set_crit(i)
 		if effect != ProjectileSim.Effect.NONE:
 			sim.set_effect(i, effect, effect_time + mod(&"effect_time"))
 		if splash > 0.0:

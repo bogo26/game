@@ -269,12 +269,14 @@ func teleport(to: Vector2, iframes: float) -> void:
 
 # --- combat ----------------------------------------------------------------------------------
 
-## Base damage with the hero's multipliers, active buffs and a crit roll.
-func roll_damage(base: float) -> float:
-	var dmg := base * damage_mult * buff_product(&"damage_factor")
-	if _rng.randf() < crit_chance:
-		dmg *= crit_mult
-	return dmg
+## Damage with the hero's multipliers and active buffs. Crits are rolled per
+## hit (World.hit_enemy, or at spawn for projectiles), not here.
+func base_damage(base: float) -> float:
+	return base * damage_mult * buff_product(&"damage_factor")
+
+
+func roll_crit() -> bool:
+	return _rng.randf() < crit_chance
 
 
 ## Hook for on-hit effects of melee/area abilities.

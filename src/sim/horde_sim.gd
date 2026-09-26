@@ -78,6 +78,7 @@ var damage_by_slot := PackedFloat32Array([0, 0, 0, 0])
 var hit_pos := PackedVector2Array()
 var hit_amount := PackedFloat32Array()
 var hit_type := PackedInt32Array()
+var hit_crit := PackedByteArray()
 ## Enemy shots fired since the World last checked (for sound).
 var shots_fired := 0
 ## Exploder blasts since the last drain (World damages heroes + draws FX).
@@ -198,13 +199,17 @@ func alive_count() -> int:
 	return count - _dead_pending
 
 
-## Applies damage; returns true if this hit killed the enemy.
-func damage(i: int, amount: float, knockback: Vector2, source_slot: int) -> bool:
+## Applies damage; returns true if this hit killed the enemy. `crit` only
+## marks the hit for feedback (the caller already multiplied the damage).
+## Marked enemies turn non-crit hits into crits (x MARK_DAMAGE_MULT); hits
+## that already crit aren't multiplied twice.
+func damage(i: int, amount: float, knockback: Vector2, source_slot: int, crit: bool = false) -> bool:
 	var h := hp[i]
 	if h <= 0.0:
 		return false
-	if mark[i] > 0.0:
+	if mark[i] > 0.0 and not crit:
 		amount *= MARK_DAMAGE_MULT
+		crit = true
 	var remaining := h - amount
 	hp[i] = remaining
 	flash[i] = FLASH_TIME
@@ -212,6 +217,7 @@ func damage(i: int, amount: float, knockback: Vector2, source_slot: int) -> bool
 		hit_pos.append(pos[i])
 		hit_amount.append(amount)
 		hit_type.append(type[i])
+		hit_crit.append(1 if crit else 0)
 	if knockback != Vector2.ZERO:
 		vel[i] += knockback * t_knockback[type[i]]
 	if source_slot >= 0 and source_slot < damage_by_slot.size():
@@ -264,6 +270,7 @@ func clear_hit_log() -> void:
 	hit_pos.clear()
 	hit_amount.clear()
 	hit_type.clear()
+	hit_crit.clear()
 
 
 func clear_kill_log() -> void:

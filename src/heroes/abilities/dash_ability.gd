@@ -115,7 +115,7 @@ func _tick_active(delta: float) -> void:
 			_hit_uids[id] = true
 			var push := (horde.pos[j] - hero.position).normalized() * knockback
 			if damage > 0.0:
-				horde.damage(j, scaled_damage(damage), push, hero.slot)
+				w.hit_enemy(j, scaled_damage(damage), push, hero.slot, hero)
 			elif push != Vector2.ZERO:
 				horde.vel[j] += push
 			if stun_time > 0.0:

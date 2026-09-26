@@ -204,6 +204,12 @@ docs/         this document
 - Upgrades tweak abilities through `Ability.mods` (e.g. `pierce`, `count`, `area_pct`, `max_active`, `minion_hp_pct`). There are 50 upgrades: 17 generic plus 4–5 per hero.
 - Hero tuning lives in `tools/gen_hero_data.py`, which writes `src/heroes/data/*.tres`. Edit the table and re-run it, or edit the `.tres` in the Godot inspector.
 - **Ultimate charge:** damage dealt ÷ the hero's `ult_cost`, plus 1% per second passively. The player ring pulses when the ultimate is ready.
+- **Critical hits:**
+  - Every hit rolls the attacker's crit chance: base 5%, Rogue 15%, Keen Eye +6%, Deadly Precision +8%.
+  - A crit deals ×crit damage: base 1.75, +0.35 per Brutal Crits.
+  - Projectiles roll once at spawn (crit shots glow and keep the crit through pierce and splash).
+  - Melee swings, bursts, zone ticks, dashes, turrets, skeletons and tesla chains roll per enemy per hit.
+  - Rogue-marked enemies always take crits, never multiplied twice.
 - **Movement abilities:** give i-frames (0.15–0.3 s) and never share a cooldown with other slots.
 - Channels (Whirlwind) block attack, special and ultimate, but not movement.
 - **Downed:**
@@ -283,7 +289,10 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - explosion debris, dash dust, hurt and pickup sparkles, level-up bursts
 
   Oldest particles are overwritten, so cost is bounded (~0.1 ms).
-- **Damage numbers:** one node draws up to 40 numbers. Only hits ≥ 12 get one (≥ 40 are big and gold), and damage to heroes shows in red.
+- **Damage numbers:** one node draws up to 40 numbers.
+  - **Crits** always get a gold double-size number with "!" (e.g. `14!`), a gold star burst and a "tink" sound. Ordinary numbers can never push them off screen.
+  - Ordinary hits get a white number from 12 damage up (double size from 40).
+  - Damage to heroes shows in red.
 - **Other effects:**
   - vector FX (`FxLayer`) for slashes, rings, telegraphs and zones
   - white hit flash in the shader

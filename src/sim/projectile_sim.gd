@@ -30,6 +30,7 @@ var last_hit := PackedInt32Array()     # uid of the last enemy hit (pierce)
 var effect := PackedInt32Array()
 var effect_time := PackedFloat32Array()
 var splash := PackedFloat32Array()     # > 0: area damage on impact
+var crit := PackedByteArray()          # 1: rolled a crit at spawn (glows, hits show as crits)
 
 ## Splash impacts this frame (for FX): position + radius pairs.
 var impacts := PackedVector2Array()
@@ -56,6 +57,7 @@ func _init() -> void:
 	effect.resize(CAPACITY)
 	effect_time.resize(CAPACITY)
 	splash.resize(CAPACITY)
+	crit.resize(CAPACITY)
 
 
 ## Returns the projectile index, or -1 when full.
@@ -80,6 +82,7 @@ func spawn(p: Vector2, v: Vector2, dmg: float, r: float, lifetime: float, p_team
 	effect[i] = Effect.NONE
 	effect_time[i] = 0.0
 	splash[i] = 0.0
+	crit[i] = 0
 	return i
 
 
@@ -90,6 +93,11 @@ func set_effect(i: int, p_effect: Effect, seconds: float) -> void:
 
 func set_splash(i: int, radius_px: float) -> void:
 	splash[i] = radius_px
+
+
+## Marks a projectile whose damage already includes a crit.
+func set_crit(i: int) -> void:
+	crit[i] = 1
 
 
 func clear() -> void:
@@ -195,7 +203,8 @@ func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_positions: PackedV
 
 func _hit_enemy(i: int, j: int, horde: HordeSim, v: Vector2) -> void:
 	var kb := v.normalized() * knockback[i] if v != Vector2.ZERO else Vector2.ZERO
-	horde.damage(j, damage[i], kb, owner[i])
+	var is_crit := crit[i] != 0
+	horde.damage(j, damage[i], kb, owner[i], is_crit)
 	match effect[i]:
 		Effect.SLOW:
 			horde.apply_slow(j, effect_time[i])
@@ -210,7 +219,8 @@ func _hit_enemy(i: int, j: int, horde: HordeSim, v: Vector2) -> void:
 		var splash_damage := damage[i] * 0.6
 		for k in _scratch:
 			if k != j:
-				horde.damage(k, splash_damage, (horde.pos[k] - center).normalized() * knockback[i] * 0.5, owner[i])
+				horde.damage(k, splash_damage, (horde.pos[k] - center).normalized() * knockback[i] * 0.5, owner[i],
+					is_crit)
 		impacts.append(center)
 		impact_radius.append(r)
 
@@ -233,6 +243,7 @@ func _remove_at(i: int, P: PackedVector2Array, V: PackedVector2Array, L: PackedF
 		effect[i] = effect[last]
 		effect_time[i] = effect_time[last]
 		splash[i] = splash[last]
+		crit[i] = crit[last]
 	count = last
 
 
@@ -258,5 +269,6 @@ func render(layer: InstanceLayer) -> void:
 		buf[o + 5] = c
 		buf[o + 7] = roundf(p.y)
 		buf[o + 8] = float(look[i])
+		buf[o + 9] = 0.45 if crit[i] != 0 else 0.0  # crit shots glow
 	layer.buffer = buf
 	layer.commit(n)

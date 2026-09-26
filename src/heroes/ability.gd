@@ -132,9 +132,11 @@ func add_mod(key: StringName, amount: float) -> void:
 	mods[key] = float(mods.get(key, 0.0)) + amount
 
 
-## Hero damage with its multipliers and crits applied.
+## Damage with upgrades and the hero's multipliers. Crits are rolled per hit
+## by World.hit_enemy (and at spawn for projectiles), so zones and multi-hit
+## abilities crit per enemy instead of all-or-nothing.
 func scaled_damage(base: float) -> float:
-	return hero.roll_damage(base * (1.0 + mod(&"damage_pct", 0.0)))
+	return hero.base_damage(base * (1.0 + mod(&"damage_pct", 0.0)))
 
 
 @abstract func _activate(aim: Vector2) -> void
