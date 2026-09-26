@@ -116,6 +116,12 @@ func _process(delta: float) -> void:
 
 
 ## A big message in the middle of the screen for a moment.
+## Player colours changed (colour-blind palette).
+func refresh_colors() -> void:
+	for i in _slot_labels.size():
+		_slot_labels[i].label_settings.font_color = GameState.player_color(i)
+
+
 func callout(text: String, color: Color = Color("ffe07a")) -> void:
 	_callout_label.text = text
 	_callout_label.label_settings.font_color = color

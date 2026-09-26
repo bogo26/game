@@ -57,8 +57,7 @@ func _input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif key.physical_keycode == KEY_F11 or (key.physical_keycode == KEY_ENTER and key.alt_pressed):
 		# Global fullscreen toggle (F11 / Alt+Enter).
-		var window := get_window()
-		window.mode = Window.MODE_WINDOWED if window.mode == Window.MODE_FULLSCREEN else Window.MODE_FULLSCREEN
+		Settings.set_value(&"fullscreen", get_window().mode != Window.MODE_FULLSCREEN)
 		get_viewport().set_input_as_handled()
 
 

@@ -28,6 +28,7 @@ godot --headless --path . -s res://tests/run_tests.gd
 ```
 
 - Press **F3** in game for the performance overlay (FPS, frame times, per-system costs).
+- **Options** (main menu or pause menu): volumes, fullscreen, screen shake, damage numbers, reduce flashing, rumble, colour-blind friendly player colours, gamepad aim assist and tips.
 
 ## Building releases
 

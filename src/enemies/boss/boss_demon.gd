@@ -280,12 +280,12 @@ func _update_sprite() -> void:
 		# A hot pink throb that hit flashes can't wash out: an attack is coming.
 		var pulse := 0.5 + 0.5 * sin(_anim * 30.0)
 		mat.set_shader_parameter("flash_color", FxLayer.DANGER.lightened(0.35))
-		mat.set_shader_parameter("flash_amount", 0.35 + 0.35 * pulse)
+		mat.set_shader_parameter("flash_amount", (0.35 + 0.35 * pulse) * maxf(0.5, Settings.flash_scale()))
 		sprite.modulate = Color.WHITE
 		return
 	var flash := world.horde.flash[_index] > 0.0
 	mat.set_shader_parameter("flash_color", Color.WHITE)
-	mat.set_shader_parameter("flash_amount", 0.75 if flash else 0.0)
+	mat.set_shader_parameter("flash_amount", 0.75 * Settings.flash_scale() if flash else 0.0)
 	sprite.modulate = Color(1.3, 0.8, 0.8) if phase == Phase.THREE else Color.WHITE
 
 

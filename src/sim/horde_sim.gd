@@ -132,6 +132,8 @@ var shots_fired := 0
 ## Ranged enemies only start a shot inside this rectangle (the camera view),
 ## so nothing fires from off screen. Empty = anywhere.
 var view_rect := Rect2()
+## Strength of the white hit flash (lower with "reduce flashing").
+var flash_strength := 1.0
 ## Exploders whose fuse lit this frame (uids), and ranged enemies that started
 ## winding up a shot (positions), for the World's warnings.
 var fuse_uids := PackedInt32Array()
@@ -1026,7 +1028,7 @@ func render(layer: InstanceLayer) -> void:
 		elif STN[i] <= 0.0:
 			frame += int(AN[i] * fps[t]) % frames[t]
 		buf[o + 8] = float(frame)
-		buf[o + 9] = 1.0 if FL[i] > 0.0 else 0.0
+		buf[o + 9] = flash_strength if FL[i] > 0.0 else 0.0
 		var tint := Tint.NONE
 		if STT[i] > 0.0:
 			if FRZ[i] > 0.0:

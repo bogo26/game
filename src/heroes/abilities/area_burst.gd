@@ -74,7 +74,7 @@ func _land(p: Vector2) -> void:
 			w.damage_enemies_in_rect(view, dmg, view.get_center(), knockback, hero.slot, stun, slow)
 		if heal_fraction > 0.0:
 			w.heal_heroes(view.get_center(), INF, heal_fraction)
-		w.fx.disc(view.get_center(), view.size.length() * 0.5, Color(color, 0.35), 0.35)
+		w.fx.disc(view.get_center(), view.size.length() * 0.5, Color(color, 0.35 * Settings.flash_scale()), 0.35)
 	else:
 		var r := _radius()
 		var hits := 0

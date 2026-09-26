@@ -165,7 +165,7 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
     - summon: the adds' spawn portals
   - HP is 1800 × level multiplier × player-count scaling. It is immune to stun and slow.
 - **Screens:** Main menu → Character select → Game (levels) → End screen (victory/defeat + stats) → Play again / Main menu.
-  - **Main menu:** Start Run, Test Room (drop-in sandbox), Quit. The main, pause and end menus use Godot focus navigation, so keyboard, any gamepad or mouse all work, with move/confirm sounds (`UiSounds`).
+  - **Main menu:** Start Run, Test Room (drop-in sandbox), Options, Quit. The main, pause and end menus use Godot focus navigation, so keyboard, any gamepad or mouse all work, with move/confirm sounds (`UiSounds`).
   - **Character select:** 4 quadrants.
     - Press A/Enter to join (holding that button doesn't also ready you up).
     - Left/right to browse the 8-hero roster.
@@ -174,7 +174,9 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
     - With nobody joined, B/Esc/Backspace returns to the main menu. The press that makes the last player leave doesn't count.
   - **Enter with Alt held** is the fullscreen shortcut and never counts as a confirm press, even if Alt is let go first.
   - **`Game`:** builds a `World` per level, shows "LEVEL n" and "LEVEL CLEAR!" banners, and banks stats. A team wipe means defeat; the boss's death means victory.
-  - **Pause:** Start or Esc opens it for any player: Resume, Music and Sounds volume, Fullscreen, and Quit to menu, which needs a second press within 3 s. The press that closes it can't also trigger a dash. It can't be opened under the victory/defeat banner.
+  - **Pause:** Start or Esc opens it for any player: Resume, Options, and Quit to menu, which needs a second press within 3 s.
+  - **Options** (`OptionsMenu`, from the main menu and the pause menu): volume, music, sounds, fullscreen, screen shake (off / low / full), damage numbers (all / crits only / off), reduce flashing (softer hit flashes, no invulnerability blinking, dimmer screen-wide bursts), controller rumble, player colours (default or a colour-blind friendly set: orange, sky blue, white, reddish purple), gamepad aim assist (off / ±10° / ±20°, locks onto the enemy nearest the aim within 160 px) and tips. Up/down picks a row, left/right or a click changes it (right-click goes back); volumes stop at 0% and 100%. Everything applies and saves at once.
+  - **`Settings` autoload** owns `user://settings.cfg` (volumes, fullscreen, comfort options, which tips were seen). The test runner points it at a temporary file with defaults, so tests never see a player's settings. The press that closes it can't also trigger a dash. It can't be opened under the victory/defeat banner.
   - **End screen:** its buttons ignore input for 0.6 s, so a player still mashing from the fight doesn't skip the results.
   - **Test Room:** with nobody joined, Esc (or Start/B on a pad) goes back to the menu.
 - **Shared camera:** follows the middle of the group with fixed zoom, and players can't leave the screen. The leash blocks the player who is running away rather than dragging the others along.

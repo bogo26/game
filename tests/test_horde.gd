@@ -285,7 +285,7 @@ func test_spitter_keeps_distance_and_fires() -> void:
 	h.projectiles = shots
 	h.spawn(0, LevelGrid.cell_center(Vector2i(10, 5)))
 	var fired := 0
-	for frame in 180:
+	for frame in 300:  # walk into range, a random first cooldown (<= 1.5 s), then the wind-up
 		h.update(1.0 / 60.0, target)
 		fired = maxi(fired, shots.count)
 	var dist := h.pos[0].distance_to(target[0])

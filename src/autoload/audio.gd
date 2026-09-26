@@ -4,11 +4,10 @@ extends Node
 ## 300-enemy fight doesn't turn into noise. Cues players must not miss (a
 ## teammate down, low HP, the boss winding up...) have voices of their own, so
 ## a flood of hits can never cut them off. Music loops per screen on its own
-## bus and crossfades between tracks. Volumes are saved to user://settings.cfg.
+## bus and crossfades between tracks. Volumes live in the Settings autoload.
 
 const SFX_PATH := "res://assets/audio/sfx/%s.wav"
 const MUSIC_PATH := "res://assets/audio/music/%s.wav"
-const SETTINGS_PATH := "user://settings.cfg"
 const VOICES := 24
 ## The last PRIORITY_VOICES voices only play PRIORITY sounds.
 const PRIORITY_VOICES := 6
@@ -55,7 +54,6 @@ func _ready() -> void:
 		_voices.append(p)
 	_music = _new_music_player()
 	_music_old = _new_music_player()
-	_load_settings()
 
 
 func _new_music_player() -> AudioStreamPlayer:
@@ -131,18 +129,6 @@ func music_track() -> StringName:
 	return _music_name
 
 
-func set_bus_volume(bus: StringName, linear: float) -> void:
-	var index := AudioServer.get_bus_index(bus)
-	if index >= 0:
-		AudioServer.set_bus_volume_linear(index, clampf(linear, 0.0, 1.0))
-		_save_settings()
-
-
-func get_bus_volume(bus: StringName) -> float:
-	var index := AudioServer.get_bus_index(bus)
-	return AudioServer.get_bus_volume_linear(index) if index >= 0 else 1.0
-
-
 func _stream(path: String) -> AudioStream:
 	if not _cache.has(path):
 		_cache[path] = load(path) if ResourceLoader.exists(path) else null
@@ -155,21 +141,3 @@ func _ensure_bus(bus: StringName) -> void:
 		var index := AudioServer.get_bus_count() - 1
 		AudioServer.set_bus_name(index, bus)
 		AudioServer.set_bus_send(index, &"Master")
-
-
-func _load_settings() -> void:
-	var cfg := ConfigFile.new()
-	if cfg.load(SETTINGS_PATH) != OK:
-		return
-	for bus: StringName in [&"Master", &"Music", &"SFX"]:
-		var index := AudioServer.get_bus_index(bus)
-		if index >= 0:
-			AudioServer.set_bus_volume_linear(index, float(cfg.get_value("audio", String(bus), 1.0)))
-
-
-func _save_settings() -> void:
-	var cfg := ConfigFile.new()
-	cfg.load(SETTINGS_PATH)
-	for bus: StringName in [&"Master", &"Music", &"SFX"]:
-		cfg.set_value("audio", String(bus), get_bus_volume(bus))
-	cfg.save(SETTINGS_PATH)

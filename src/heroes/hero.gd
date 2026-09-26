@@ -362,7 +362,31 @@ func _update_aim() -> void:
 		if to_mouse.length_squared() > 4.0:
 			aim_dir = to_mouse.normalized()
 	else:
-		aim_dir = input.aim
+		aim_dir = assisted_aim(input.aim, Settings.aim_assist_angle())
+
+
+## Gamepad aim assist: snaps `aim` onto the enemy within AIM_ASSIST_RANGE that
+## is closest to it in angle, if that's within `cone` radians.
+func assisted_aim(aim: Vector2, cone: float) -> Vector2:
+	if cone <= 0.0 or world == null:
+		return aim
+	var horde := world.horde
+	var found := PackedInt32Array()
+	horde.query_circle(position, Settings.AIM_ASSIST_RANGE, found)
+	var best := aim
+	var best_angle := cone
+	var from := body_position()
+	for j in found:
+		if horde.hp[j] <= 0.0 or not horde.is_mobile(j) or horde.is_falling(j):
+			continue
+		var to := horde.body_center(j) - from
+		if to.length_squared() < 1.0:
+			continue
+		var angle := absf(aim.angle_to(to))
+		if angle < best_angle:
+			best_angle = angle
+			best = to.normalized()
+	return best
 
 
 # --- movement helpers used by abilities --------------------------------------------------
@@ -498,14 +522,17 @@ func _update_visuals(delta: float) -> void:
 	# Each kind of invulnerability looks different: hit (blink), dash
 	# (bright), fresh revive (gold shimmer).
 	if _hurt_flash > 0.0:
-		sprite.modulate = Color(2.0, 0.6, 0.6)
+		sprite.modulate = Color.WHITE.lerp(Color(2.0, 0.6, 0.6), Settings.flash_scale())
 	elif is_dashing():
 		sprite.modulate = Color(1.6, 1.6, 1.6)
 	elif state == State.ALIVE and revive_shield > 0.0:
 		var shimmer := 0.5 + 0.5 * sin(_anim_time * 14.0)
 		sprite.modulate = Color(1.2, 1.12, 0.8).lerp(Color(1.7, 1.5, 0.85), shimmer)
 	elif state == State.ALIVE and invulnerable_time > 0.0:
-		sprite.modulate = Color(1, 1, 1, 0.55 if int(invulnerable_time * 20.0) % 2 == 0 else 1.0)
+		if Settings.reduce_flashing:
+			sprite.modulate = Color(1, 1, 1, 0.7)  # steady instead of blinking
+		else:
+			sprite.modulate = Color(1, 1, 1, 0.55 if int(invulnerable_time * 20.0) % 2 == 0 else 1.0)
 	else:
 		sprite.modulate = Color.WHITE
 	var outline := color

@@ -24,6 +24,7 @@ InputRouter="*res://src/autoload/input_router.gd"
 GameState="*res://src/autoload/game_state.gd"
 PerfMonitor="*res://src/autoload/perf_monitor.gd"
 Audio="*res://src/autoload/audio.gd"
+Settings="*res://src/autoload/settings.gd"
 
 [debug]
 

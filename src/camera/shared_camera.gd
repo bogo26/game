@@ -55,9 +55,10 @@ func follow(points: Array[Vector2], delta: float) -> void:
 		offset = Vector2.ZERO
 
 
-## Screen shake in whole pixels; stronger calls override weaker ones.
+## Screen shake in whole pixels; stronger calls override weaker ones. Scaled
+## (or turned off) by the screen-shake setting.
 func add_shake(strength: float) -> void:
-	_shake = minf(MAX_SHAKE, maxf(_shake, strength))
+	_shake = minf(MAX_SHAKE, maxf(_shake, strength * Settings.shake_scale()))
 
 
 func snap_to(point: Vector2) -> void:

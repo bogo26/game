@@ -51,6 +51,11 @@ func _process(_delta: float) -> bool:
 
 
 func _run_all() -> void:
+	# Tests run with default settings, never the player's saved ones.
+	var settings := root.get_node_or_null("Settings")
+	if settings:
+		settings.set("path", "user://test_settings.cfg")
+		settings.call("reset")
 	var filter := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--filter="):

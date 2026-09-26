@@ -1,6 +1,7 @@
 extends Node2D
 ## Title screen: slow pan over a dungeon, the game title and a button list
-## (Start Run / Test Room / Quit). Any keyboard, gamepad or mouse can navigate.
+## (Start Run / Test Room / Options / Quit). Any keyboard, gamepad or mouse can
+## navigate.
 
 const BACKGROUND_LEVEL := preload("res://src/levels/data/test_room.tres")
 const CHARACTER_SELECT := "res://src/ui/character_select.tscn"
@@ -26,7 +27,15 @@ func _ready() -> void:
 	%StartButton.pressed.connect(_on_start)
 	%TestRoomButton.pressed.connect(_on_test_room)
 	%QuitButton.pressed.connect(func() -> void: get_tree().quit())
-	UiSounds.attach(self)
+	var options := OptionsMenu.new()
+	add_child(options)
+	%OptionsButton.pressed.connect(func() -> void:
+		$UI/Center.visible = false  # keeps focus inside the options
+		options.open())
+	options.closed.connect(func() -> void:
+		$UI/Center.visible = true
+		UiSounds.focus_quietly(%OptionsButton))
+	UiSounds.attach($UI)
 	UiSounds.focus_quietly(start_button)
 
 

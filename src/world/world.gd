@@ -218,6 +218,7 @@ func _ready() -> void:
 	Events.hero_downed.connect(func(_s: int) -> void: Audio.play(&"down"))
 	Events.hero_revived.connect(func(_s: int) -> void: Audio.play(&"revive"))
 	Events.hero_low_hp.connect(_on_hero_low_hp)
+	Settings.changed.connect(_on_settings_changed)
 	Events.ult_ready.connect(_on_ult_ready)
 	Events.ability_ready.connect(_on_ability_ready)
 	Events.ability_denied.connect(_on_ability_denied)
@@ -357,6 +358,7 @@ func _process(delta: float) -> void:
 			_on_quit_requested()  # empty test room: Esc / Start / B goes back to the menu
 	var t_sim_end := Time.get_ticks_usec()
 
+	horde.flash_strength = Settings.flash_scale()
 	horde.render(horde_layer)
 	projectiles.render(projectile_layer)
 	pickups.render(pickup_layer, heart_layer)
@@ -869,6 +871,13 @@ func _on_hero_damaged(slot: int, amount: float) -> void:
 		numbers.add_hero_damage(hero.position + Vector2(0, -8), amount, big)
 		if big:
 			shake(2.0)
+
+
+func _on_settings_changed(key: StringName) -> void:
+	if key == &"palette":
+		for hero in heroes:
+			hero.color = GameState.player_color(hero.slot)
+		hud.refresh_colors()
 
 
 func _on_hero_low_hp(_slot: int) -> void:

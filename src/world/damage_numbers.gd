@@ -23,14 +23,19 @@ func _ready() -> void:
 	z_index = 5
 
 
-## `big` numbers use the 2x font (huge hits).
+## `big` numbers use the 2x font (huge hits). Hidden unless the damage-numbers
+## setting is "all".
 func add(p: Vector2, amount: float, color: Color, big: bool = false) -> void:
+	if Settings.damage_numbers != Settings.Numbers.ALL:
+		return
 	_push(p, str(int(round(amount))), color, 16 if big else 8, false)
 
 
-## Critical hit: gold, 2x font, "!" - always shown, and never pushed out by
-## ordinary numbers.
+## Critical hit: gold, 2x font, "!" - always shown (unless numbers are off),
+## and never pushed out by ordinary numbers.
 func add_crit(p: Vector2, amount: float) -> void:
+	if Settings.damage_numbers == Settings.Numbers.OFF:
+		return
 	_push(p, "%d!" % int(round(amount)), CRIT_COLOR, 16, true)
 
 
@@ -43,6 +48,8 @@ func add_text(p: Vector2, text: String, color: Color) -> void:
 ## Damage a hero took: red, never pushed out by the horde's numbers; big
 ## when it's a big chunk of their health.
 func add_hero_damage(p: Vector2, amount: float, big: bool) -> void:
+	if Settings.damage_numbers == Settings.Numbers.OFF:
+		return
 	_push(p, str(int(round(amount))), HURT_COLOR, 16 if big else 8, true)
 
 

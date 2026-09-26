@@ -1,8 +1,8 @@
 class_name PauseMenu
 extends CanvasLayer
-## Pause overlay (Resume, volumes, fullscreen, Quit to menu). Any keyboard,
-## gamepad or mouse can navigate it; Start / Esc / B closes it again. Quitting
-## takes a second press, so a run isn't thrown away by accident.
+## Pause overlay (Resume, Options, Quit to menu). Any keyboard, gamepad or
+## mouse can navigate it; Start / Esc / B closes it again. Quitting takes a
+## second press, so a run isn't thrown away by accident.
 
 signal quit_requested
 ## The menu closed and play resumes.
@@ -15,6 +15,9 @@ const QUIT_CONFIRM_TIME := 3.0
 
 var _opened_this_frame := false
 var _quit_armed := 0.0
+var _options: OptionsMenu
+## The Esc / B that closes the options must not also close the pause menu.
+var _ignore_pause_until := -1
 ## Process frame the menu last closed on (so the same press can't reopen it).
 var closed_at_frame := -1
 
@@ -27,15 +30,11 @@ func _ready() -> void:
 	%ResumeButton.pressed.connect(close)
 	%QuitButton.pressed.connect(_on_quit_pressed)
 	%QuitButton.focus_exited.connect(_disarm_quit)
-	%MusicSlider.value = Audio.get_bus_volume(&"Music")
-	%SoundSlider.value = Audio.get_bus_volume(&"SFX")
-	%MusicSlider.value_changed.connect(func(v: float) -> void: Audio.set_bus_volume(&"Music", v))
-	%SoundSlider.value_changed.connect(func(v: float) -> void:
-		Audio.set_bus_volume(&"SFX", v)
-		Audio.play(&"ui_move"))
-	%FullscreenButton.toggled.connect(func(on: bool) -> void:
-		get_window().mode = Window.MODE_FULLSCREEN if on else Window.MODE_WINDOWED)
+	%OptionsButton.pressed.connect(_open_options)
 	UiSounds.attach(self)
+	_options = OptionsMenu.new()
+	add_child(_options)
+	_options.closed.connect(_on_options_closed)
 
 
 func is_open() -> bool:
@@ -52,7 +51,6 @@ func toggle() -> void:
 func open() -> void:
 	visible = true
 	_opened_this_frame = true
-	%FullscreenButton.set_pressed_no_signal(get_window().mode == Window.MODE_FULLSCREEN)
 	get_tree().paused = true
 	UiSounds.focus_quietly(resume_button)
 
@@ -60,10 +58,25 @@ func open() -> void:
 func close() -> void:
 	visible = false
 	_disarm_quit()
+	_options.close()
+	%Box.visible = true
 	closed_at_frame = Engine.get_process_frames()
 	InputRouter.swallow_presses()
 	get_tree().paused = InputRouter.has_disconnected_player()
 	closed.emit()
+
+
+func _open_options() -> void:
+	%Box.visible = false
+	_options.open()
+
+
+func _on_options_closed() -> void:
+	if not visible:
+		return
+	%Box.visible = true
+	_ignore_pause_until = Engine.get_process_frames() + 1
+	UiSounds.focus_quietly(%OptionsButton)
 
 
 func _on_quit_pressed() -> void:
@@ -84,6 +97,8 @@ func _process(delta: float) -> void:
 	if not visible or _opened_this_frame:
 		_opened_this_frame = false
 		return
+	if _options.is_open() or Engine.get_process_frames() <= _ignore_pause_until:
+		return
 	if _quit_armed > 0.0:
 		_quit_armed -= delta
 		if _quit_armed <= 0.0:
@@ -95,6 +110,7 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	if visible and event.is_action_pressed(&"ui_cancel"):
+	if visible and not _options.is_open() and event.is_action_pressed(&"ui_cancel") \
+			and Engine.get_process_frames() > _ignore_pause_until:
 		close()
 		get_viewport().set_input_as_handled()

@@ -130,7 +130,7 @@ static func enter_down() -> bool:
 
 
 func rumble(weak: float, strong: float, duration: float) -> void:
-	if device >= 0 and connected:
+	if device >= 0 and connected and Settings.rumble:
 		Input.start_joy_vibration(device, weak, strong, duration)
 
 

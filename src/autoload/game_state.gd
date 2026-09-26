@@ -14,6 +14,14 @@ const PLAYER_COLORS: Array[Color] = [
 	Color("5cc85e"),  # P3 green
 	Color("f2c63c"),  # P4 yellow
 ]
+## Colour-blind friendly set (Okabe-Ito based): told apart by hue and lightness
+## under the common kinds of colour blindness.
+const COLORBLIND_COLORS: Array[Color] = [
+	Color("e69f00"),  # P1 orange
+	Color("56b4e9"),  # P2 sky blue
+	Color("f0f0f0"),  # P3 white
+	Color("cc79a7"),  # P4 reddish purple
+]
 
 
 class PlayerSlot:
@@ -75,7 +83,8 @@ func _ready() -> void:
 
 
 func player_color(slot: int) -> Color:
-	return PLAYER_COLORS[slot % PLAYER_COLORS.size()]
+	var colors := COLORBLIND_COLORS if Settings.palette == Settings.Palette.COLORBLIND else PLAYER_COLORS
+	return colors[slot % colors.size()]
 
 
 ## Slots that have a device assigned and a hero picked.
