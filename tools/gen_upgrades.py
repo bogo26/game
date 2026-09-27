@@ -6,11 +6,16 @@ Effect syntax (see src/upgrades/upgrade_data.gd):
                                         crit_chance crit_damage pickup_range regen ult_charge
                                         life_on_kill revive_speed
   "ability <slot|all> <mod> <amount>"  slots: attack special movement ultimate all
+Legendaries (LEGENDARIES, the mini boss's reward) have no effect lines: each
+turns one ability into its form from tools/gen_hero_data.py (FORMS).
 Run: python3 tools/gen_upgrades.py
 """
 import os
 
-COMMON, RARE, EPIC = 0, 1, 2
+from gen_hero_data import FORMS
+
+COMMON, RARE, EPIC, LEGENDARY = 0, 1, 2, 3
+SLOTS = {"attack": 0, "special": 1, "movement": 2, "ultimate": 3}
 
 # (id, name, description, rarity, max_stacks, hero_id, [effects])
 UPGRADES = [
@@ -144,6 +149,61 @@ ELEMENTS = [
 ELEMENT_TIERS = {1: (RARE, 1.0), 2: (RARE, 2.5), 3: (EPIC, 8.0)}
 
 
+# The mini boss's reward: 3 per hero, each on a different ability; a player
+# picks one of their hero's three. (id, name, card text)
+# With four players a card holds about this much text.
+CARD_TEXT_MAX = 88
+LEGENDARIES = [
+    ("knight_crescent_wave", "Crescent Wave",
+     "Sword Slash: every 3rd swing also sends a crescent of light through a whole line"),
+    ("knight_challenge", "Challenge",
+     "Ground Slam: drag nearby enemies to your feet and stun them. -4% damage taken per enemy"),
+    ("knight_juggernaut", "Juggernaut",
+     "Shield Charge: carry everything in your path, then slam it all down (harder into walls)"),
+    ("ranger_ricochet", "Ricochet",
+     "Piercing Arrow: arrows glance off each enemy they hit to the next one, 3 times"),
+    ("ranger_cluster_arrow", "Cluster Arrow",
+     "Fan Volley: one heavy arrow that bursts into a ring of 12 arrows where it lands"),
+    ("ranger_decoy", "Decoy",
+     "Backflip: leave a straw decoy the horde goes after for 3s. It bursts into caltrops"),
+    ("mage_frozen_orb", "Frozen Orb",
+     "Frost Nova: hurl an ice orb that sprays slowing shards, then bursts into a Frost Nova"),
+    ("mage_chronoshift", "Chronoshift",
+     "Blink: leave an echo. 2.5s later you snap back to it and undo half the damage taken"),
+    ("mage_singularity", "Singularity",
+     "Meteor: a black hole drags enemies in for 3s, then collapses in the Meteor's blast"),
+    ("cleric_prism_orbs", "Prism Orbs",
+     "Holy Orb: orbs split in three each time they bounce off a wall (twice)"),
+    ("cleric_bastion", "Bastion",
+     "Sanctuary: a dome for 5s that stops enemy shots and pushes enemies out. Still heals"),
+    ("cleric_judgement", "Judgement",
+     "Divine Light: still revives and heals, then 12 pillars of light hit the toughest foes"),
+    ("berserker_throwing_axe", "Throwing Axe",
+     "Axe Cleave: every 3rd swing hurls your axe out through the horde and back"),
+    ("berserker_bloodbath", "Bloodbath",
+     "Blood Frenzy: while it lasts, your kills burst in blood, hurting enemies and healing you"),
+    ("berserker_rebound", "Rebound",
+     "Leap Slam: each landing bounces you onto the next enemy: 3 slams in a row, each bigger"),
+    ("rogue_blade_vortex", "Blade Vortex",
+     "Knife Ring: the knives whirl around you for 3s, cutting what comes close, then fly out"),
+    ("rogue_shadowstrike", "Shadowstrike",
+     "Shadow Step: appear behind the enemy nearest your aim and stab it: a sure crit"),
+    ("rogue_shadow_hunt", "Shadow Hunt",
+     "Shadow Clones: your clones hunt on their own, blinking between enemies to stab them"),
+    ("engineer_flamethrower", "Flamethrower",
+     "Rivet Gun: becomes a flamethrower. Short gouts of fire that set enemies burning"),
+    ("engineer_mortar", "Mortar",
+     "Deploy Turret: build mortars instead, lobbing shells at the biggest pack in range"),
+    ("engineer_tesla_grid", "Tesla Grid",
+     "Tesla Tower: links itself to you and your turrets with lightning that shocks enemies"),
+    ("necro_haunt", "Haunt",
+     "Soul Bolt: enemies it kills rise as wisps that seek another enemy and burst on it"),
+    ("necro_bone_golem", "Bone Golem",
+     "Raise Dead: fuse corpses into one golem that draws the horde. Cast again to feed it"),
+    ("necro_lich_form", "Lich Form",
+     "Army of the Dead: become a Lich for 10s: triple bolts, and your kills rise as skeletons"),
+]
+
 # Only useful with teammates: never offered to a solo player.
 TEAM_ONLY = {"guardian_angel"}
 
@@ -154,7 +214,7 @@ def q(s):
 
 def main():
     out = ['[gd_resource type="Resource" script_class="UpgradeLibrary" load_steps=%d format=3]'
-           % (len(UPGRADES) + len(ELEMENTS) + 3), ""]
+           % (len(UPGRADES) + len(ELEMENTS) + len(LEGENDARIES) + 3), ""]
     out.append('[ext_resource type="Script" path="res://src/upgrades/upgrade_library.gd" id="1_library"]')
     out.append('[ext_resource type="Script" path="res://src/upgrades/upgrade_data.gd" id="2_upgrade"]')
     out.append("")
@@ -167,6 +227,11 @@ def main():
         if tier > 1:
             extra["requires"] = "%s_%d" % (element, tier - 1)
         rows.append((uid, name, desc, rarity, 1, "", effects, extra))
+    assert {u[0] for u in LEGENDARIES} == set(FORMS), "every legendary needs a form and every form a card"
+    for (uid, name, desc) in LEGENDARIES:
+        hero, slot = FORMS[uid][0], FORMS[uid][1]
+        assert len(desc) <= CARD_TEXT_MAX, "%s: card text too long for a 4-player card" % uid
+        rows.append((uid, name, desc, LEGENDARY, 1, hero, [], {"form_slot": SLOTS[slot]}))
     for (uid, name, desc, rarity, stacks, hero, effects, extra) in rows:
         assert uid not in ids, uid
         ids.add(uid)
@@ -187,6 +252,8 @@ def main():
             out.append('element = &"%s"' % extra["element"])
             out.append("tier = %d" % extra["tier"])
             out.append("weight_bonus = %s" % repr(float(extra["weight_bonus"])))
+        if "form_slot" in extra:
+            out.append("form_slot = %d" % extra["form_slot"])
         out.append("")
     for (uid, _n, _d, _r, _s, _h, _e, extra) in rows:
         assert extra.get("requires", uid) in ids, "%s requires an unknown upgrade" % uid

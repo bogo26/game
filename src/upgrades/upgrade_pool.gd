@@ -42,6 +42,8 @@ func _init(p_library: UpgradeLibrary = null, seed_value: int = -1) -> void:
 func roll_offers(hero_id: StringName, stacks: Dictionary, count: int = 3, solo: bool = false) -> Array[UpgradeData]:
 	var candidates: Array[UpgradeData] = []
 	for u in library.upgrades:
+		if u.is_legendary():
+			continue  # only the mini boss's reward round offers these
 		if u.hero_id != &"" and u.hero_id != hero_id:
 			continue
 		if solo and u.team_only:
@@ -65,6 +67,21 @@ func roll_offers(hero_id: StringName, stacks: Dictionary, count: int = 3, solo: 
 				break
 		offers.append(candidates[picked])
 		candidates.remove_at(picked)
+	return offers
+
+
+## The mini boss's reward: this hero's legendaries, in slot order, except
+## any for a slot that was already transformed.
+func legendary_offers(hero_id: StringName, stacks: Dictionary) -> Array[UpgradeData]:
+	var taken_slots: Array[int] = []
+	for u in library.upgrades:
+		if u.is_legendary() and int(stacks.get(u.id, 0)) > 0:
+			taken_slots.append(u.form_slot)
+	var offers: Array[UpgradeData] = []
+	for u in library.upgrades:
+		if u.is_legendary() and u.hero_id == hero_id and u.form_slot not in taken_slots:
+			offers.append(u)
+	offers.sort_custom(func(a: UpgradeData, b: UpgradeData) -> bool: return a.form_slot < b.form_slot)
 	return offers
 
 
@@ -103,7 +120,14 @@ static func apply_effects(upgrade: UpgradeData, stats: Stats, abilities: Array[A
 ## Returns a list of problems with an upgrade's effect lines (empty = valid).
 static func validate(upgrade: UpgradeData) -> PackedStringArray:
 	var problems := PackedStringArray()
-	if upgrade.effects.is_empty():
+	if upgrade.is_legendary():
+		if upgrade.form_slot > SLOT_NAMES.size() - 1:
+			problems.append("%s: unknown form slot %d" % [upgrade.id, upgrade.form_slot])
+		if upgrade.hero_id == &"":
+			problems.append("%s: a legendary belongs to one hero" % upgrade.id)
+		if not ResourceLoader.exists(upgrade.form_path()):
+			problems.append("%s: no form at %s" % [upgrade.id, upgrade.form_path()])
+	elif upgrade.effects.is_empty():
 		problems.append("%s: no effects" % upgrade.id)
 	for line in upgrade.effects:
 		var parts := line.split(" ", false)

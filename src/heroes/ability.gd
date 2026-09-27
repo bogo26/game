@@ -28,6 +28,12 @@ func bind(p_hero: Hero, p_slot: Slot) -> void:
 	slot = p_slot
 
 
+## Called when a legendary form replaces this ability (after cancel()): drop
+## any connection made in bind().
+func unbind() -> void:
+	pass
+
+
 func world() -> World:
 	return hero.world
 
@@ -126,6 +132,21 @@ func heal_on_kill() -> float:
 
 func sprite_scale() -> float:
 	return 1.0
+
+
+## Tint multiplied into the hero's sprite (Lich Form).
+func sprite_modulate() -> Color:
+	return Color.WHITE
+
+
+## Extra projectiles for every attack (Lich Form); summed over the abilities.
+func shot_bonus() -> float:
+	return 0.0
+
+
+## An enemy the hero (or its minions) hit last just died at `at`.
+func on_kill(_at: Vector2) -> void:
+	pass
 
 
 ## Radius multiplier from upgrades (area_pct) and active buffs.

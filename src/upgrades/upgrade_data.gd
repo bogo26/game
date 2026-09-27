@@ -9,12 +9,16 @@ extends Resource
 ## abilities through Ability.mod() (count, pierce, area_pct, cooldown_pct, ...).
 ## Elemental upgrades come in chains of three tiers ("ability attack fire 1"
 ## each); a tier is only offered once the one it `requires` was taken.
+## Legendaries (the mini boss's reward, never in ordinary offers) turn one of
+## a hero's abilities into a new form: `form_slot` says which, and the form is
+## the ability template at form_path() (see tools/gen_hero_data.py).
 
-enum Rarity { COMMON, RARE, EPIC }
+enum Rarity { COMMON, RARE, EPIC, LEGENDARY }
 
-const RARITY_WEIGHTS: Array[float] = [10.0, 4.0, 1.2]
-const RARITY_COLORS: Array[Color] = [Color("c8c8d0"), Color("5aa8f0"), Color("c070f0")]
-const RARITY_NAMES: Array[String] = ["Common", "Rare", "Epic"]
+const RARITY_WEIGHTS: Array[float] = [10.0, 4.0, 1.2, 0.0]
+const RARITY_COLORS: Array[Color] = [Color("c8c8d0"), Color("5aa8f0"), Color("c070f0"), Color("ffae3c")]
+const RARITY_NAMES: Array[String] = ["Common", "Rare", "Epic", "Legendary"]
+const FORM_PATH := "res://src/heroes/data/forms/%s.tres"
 
 @export var id: StringName = &""
 @export var display_name := ""
@@ -34,6 +38,17 @@ const RARITY_NAMES: Array[String] = ["Common", "Rare", "Epic"]
 @export var weight_bonus := 1.0
 ## Only useful with teammates (e.g. faster revives): never offered solo.
 @export var team_only := false
+## Legendaries: the ability slot (Ability.Slot) this card transforms; -1 otherwise.
+@export var form_slot := -1
+
+
+func is_legendary() -> bool:
+	return form_slot >= 0
+
+
+## The ability template a legendary turns its slot into.
+func form_path() -> String:
+	return FORM_PATH % id
 
 
 func weight() -> float:

@@ -18,6 +18,10 @@ const TITLE_HEIGHT := 20.0
 ## Once everyone has picked, the result stays up this long (so the last
 ## player sees "PICKED!" too) before the next round or the game resumes.
 const ROUND_END_DELAY := 0.3
+## A legendary card's last line: the button and slot it transforms.
+const SLOT_ACTIONS: Array[PlayerInput.Action] = [PlayerInput.Action.ATTACK, PlayerInput.Action.SPECIAL,
+	PlayerInput.Action.MOVEMENT, PlayerInput.Action.ULTIMATE]
+const SLOT_LABELS: Array[String] = ["ATTACK", "SPECIAL", "MOVEMENT", "ULTIMATE"]
 
 
 class Picker:
@@ -115,6 +119,8 @@ static func round_title(pick_round: int) -> String:
 			return "TREASURE!  PICK AN UPGRADE"
 		GameState.BONUS_ROUND:
 			return "BONUS!  PICK AN UPGRADE"
+		GameState.LEGENDARY_ROUND:
+			return "LEGENDARY!  TRANSFORM AN ABILITY"
 	return "LEVEL %d!  PICK AN UPGRADE" % pick_round
 
 
@@ -125,10 +131,14 @@ func _start_round() -> void:
 	_title.position = Vector2(0, 2)
 	_title.size = Vector2(view.x, TITLE_HEIGHT)
 	var rects := _layout(_heroes, view)
+	var legendary := GameState.next_round() == GameState.LEGENDARY_ROUND
 	for i in _heroes.size():
 		var pk := Picker.new()
 		pk.hero = _heroes[i]
-		pk.offers = pool.roll_offers(pk.hero.hero_id, pk.hero.upgrade_stacks, CARD_COUNT, _heroes.size() == 1)
+		if legendary:
+			pk.offers = pool.legendary_offers(pk.hero.hero_id, pk.hero.upgrade_stacks)
+		else:
+			pk.offers = pool.roll_offers(pk.hero.hero_id, pk.hero.upgrade_stacks, CARD_COUNT, _heroes.size() == 1)
 		pk.picked = pk.offers.is_empty()
 		_build_panel(pk, rects[i])
 		_pickers.append(pk)
@@ -249,25 +259,41 @@ func _build_card(upgrade: UpgradeData, hero: Hero, size: Vector2) -> Panel:
 	name_label.position = Vector2(4, 6)
 	card.add_child(name_label)
 	var tag := UpgradeData.RARITY_NAMES[upgrade.rarity]
-	if upgrade.hero_id != &"":
+	if upgrade.hero_id != &"" and not upgrade.is_legendary():
 		tag = hero.data.display_name
 	if element != -1:
 		tag = "%s %s" % [Elements.NAMES[element], ["", "I", "II", "III"][clampi(upgrade.tier, 0, 3)]]
 	var rarity := _label(tag.to_upper(), 8, rarity_color)
 	rarity.position = Vector2(4, 30)
 	card.add_child(rarity)
-	var desc := _wrapped_label(upgrade.description, Color(0.78, 0.78, 0.84), inner_w)
+	var desc := _wrapped_label(card_text(upgrade, hero), Color(0.78, 0.78, 0.84), inner_w)
 	desc.position = Vector2(4, 42)
 	card.add_child(desc)
 	var taken := int(hero.upgrade_stacks.get(upgrade.id, 0))
 	var counter := "%d/%d" % [taken + 1, upgrade.max_stacks]
 	if element != -1:
 		counter = "TIER %d/3" % upgrade.tier
+	if upgrade.is_legendary():
+		var k := clampi(upgrade.form_slot, 0, SLOT_ACTIONS.size() - 1)
+		counter = "%s %s" % [hero.input.glyph(SLOT_ACTIONS[k]), SLOT_LABELS[k]]
 	var stacks := _label(counter, 8, Color(0.55, 0.55, 0.62))
 	stacks.position = Vector2(4, size.y - 13)
 	card.add_child(stacks)
 	card.set_meta("rarity_color", rarity_color)
 	return card
+
+
+## A card's description. Hero cards name the ability they improve ("Fan
+## Volley: +2 arrows"); once a legendary transformed it, they use its new name.
+static func card_text(upgrade: UpgradeData, hero: Hero) -> String:
+	var text := upgrade.description
+	var base := hero.data.abilities()
+	for k in mini(base.size(), hero.abilities.size()):
+		var was := base[k].display_name
+		var now := hero.abilities[k].display_name
+		if was != now and text.begins_with(was + ":"):
+			return now + text.substr(was.length())
+	return text
 
 
 func _refresh(pk: Picker) -> void:

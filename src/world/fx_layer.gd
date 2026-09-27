@@ -9,7 +9,7 @@ extends Node2D
 ## when it dies).
 
 enum Kind { RING, DISC, SLASH, LINE, TELEGRAPH, ZONE, WARN_LINE, BOLT, WARN_BAND, DOT_RING, PORTAL, WARN_ARC, LOB,
-	NOVA, BEAM, WARN_RING }
+	NOVA, BEAM, WARN_RING, IMPLODE }
 
 ## Everything hostile warns in this colour (enemy shots use it too).
 const DANGER := Color(1.0, 0.24, 0.5)
@@ -155,6 +155,12 @@ func beam(a: Vector2, b: Vector2, width: float, color: Color, duration: float) -
 	_add(Kind.BEAM, a, b, width, duration, 0.0, 0.0, color)
 
 
+## A ring closing in on p from `radius` (a pull: the Knight's Challenge,
+## a Singularity's grip), brighter as it closes.
+func implode(p: Vector2, radius: float, color: Color, duration: float = 0.3) -> void:
+	_add(Kind.IMPLODE, p, p, radius, duration, 0.0, 0.0, color)
+
+
 ## Persistent area (ground effects); fades in the last 20%.
 func zone(p: Vector2, radius: float, color: Color, duration: float) -> void:
 	_add(Kind.ZONE, p, p, radius, duration, 0.0, 0.0, color)
@@ -292,6 +298,12 @@ func _draw() -> void:
 					draw_colored_polygon(PackedVector2Array([p + side, b + side, b - side, p - side]),
 						Color(c, 0.6 * fade))
 					draw_line(p, b, Color(1, 1, 1, 0.9 * fade), -1.0 if r < 6.0 else 2.0, false)
+			Kind.IMPLODE:
+				var rr := lerpf(r, 2.0, t * t)
+				c.a *= 0.35 + 0.65 * t
+				draw_arc(p, rr, 0.0, TAU, _segments(rr), c, 2.0 if rr > 6.0 else 1.0, false)
+				if rr * 1.4 < r:
+					draw_arc(p, rr * 1.4, 0.0, TAU, _segments(rr * 1.4), Color(c, c.a * 0.4), 1.0, false)
 			Kind.LOB:
 				# Leaves from the thrower's mouth (8 px up), lands on the ground.
 				var ground := _pos[i].lerp(_pos2[i], t) + Vector2(0, 8.0 * (1.0 - t))

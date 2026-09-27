@@ -59,6 +59,9 @@ const ENEMY_ROWS := ["swarmer", "brute", "spitter", "exploder", "skeleton", "bar
 const FLYERS := ["bat", "imp", "frost_wraith"]
 ## Column index of each projectile / pickup in row 0 / row 1 of the fx atlas.
 const PROJECTILES := ["arrow", "bolt", "orb", "spit", "knife", "rivet", "soul", "fire"]
+## Row 3 after the bone archers' shard: the legendary forms' shots
+## (ProjectileSim.Look CRESCENT..ICE_ORB). None is hot pink: that's the enemies'.
+const FORM_PROJECTILES := ["crescent", "axe", "ice_shard", "flame", "prism", "heavy_arrow", "ice_orb"]
 const PICKUPS := ["gem_small", "gem_medium", "gem_large", "heart"]
 
 
@@ -1475,6 +1478,8 @@ func _gen_fx_atlas() -> void:
 	for i in PICKUPS.size():
 		_draw_pickup(img, i * 16, 16, PICKUPS[i])
 	_draw_shard(img, 0, 48)
+	for i in FORM_PROJECTILES.size():
+		_draw_projectile(img, (i + 1) * 16, 48, FORM_PROJECTILES[i])
 	# Row 2: soft round particles (white, tinted in shader) of sizes 1..8.
 	for i in 8:
 		var r := float(i + 1) * 0.9
@@ -1524,6 +1529,84 @@ func _draw_projectile(img: Image, ox: int, oy: int, kind: String) -> void:
 			_rect(img, ox + 5, oy + 5, 7, 6, Color("ff3d8b"))
 			_rect(img, ox + 6, oy + 6, 5, 4, Color("ff9ac4"))
 			_rect(img, ox + 7, oy + 7, 3, 2, Color("ffffff"))
+		"crescent":  # the Knight's wave: a gold crescent, its thick side leading
+			for y in 16:
+				for x in 16:
+					var q := Vector2(x + 0.5, y + 0.5)
+					var d := q.distance_to(Vector2(6.5, 8.0))
+					if d <= 6.2 and q.distance_to(Vector2(4.0, 8.0)) > 5.6:
+						_px(img, ox + x, oy + y, Color("fff6c8") if d > 5.2 else Color("ffd760"))
+		"axe":  # the Berserker's thrown axe (it spins, so any way up)
+			for k in 2:
+				_line(img, Vector2(ox + 3 + k, oy + 13), Vector2(ox + 9 + k, oy + 5), Color("7a5230"))
+			# The head in the handle's frame: u runs down the handle from its top,
+			# v out to the side; the bit flares toward its edge.
+			var top := Vector2(10.5, 4.5)
+			var down := Vector2(-0.6, 0.8)
+			var side := Vector2(0.8, 0.6)
+			for y in 16:
+				for x in 16:
+					var rel := Vector2(x + 0.5, y + 0.5) - top
+					var u := rel.dot(down)
+					var v := rel.dot(side)
+					if v > 0.3 and v <= 5.2 and absf(u - 1.6) <= 1.1 + v * 0.55:
+						_px(img, ox + x, oy + y, Color("eef2f6") if v > 4.2 else Color("b8c0cc"))
+					elif v <= 0.3 and v > -2.2 and absf(u - 1.6) <= 1.0:
+						_px(img, ox + x, oy + y, Color("8a929c"))
+		"ice_shard":  # the Frozen Orb's shards: pale ice
+			_rect(img, ox + 3, oy + 7, 8, 1, Color("4a90c0"))
+			_rect(img, ox + 2, oy + 6, 2, 1, Color("a0e0ff"))
+			_rect(img, ox + 2, oy + 8, 2, 1, Color("a0e0ff"))
+			_rect(img, ox + 10, oy + 6, 3, 3, Color("a0e0ff"))
+			_px(img, ox + 13, oy + 7, Color("e8f8ff"))
+			_px(img, ox + 11, oy + 7, Color("ffffff"))
+		"flame":  # the flamethrower's gout: a flame puff trailing back
+			for y in 16:
+				for x in 16:
+					var d := Vector2(x + 0.5, y + 0.5).distance_to(Vector2(10.0, 8.0))
+					var half := (x - 3.0) / 7.0 * 3.5
+					var tail := x >= 3 and x < 10 and absf(y + 0.5 - 8.0) <= half
+					if d <= 3.6 or tail:
+						var c := Color("e8641c")
+						if d < 1.8:
+							c = Color("fff0a0")
+						elif d < 2.8 or (tail and absf(y + 0.5 - 8.0) < half * 0.5):
+							c = Color("ffb040")
+						_px(img, ox + x, oy + y, c)
+		"prism":  # the Cleric's prism orb: white light in a rainbow rim
+			var hues: Array[Color] = [Color("ff6a6a"), Color("ffb44a"), Color("fff06a"), Color("7aff8a"),
+				Color("6ae8ff"), Color("c08aff")]
+			for y in 16:
+				for x in 16:
+					var v := Vector2(x + 0.5, y + 0.5) - Vector2(8.0, 8.0)
+					var d := v.length()
+					if d <= 3.9:
+						var c := Color("fff6d0")
+						if d < 1.5:
+							c = Color("ffffff")
+						elif d > 2.7:
+							c = hues[int(fposmod(v.angle() + PI, TAU) / TAU * hues.size()) % hues.size()]
+						_px(img, ox + x, oy + y, c)
+		"heavy_arrow":  # Cluster Arrow: a thick shaft, a big head, green fletching
+			_rect(img, ox + 2, oy + 7, 10, 2, Color("c8a070"))
+			_rect(img, ox + 11, oy + 5, 2, 6, Color("e8f0f8"))
+			_rect(img, ox + 13, oy + 6, 1, 4, Color("e8f0f8"))
+			_rect(img, ox + 14, oy + 7, 1, 2, Color("ffffff"))
+			_rect(img, ox + 1, oy + 5, 3, 2, Color("60d060"))
+			_rect(img, ox + 1, oy + 9, 3, 2, Color("60d060"))
+		"ice_orb":  # the Frozen Orb itself
+			for y in 16:
+				for x in 16:
+					var d := Vector2(x + 0.5, y + 0.5).distance_to(Vector2(8.0, 8.0))
+					if d <= 5.0:
+						var c := Color("a8dcff")
+						if d > 4.0:
+							c = Color("5a9ad0")
+						elif d < 2.5:
+							c = Color("e0f6ff")
+						_px(img, ox + x, oy + y, c)
+			_px(img, ox + 6, oy + 6, Color("ffffff"))
+			_px(img, ox + 7, oy + 5, Color("ffffff"))
 	_outline(img, Rect2i(ox, oy, 16, 16))
 
 

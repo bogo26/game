@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="DecoyAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/decoy.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Decoy"
+description = "Backflip, leaving a decoy the horde goes after. It bursts into caltrops."
+cooldown = 4.0
+direction = 2
+distance = 64.0
+duration = 0.2
+iframes = 0.3
+start_zone_radius = 0.0
+start_zone_duration = 4.0
+start_zone_damage = 3.0
+start_zone_slow = 0.6
+color = Color(0.6, 1.0, 0.6, 0.6)
+decoy_hp = 60.0
+decoy_time = 3.0
+caltrop_radius = 34.0

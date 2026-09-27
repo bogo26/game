@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="FrozenOrbAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/frozen_orb.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Frozen Orb"
+description = "Hurl an orb of ice that sprays slowing shards, then bursts into a Frost Nova."
+cooldown = 7.0
+target = 0
+radius = 56.0
+damage = 8.0
+knockback = 40.0
+stun_time = 1.5
+slow_time = 3.5
+color = Color(0.6, 0.85, 1.0, 1.0)
+orb_speed = 90.0
+orb_time = 1.4
+shard_interval = 0.07
+shard_turn = 40.0
+shard_damage = 4.0
+shard_speed = 170.0
+shard_lifetime = 0.4
+shard_slow = 1.5

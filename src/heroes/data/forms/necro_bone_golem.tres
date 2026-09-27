@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="BoneGolemAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/bone_golem.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Bone Golem"
+description = "Fuse fresh corpses into a golem the horde goes after. Cast again to feed it."
+cooldown = 7.0
+kind = 4
+count = 4
+max_active = 1
+lifetime = 20.0
+use_corpses = false
+corpse_radius = 140.0
+minion_hp = 30.0
+minion_damage = 14.0
+attack_interval = 1.1
+attack_range = 140.0
+golem_hp = 80.0
+hp_per_corpse = 20.0
+corpses = 6

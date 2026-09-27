@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="ProjectileAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/projectile_ability.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Ricochet"
+description = "Arrows glance off each enemy they hit toward the next one nearby, up to 3 times."
+cooldown = 0.26
+hold_to_repeat = true
+damage = 9.0
+speed = 300.0
+radius = 3.0
+lifetime = 1.1
+pierce = 3
+knockback = 30.0
+look = 0
+ricochet = true

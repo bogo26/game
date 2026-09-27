@@ -17,9 +17,19 @@ var _swings := 0
 
 func _activate(aim: Vector2) -> void:
 	_swings += 1
+	_swing(aim, is_combo_swing())
+
+
+## Whether the swing just counted is a combo finisher.
+func is_combo_swing() -> bool:
+	return combo_every > 0 and _swings % combo_every == 0
+
+
+## One swing; a heavy one (the combo finisher) reaches further, hits harder
+## and flashes gold.
+func _swing(aim: Vector2, heavy: bool) -> void:
 	var multiplier := 1.0
 	var reach_now := reach * area_scale()
-	var heavy := combo_every > 0 and _swings % combo_every == 0
 	if heavy:
 		multiplier = combo_multiplier
 		reach_now *= 1.3

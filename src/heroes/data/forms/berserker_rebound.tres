@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="ReboundAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/rebound.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Rebound"
+description = "Leap and slam, then bounce onto the nearest enemy: 3 slams, each bigger."
+cooldown = 4.5
+direction = 1
+distance = 80.0
+duration = 0.34
+iframes = 0.4
+arc_height = 14.0
+landing_damage = 20.0
+landing_radius = 36.0
+landing_stun = 0.4
+color = Color(1.0, 0.55, 0.3, 0.7)
+hops = 3
+hop_range = 110.0
+hop_distance = 90.0
+hop_duration = 0.28
+area_growth = 1.2
+power_growth = 1.25
+min_hop = 24.0

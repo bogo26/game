@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="SingularityAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/singularity.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Singularity"
+description = "A black hole for 3s drags enemies in and grinds them, then collapses in a huge blast."
+cooldown = 0.5
+target = 1
+distance = 100.0
+radius = 72.0
+damage = 120.0
+knockback = 250.0
+stun_time = 0.5
+delay = 1.0
+color = Color(0.62, 0.35, 1.0, 1.0)
+hole_time = 3.0
+pull_radius = 110.0
+pull_speed = 100.0
+swirl = 0.6
+core_radius = 28.0
+grind_damage = 6.0
+grind_interval = 0.25

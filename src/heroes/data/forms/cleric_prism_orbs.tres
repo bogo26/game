@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ProjectileAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/projectile_ability.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Prism Orb"
+description = "Orb that bounces off walls, splitting in three at a bounce (twice)."
+cooldown = 0.45
+hold_to_repeat = true
+damage = 8.0
+speed = 150.0
+radius = 4.0
+lifetime = 1.8
+pierce = 2
+bounces = 3
+knockback = 40.0
+look = 29
+splits = 2

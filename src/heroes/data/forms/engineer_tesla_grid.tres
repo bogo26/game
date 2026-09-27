@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="TeslaGridAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/tesla_grid.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Tesla Grid"
+description = "8s tower: lightning links it to you and your turrets, shocking whatever crosses them."
+cooldown = 0.5
+kind = 2
+count = 1
+max_active = 1
+lifetime = 8.0
+minion_damage = 14.0
+attack_interval = 0.35
+attack_range = 150.0
+link_range = 200.0
+link_width = 6.0
+link_damage = 10.0
+link_interval = 0.2
+link_stun = 0.25

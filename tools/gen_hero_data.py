@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""Writes src/heroes/data/<id>.tres from the HEROES table below.
+"""Writes src/heroes/data/<id>.tres from the HEROES table below, and the
+legendary forms (FORMS) to src/heroes/data/forms/<upgrade id>.tres.
 
 Hero tuning lives here for now because hand-editing nested sub-resources in
 .tres files is error-prone; the Godot inspector can edit the output too.
 Run: python3 tools/gen_hero_data.py
 """
 import os
+import re
 
 SCRIPTS = {
     "data": "res://src/heroes/hero_data.gd",
@@ -20,13 +22,20 @@ SCRIPTS = {
     "summon": "res://src/heroes/abilities/summon_ability.gd",
     "clones": "res://src/heroes/abilities/shadow_clones.gd",
 }
+# The legendary forms' own scripts (src/heroes/abilities/forms/<key>.gd).
+for _form in ("crescent_wave", "challenge", "juggernaut", "cluster_arrow", "decoy", "frozen_orb", "chronoshift",
+              "singularity", "bastion", "judgement", "throwing_axe", "bloodbath", "rebound", "blade_vortex",
+              "shadowstrike", "shadow_hunt", "tesla_grid", "haunt", "bone_golem", "lich_form"):
+    SCRIPTS[_form] = "res://src/heroes/abilities/forms/%s.gd" % _form
 
 # Enum values (must match the GDScript enums).
-LOOK = {"arrow": 0, "bolt": 1, "orb": 2, "spit": 3, "knife": 4, "rivet": 5, "soul": 6, "fire": 7}
+LOOK = {"arrow": 0, "bolt": 1, "orb": 2, "spit": 3, "knife": 4, "rivet": 5, "soul": 6, "fire": 7,
+        "crescent": 25, "axe": 26, "ice_shard": 27, "flame": 28, "prism": 29, "heavy_arrow": 30, "ice_orb": 31}
+EFFECT = {"none": 0, "slow": 1, "stun": 2, "burn": 3}
 DASH_DIR = {"move_or_aim": 0, "aim": 1, "away_from_aim": 2}
 BURST_TARGET = {"self": 0, "aim_point": 1, "screen": 2}
 ZONE_TARGET = {"self": 0, "aim_point": 1}
-MINION = {"skeleton": 0, "turret": 1, "tesla": 2}
+MINION = {"skeleton": 0, "turret": 1, "tesla": 2, "mortar": 3, "golem": 4, "decoy": 5}
 
 HEROES = {
     "knight": {
@@ -176,6 +185,142 @@ HEROES = {
     },
 }
 
+# Legendary forms (the mini boss's reward, see tools/gen_upgrades.py): each
+# replaces one of a hero's abilities. A form's props are that ability's own
+# merged with the overrides here, so its script must be the ability's script
+# or a subclass of it (the upgrades the hero took keep their meaning).
+# {upgrade id: (hero, slot, script key, overrides)}
+FORMS = {
+    # --- knight -------------------------------------------------------------------------------
+    "knight_crescent_wave": ("knight", "attack", "crescent_wave", {
+        "display_name": "Crescent Wave",
+        "description": "Sword arc; every 3rd swing also sends a crescent of light through a whole line.",
+        "combo_every": 3, "combo_multiplier": 1.5,
+        "wave_speed": 230.0, "wave_lifetime": 0.55, "wave_radius": 7.0, "wave_knockback": 70.0}),
+    "knight_challenge": ("knight", "special", "challenge", {
+        "display_name": "Challenge",
+        "description": "Drag every enemy near you to your feet and stun it. Take less damage for each one caught.",
+        "radius": 80.0, "damage": 10.0, "knockback": 0.0, "stun_time": 1.2, "color": (1.0, 0.85, 0.4),
+        "pull_to": 12.0, "guard_per_enemy": 0.04, "max_guard": 0.4, "guard_time": 5.0}),
+    "knight_juggernaut": ("knight", "movement", "juggernaut", {
+        "display_name": "Juggernaut",
+        "description": "Charge, carrying everything in your path, then slam it all down in a shockwave.",
+        "knockback": 0.0, "stun_time": 0.0, "hit_radius": 14.0,
+        "max_carried": 10, "carry_offset": 12.0, "crash_radius": 34.0, "crash_damage": 14.0,
+        "crash_per_enemy": 3.0, "crash_stun": 0.6, "crash_knockback": 180.0, "wall_bonus": 1.5, "wall_stun": 0.5}),
+    # --- ranger -------------------------------------------------------------------------------
+    "ranger_ricochet": ("ranger", "attack", "projectile", {
+        "display_name": "Ricochet",
+        "description": "Arrows glance off each enemy they hit toward the next one nearby, up to 3 times.",
+        "pierce": 3, "ricochet": True}),
+    "ranger_cluster_arrow": ("ranger", "special", "cluster_arrow", {
+        "display_name": "Cluster Arrow",
+        "description": "A heavy arrow that bursts into a ring of 12 arrows where it lands.",
+        "count": 12, "speed": 270.0, "lifetime": 0.45,
+        "heavy_damage": 20.0, "heavy_speed": 240.0, "heavy_lifetime": 0.6, "heavy_radius": 5.0,
+        "heavy_knockback": 60.0}),
+    "ranger_decoy": ("ranger", "movement", "decoy", {
+        "display_name": "Decoy",
+        "description": "Backflip, leaving a decoy the horde goes after. It bursts into caltrops.",
+        "start_zone_radius": 0.0, "decoy_hp": 60.0, "decoy_time": 3.0, "caltrop_radius": 34.0}),
+    # --- mage ---------------------------------------------------------------------------------
+    "mage_frozen_orb": ("mage", "special", "frozen_orb", {
+        "display_name": "Frozen Orb",
+        "description": "Hurl an orb of ice that sprays slowing shards, then bursts into a Frost Nova.",
+        "orb_speed": 90.0, "orb_time": 1.4, "shard_interval": 0.07, "shard_turn": 40.0, "shard_damage": 4.0,
+        "shard_speed": 170.0, "shard_lifetime": 0.4, "shard_slow": 1.5}),
+    "mage_chronoshift": ("mage", "movement", "chronoshift", {
+        "display_name": "Chronoshift",
+        "description": "Blink, leaving an echo. 2.5s later you snap back to it and undo half the damage taken.",
+        "echo_time": 2.5, "undo_share": 0.5, "return_iframes": 0.3}),
+    "mage_singularity": ("mage", "ultimate", "singularity", {
+        "display_name": "Singularity",
+        "description": "A black hole for 3s drags enemies in and grinds them, then collapses in a huge blast.",
+        "color": (0.62, 0.35, 1.0), "hole_time": 3.0, "pull_radius": 110.0, "pull_speed": 100.0, "swirl": 0.6,
+        "core_radius": 28.0, "grind_damage": 6.0, "grind_interval": 0.25}),
+    # --- cleric -------------------------------------------------------------------------------
+    "cleric_prism_orbs": ("cleric", "attack", "projectile", {
+        "display_name": "Prism Orb",
+        "description": "Orb that bounces off walls, splitting in three at a bounce (twice).",
+        "look": LOOK["prism"], "splits": 2}),
+    "cleric_bastion": ("cleric", "special", "bastion", {
+        "display_name": "Bastion",
+        "description": "A dome of light for 5s: enemy shots fizzle, enemies are pushed out, allies inside heal.",
+        "push_speed": 160.0}),
+    "cleric_judgement": ("cleric", "ultimate", "judgement", {
+        "display_name": "Judgement",
+        "description": "Revive and heal the team, then 12 pillars of light strike the toughest enemies on screen.",
+        "pillars": 12, "pillar_interval": 0.12, "pillar_damage": 90.0, "pillar_radius": 22.0, "pillar_stun": 0.6,
+        "pillar_knockback": 60.0}),
+    # --- berserker ----------------------------------------------------------------------------
+    "berserker_throwing_axe": ("berserker", "attack", "throwing_axe", {
+        "display_name": "Throwing Axe",
+        "description": "Heavy cleave; every third swing hurls the axe out and back, hitting both ways.",
+        "throw_reach": 110.0, "throw_speed": 230.0, "return_speed": 260.0, "throw_radius": 6.0}),
+    "berserker_bloodbath": ("berserker", "special", "bloodbath", {
+        "display_name": "Bloodbath",
+        "description": "Pay 10% HP: frenzy for 5s. Every kill bursts in blood that hurts enemies and heals you.",
+        "burst_radius": 28.0, "burst_damage": 12.0, "burst_heal": 2.0, "burst_knockback": 60.0}),
+    "berserker_rebound": ("berserker", "movement", "rebound", {
+        "display_name": "Rebound",
+        "description": "Leap and slam, then bounce onto the nearest enemy: 3 slams, each bigger.",
+        "hops": 3, "hop_range": 110.0, "hop_distance": 90.0, "hop_duration": 0.28, "area_growth": 1.2,
+        "power_growth": 1.25, "min_hop": 24.0}),
+    # --- rogue --------------------------------------------------------------------------------
+    "rogue_blade_vortex": ("rogue", "special", "blade_vortex", {
+        "display_name": "Blade Vortex",
+        "description": "12 knives whirl around you for 3s, cutting whatever comes close, then fly outward.",
+        "whirl_time": 3.0, "orbit_radius": 26.0, "orbit_speed": 7.0, "whirl_share": 0.6, "rehit": 0.4}),
+    "rogue_shadowstrike": ("rogue", "movement", "shadowstrike", {
+        "display_name": "Shadowstrike",
+        "description": "Appear behind the enemy nearest your aim and stab it: a sure crit. Marks those around it.",
+        "strike_range": 110.0, "strike_damage": 24.0, "mark_radius": 30.0, "behind": 9.0}),
+    "rogue_shadow_hunt": ("rogue", "ultimate", "shadow_hunt", {
+        "display_name": "Shadow Hunt",
+        "description": "3 clones hunt on their own for 6s, blinking from enemy to enemy to stab and mark them.",
+        "hunt_range": 140.0, "hop_interval": 0.35, "hunt_mark": 2.0}),
+    # --- engineer -----------------------------------------------------------------------------
+    "engineer_flamethrower": ("engineer", "attack", "projectile", {
+        "display_name": "Flamethrower",
+        "description": "A short gout of fire that passes through enemies and sets them burning.",
+        "cooldown": 0.12, "count": 2, "spread_degrees": 0.0, "jitter_deg": 12.0, "speed": 150.0,
+        "speed_jitter": 0.2, "lifetime": 0.4, "radius": 5.0, "pierce": 99, "damage": 3.0, "knockback": 5.0,
+        "look": LOOK["flame"], "effect": EFFECT["burn"], "effect_time": 2.0}),
+    "engineer_mortar": ("engineer", "special", "summon", {
+        "display_name": "Deploy Mortar",
+        "description": "Place a mortar that lobs shells at the biggest pack in range (max 2).",
+        "kind": MINION["mortar"], "minion_damage": 14.0, "attack_interval": 1.4, "attack_range": 220.0}),
+    "engineer_tesla_grid": ("engineer", "ultimate", "tesla_grid", {
+        "display_name": "Tesla Grid",
+        "description": "8s tower: lightning links it to you and your turrets, shocking whatever crosses them.",
+        "link_range": 200.0, "link_width": 6.0, "link_damage": 10.0, "link_interval": 0.2, "link_stun": 0.25}),
+    # --- necromancer --------------------------------------------------------------------------
+    "necro_haunt": ("necromancer", "attack", "haunt", {
+        "display_name": "Haunt",
+        "description": "Soul bolts. Enemies they kill rise as wisps that seek another enemy and burst on it.",
+        "reap": True, "wisp_share": 0.7, "wisp_speed": 120.0, "wisp_turn": 6.0, "wisp_range": 140.0,
+        "wisp_life": 2.0, "wisp_burst": 16.0, "max_wisps": 10}),
+    "necro_bone_golem": ("necromancer", "special", "bone_golem", {
+        "display_name": "Bone Golem",
+        "description": "Fuse fresh corpses into a golem the horde goes after. Cast again to feed it.",
+        "kind": MINION["golem"], "max_active": 1, "use_corpses": False, "minion_damage": 14.0,
+        "attack_interval": 1.1, "golem_hp": 80.0, "hp_per_corpse": 20.0, "corpses": 6}),
+    "necro_lich_form": ("necromancer", "ultimate", "lich_form", {
+        "display_name": "Lich Form",
+        "description": "Become a Lich for 10s: bolts fire in threes and enemies you kill rise as skeletons.",
+        "duration": 10.0, "lich_scale": 1.3, "lich_damage_taken": 0.75, "extra_bolts": 2}),
+}
+
+ROOT = os.path.join(os.path.dirname(__file__), "..")
+
+
+def class_name_of(script_path):
+    """The class_name a res:// script declares."""
+    with open(os.path.join(ROOT, script_path[len("res://"):])) as f:
+        match = re.search(r"^class_name (\w+)", f.read(), re.M)
+    assert match, "%s has no class_name" % script_path
+    return match.group(1)
+
 
 def fmt(value):
     if isinstance(value, bool):
@@ -222,7 +367,26 @@ def write_hero(hero_id, hero):
         f.write("\n".join(out) + "\n")
 
 
+def write_form(form_id, form):
+    hero_id, slot, kind, overrides = form
+    props = dict(HEROES[hero_id][slot][1])
+    props.update(overrides)
+    script = SCRIPTS[kind]
+    out = ['[gd_resource type="Resource" script_class="%s" load_steps=2 format=3]' % class_name_of(script), ""]
+    out.append('[ext_resource type="Script" path="%s" id="1_form"]' % script)
+    out.append("")
+    out.append("[resource]")
+    out.append('script = ExtResource("1_form")')
+    out += ["%s = %s" % (k, fmt(v)) for k, v in props.items()]
+    path = os.path.join(ROOT, "src", "heroes", "data", "forms", form_id + ".tres")
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as f:
+        f.write("\n".join(out) + "\n")
+
+
 if __name__ == "__main__":
     for hero_id, hero in HEROES.items():
         write_hero(hero_id, hero)
-    print("wrote %d heroes" % len(HEROES))
+    for form_id, form in FORMS.items():
+        write_form(form_id, form)
+    print("wrote %d heroes and %d legendary forms" % (len(HEROES), len(FORMS)))

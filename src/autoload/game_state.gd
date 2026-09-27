@@ -6,6 +6,8 @@ const MAX_PLAYERS := 4
 ## Pick rounds that don't come from a team level-up.
 const TREASURE_ROUND := 0
 const BONUS_ROUND := -1
+## The mini boss's reward: each hero's legendaries (see UpgradePool.legendary_offers).
+const LEGENDARY_ROUND := -3
 ## Team lives at the start of every level (on Normal; see DIFFICULTY).
 const LIVES_PER_LEVEL := 1
 
@@ -68,7 +70,8 @@ var xp := 0
 var level_index := 0
 var run_active := false
 ## Pick rounds earned but not yet resolved by the pick screen, oldest first:
-## the team level each was earned at, or TREASURE_ROUND / BONUS_ROUND.
+## the team level each was earned at, or TREASURE_ROUND / BONUS_ROUND /
+## LEGENDARY_ROUND.
 var pending_rounds: Array[int] = []
 ## How many pick rounds are waiting. Setting it (tests, debug) adds bonus
 ## rounds or drops the newest ones.
@@ -150,6 +153,11 @@ func xp_to_next() -> int:
 ## A treasure chest: one extra upgrade pick for everyone, shown first.
 func add_treasure_pick() -> void:
 	pending_rounds.push_front(TREASURE_ROUND)
+
+
+## The mini boss fell: every player picks a legendary, before anything else.
+func add_legendary_pick() -> void:
+	pending_rounds.push_front(LEGENDARY_ROUND)
 
 
 ## The next pick round (see pending_rounds); -2 when none is waiting.
