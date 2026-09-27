@@ -164,6 +164,13 @@ func tick(dt: float) -> void:
 		_check_exit(dt)
 
 
+## Pick rounds wait while an arena fight is on (chests' treasure rounds
+## aside: see World.can_open_pick_round); in corridors and the boss fight
+## they open right away.
+func picks_held() -> bool:
+	return active_room != null and not data.is_boss_level
+
+
 func on_enemy_killed() -> void:
 	if active_room:
 		active_room.killed += 1
@@ -379,8 +386,9 @@ func _hero_within(p: Vector2, distance: float) -> bool:
 
 # --- boss ------------------------------------------------------------------------------------
 
-func _spawn_boss(at: Vector2) -> void:
-	boss = (load(data.boss_scene) as PackedScene).instantiate()
+## Spawns the level's boss (or the one in `scene`) at `at`.
+func _spawn_boss(at: Vector2, scene: String = "") -> void:
+	boss = (load(scene if scene != "" else data.boss_scene) as PackedScene).instantiate()
 	boss.setup(world, at, boss_hp_multiplier, world.spawner.effective_hp_multiplier())
 	boss_name = boss.display_name
 	world.entities.add_child(boss)

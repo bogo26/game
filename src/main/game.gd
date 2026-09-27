@@ -3,6 +3,8 @@ extends Node
 ## level banners, advances to the next level when the team reaches the exit
 ## (a mini boss's level included: its exit opens once the boss falls), and
 ## ends the run on a team wipe (defeat) or the final boss's death (victory).
+## In Endless Waves (GameState.mode) it builds one World in the waves arena
+## instead, and the game ends when the team falls.
 
 const WORLD_SCENE := "res://src/world/world.tscn"
 const END_SCENE := "res://src/ui/end_screen.tscn"
@@ -25,6 +27,8 @@ func _ready() -> void:
 	var bot_arg := false
 	for arg in OS.get_cmdline_user_args():
 		bot_arg = bot_arg or arg.begins_with("--bots=")
+		if arg == "--waves":  # debug: straight into Endless Waves
+			GameState.mode = GameState.Mode.WAVES
 	if InputRouter.assigned_slots().is_empty() and not bot_arg:
 		# Launched directly (editor F6): play solo with the keyboard.
 		InputRouter.assign(0, PlayerInput.DEVICE_KEYBOARD)
@@ -35,6 +39,11 @@ func _ready() -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--level="):  # debug: jump to a level (1-based)
 			GameState.level_index = arg.get_slice("=", 1).to_int() - 1
+		elif arg.begins_with("--wave="):  # debug: Endless Waves from wave N
+			GameState.wave = maxi(0, arg.get_slice("=", 1).to_int() - 1)
+	if GameState.mode == GameState.Mode.WAVES:
+		_load_waves()
+		return
 	GameState.level_index = clampi(GameState.level_index, 0, run.levels.size() - 1)
 	_load_level()
 
@@ -48,16 +57,31 @@ func _process(delta: float) -> void:
 
 
 func _load_level() -> void:
+	var data := _layout(GameState.level_index)
+	_add_world(data)
+	_show_banner(run.title(GameState.level_index), data.display_name)
+
+
+## Endless Waves: one World, in the waves arena, for the whole game.
+func _load_waves() -> void:
+	var data := WaveDirector.arena_for(GameState.run_seed)
+	_add_world(data, true)
+	_show_banner("ENDLESS WAVES", data.display_name)
+
+
+## Builds the World for `data` in place of the last level's; `waves` makes
+## it an Endless Waves game.
+func _add_world(data: LevelData, waves: bool = false) -> void:
 	if world:
 		remove_child(world)
 		world.queue_free()
 	# Never carry a pause into the new level (only an unplugged pad keeps it).
 	get_tree().paused = InputRouter.has_disconnected_player()
-	var data := _layout(GameState.level_index)
 	GameState.team_lives = GameState.lives_per_level()
 	world = (load(WORLD_SCENE) as PackedScene).instantiate()
 	world.level_data = data
 	world.run_mode = true
+	world.wave_mode = waves
 	world.level_up_delay = BANNER_TIME  # pick rounds wait for the level banner
 	add_child(world)
 	move_child(world, 0)
@@ -65,9 +89,8 @@ func _load_level() -> void:
 	world.team_wiped.connect(_on_team_wiped)
 	world.boss_defeated.connect(_on_boss_defeated)
 	world.quit_requested.connect(_quit_to_menu)
-	# The boss track starts when the boss room's fight does (LevelDirector).
+	# The boss track starts when the boss room's fight (or wave) does.
 	Audio.play_music(&"dungeon")
-	_show_banner(run.title(GameState.level_index), data.display_name)
 
 
 ## This run's layout for a level (see RunConfig.layout_for); --layout=a|b,
@@ -152,7 +175,10 @@ func _on_team_wiped() -> void:
 	_ending = true
 	_stop_interruptions()
 	_bank_level_stats()
-	_show_banner("DEFEAT", "Your party has fallen")
+	if GameState.mode == GameState.Mode.WAVES:
+		_show_banner("GAME OVER", "You reached wave %d" % GameState.wave)
+	else:
+		_show_banner("DEFEAT", "Your party has fallen")
 	Audio.stop_music()
 	Audio.play(&"defeat")
 	_banner_time = END_DELAY
@@ -185,11 +211,15 @@ func _stop_interruptions() -> void:
 func _end(victory: bool) -> void:
 	GameState.last_run_victory = victory
 	GameState.run_active = false
-	var heroes: Array = []
-	for s in GameState.slots:
-		if s.hero_id != &"" and InputRouter.get_player(s.slot).is_assigned():
-			heroes.append(s.hero_id)
-	GameState.last_run_news = GameState.profile.record_run(victory, GameState.difficulty, GameState.run_time, heroes)
+	if GameState.mode == GameState.Mode.WAVES:
+		GameState.last_run_news = GameState.profile.record_waves(GameState.difficulty, GameState.wave)
+	else:
+		var heroes: Array = []
+		for s in GameState.slots:
+			if s.hero_id != &"" and InputRouter.get_player(s.slot).is_assigned():
+				heroes.append(s.hero_id)
+		GameState.last_run_news = GameState.profile.record_run(victory, GameState.difficulty, GameState.run_time,
+			heroes)
 	get_tree().paused = false
 	get_tree().change_scene_to_file(END_SCENE)
 

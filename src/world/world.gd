@@ -144,6 +144,9 @@ var pause_enabled := true
 ## Part of a run (vs. the sandbox test room): no drop-in, wipes end the run,
 ## reaching the exit completes the level.
 @export var run_mode := false
+## Endless Waves (with run_mode): a WaveDirector runs the level instead of a
+## LevelDirector.
+@export var wave_mode := false
 
 var grid: LevelGrid
 var heroes: Array[Hero] = []
@@ -309,6 +312,8 @@ func _ready() -> void:
 	Events.player_device_lost.connect(_on_device_changed)
 	Events.player_device_restored.connect(_on_device_changed)
 	_snapshot_heroes()
+	if wave_mode:
+		director = WaveDirector.new()
 	director.setup(self)
 	_spawn_props()
 	flow.compute_now(target_positions)
@@ -1217,7 +1222,10 @@ func _on_ability_denied(_slot: int, _ability_slot: int) -> void:
 func _on_team_level_up(_level: int) -> void:
 	Audio.play(&"level_up")
 	if picks_held():
-		tip(&"held", "Level up! Your upgrade picks wait until the arena is cleared")
+		if wave_mode:
+			tip(&"held_wave", "Level up! Your upgrade picks wait until the wave is cleared")
+		else:
+			tip(&"held", "Level up! Your upgrade picks wait until the arena is cleared")
 	for hero in heroes:
 		particles.burst(hero.position + Vector2(0, -6), 24, Color(1, 0.88, 0.45), 90.0, 0.8, 3, Vector2.UP, PI, -40.0, 2.0)
 
@@ -1342,10 +1350,10 @@ func _grant_grace(seconds: float) -> void:
 			hero.invulnerable_time = maxf(hero.invulnerable_time, seconds)
 
 
-## Pick rounds wait while an arena fight is on (except chests' treasure
-## rounds); in corridors and the boss fight they open right away.
+## Pick rounds wait while an arena fight (or a wave) is on, except chests'
+## treasure rounds; see LevelDirector.picks_held().
 func picks_held() -> bool:
-	return director.active_room != null and not level_data.is_boss_level
+	return director.picks_held()
 
 
 func can_open_pick_round() -> bool:
@@ -1361,12 +1369,22 @@ func _on_arena_cleared(_room_id: int) -> void:
 		tip(&"exit", "The exit is open: everyone into the portal!")
 
 
-## A mini boss fell: its room opens, and so does the exit behind it, and
-## every player picks a legendary.
+## A mini boss fell (in Endless Waves, any boss): its room opens, and so does
+## the exit behind it, and every player picks a legendary - while any hero
+## still has one to take (with none left the round would open empty).
 func _on_mini_boss_defeated(boss_name: String) -> void:
 	hud.callout("%s SLAIN!" % boss_name.to_upper(), Color(1, 0.9, 0.5))
-	GameState.add_legendary_pick()
+	if legendaries_left():
+		GameState.add_legendary_pick()
 	level_up_delay = maxf(level_up_delay, LEGENDARY_DELAY)
+
+
+## Whether any hero still has a legendary to take (UpgradePool.legendary_offers).
+func legendaries_left() -> bool:
+	for hero in heroes:
+		if not upgrade_pool.legendary_offers(hero.hero_id, hero.upgrade_stacks).is_empty():
+			return true
+	return false
 
 
 func _on_wave_started(wave: int, waves: int) -> void:

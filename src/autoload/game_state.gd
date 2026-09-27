@@ -11,6 +11,9 @@ const LEGENDARY_ROUND := -3
 ## Team lives at the start of every level (on Normal; see DIFFICULTY).
 const LIVES_PER_LEVEL := 1
 
+## What Start Run and Endless Waves play: the dungeon run, or waves in one
+## arena until the team falls (WaveDirector).
+enum Mode { RUN, WAVES }
 enum Difficulty { CASUAL, NORMAL, HARD }
 const DIFFICULTY_NAMES: Array[String] = ["Casual", "Normal", "Hard"]
 ## Per difficulty: enemy HP, enemy damage, spawn rate, team lives per level
@@ -92,6 +95,9 @@ var debug_picks_given := false
 ## Team lives left this level: a wipe with one left is a Second Wind (everyone
 ## gets back up) instead of the end of the run. Refilled every level.
 var team_lives := 0
+var mode: Mode = Mode.RUN
+## Endless Waves: the last wave that started (end screen, records).
+var wave := 0
 var difficulty: Difficulty = Difficulty.NORMAL
 ## Records between runs (best times, wins, Hard unlocked, hero stars).
 var profile := Profile.new()
@@ -179,6 +185,7 @@ func reset_run() -> void:
 	debug_picks_given = false
 	team_lives = lives_per_level()
 	lives_used = 0
+	wave = 0
 	run_kills = 0
 	run_time = 0.0
 	levels_cleared = 0

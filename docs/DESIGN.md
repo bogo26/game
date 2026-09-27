@@ -2,7 +2,7 @@
 
 Working title. A 1–4 player **local co-op**, top-down **pixel-art horde crawler** for **macOS and Windows**, built with **Godot 4 (GDScript)**.
 
-Players pick heroes, fight through hand-built levels packed with hordes of up to **300 enemies on screen**, and choose upgrades (pick 1 of 3) on every team level-up.
+Players pick heroes, fight through hand-built levels packed with hordes of up to **300 enemies on screen**, and choose upgrades (pick 1 of 3) on every team level-up. Two modes: the 8-level dungeon **run**, and **Endless Waves**, which holds one arena against waves that keep getting harder until the team falls (see [Endless Waves](#endless-waves)).
 
 ## Targets
 
@@ -100,7 +100,7 @@ Four kinds make up most of the horde throughout the run. Every level adds an ene
 
 ## Difficulty and records
 
-Chosen in character select with LB / RB (Q / E); Hard unlocks after a win on Normal.
+Chosen in character select with LB / RB (Q / E); Hard unlocks after a win on Normal, or after reaching wave 20 of Endless Waves on Normal. Both modes use the same difficulties.
 
 | | Enemy HP | Enemy damage | Spawn rate | Team lives per level | Elites |
 |---|---|---|---|---|---|
@@ -109,7 +109,7 @@ Chosen in character select with LB / RB (Q / E); Hard unlocks after a win on Nor
 | Hard | ×1.3 | ×1.3 | ×1.2 | 0 | ×2 |
 
 - Enemy damage is a real multiplier (`HordeSim.damage_mult`): contact, spit, exploder and elite blasts, spikes and every boss attack.
-- **Profile** (`Profile`, `user://profile.cfg`): runs played, wins and best time per difficulty, and the hardest difficulty won with each hero, shown as a bronze / silver / gold star by the hero's name in character select. The end screen announces "NEW BEST TIME!" and "HARD UNLOCKED!".
+- **Profile** (`Profile`, `user://profile.cfg`): runs played, wins and best time per difficulty, the hardest difficulty won with each hero, shown as a bronze / silver / gold star by the hero's name in character select, and the best wave reached in Endless Waves per difficulty (`best_wave`, in its own `[waves]` section). The end screen announces "NEW BEST TIME!", "NEW BEST WAVE!" and "HARD UNLOCKED!".
   - Best times only compare runs of the same length: the profile stores a run version (`Profile.RUN_VERSION`, 2 = the 8-level run), and loading an older profile drops its best times but keeps wins, Hard unlocked and the stars.
 
 Spawn director:
@@ -157,7 +157,7 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
 
 ### Legendary upgrades (the mini boss's reward)
 
-Beating the mini boss opens a **LEGENDARY** round ("LEGENDARY!  TRANSFORM AN ABILITY", `GameState.LEGENDARY_ROUND`, queued first by `World._on_mini_boss_defeated()` and opening 1.6 s later, after the death's slow motion). Each player is offered their own hero's three legendaries (`UpgradePool.legendary_offers()`), and **each turns a different ability into a new form**: a new name, look and behaviour for the rest of the run. So the pick is which ability to transform for levels 4–6 and the final boss. The final boss gives none; the chest by the mini boss's exit still gives its ordinary treasure round.
+Beating the mini boss opens a **LEGENDARY** round ("LEGENDARY!  TRANSFORM AN ABILITY", `GameState.LEGENDARY_ROUND`, queued first by `World._on_mini_boss_defeated()` and opening 1.6 s later, after the death's slow motion). Each player is offered their own hero's three legendaries (`UpgradePool.legendary_offers()`), and **each turns a different ability into a new form**: a new name, look and behaviour for the rest of the run. So the pick is which ability to transform for levels 4–6 and the final boss. The final boss gives none; the chest by the mini boss's exit still gives its ordinary treasure round. In Endless Waves every boss wave gives one, until a hero has taken all three (see [Endless Waves](#endless-waves)).
 
 | Hero | Legendary | Transforms | What changes |
 |---|---|---|---|
@@ -282,9 +282,9 @@ Beating the mini boss opens a **LEGENDARY** round ("LEGENDARY!  TRANSFORM AN ABI
   - Phase 3 (below 25%): enraged (faster, lances in threes) and **blizzards**: for 5 s a wind pushes every hero one way (34 px/s) while shards of ice ride it in from the upwind wall.
   - Backed into a wall with a hero on her for 0.8 s, she **steps through the ice** to a spot 150 px beyond them: she fades out for 0.5 s while a frost portal shows where she'll appear.
   - Telegraphs: aim lines (locked when the wind-up starts); the nova's full reach, filling up; each icicle's circle; the beam's wedge and where it starts; the "BLIZZARD!" callout; spawn portals.
-- **Screens:** Main menu → Character select → Game (levels) → End screen → Play again / Change heroes / Main menu.
-  - **End screen:** difficulty, levels, enemies, team level, time and Second Winds; any records set; and a table of every player's kills, damage dealt and taken, downs, revives given and biggest hit, with awards: Slayer (most kills), Medic (most revives), Tank (most damage taken), Sharpshooter (biggest hit) - only with teammates to beat - and Untouchable (never downed). **Play again** starts a new run right away with the same team, heroes and difficulty; **Change heroes** goes to character select with everyone still joined and their last hero picked.
-  - **Main menu:** Start Run, Test Room (drop-in sandbox), Options, Quit. The main, pause and end menus use Godot focus navigation, so keyboard, any gamepad or mouse all work, with move/confirm sounds (`UiSounds`).
+- **Screens:** Main menu → Character select → Game (levels, or Endless Waves) → End screen → Play again / Change heroes / Main menu.
+  - **End screen:** difficulty, levels, enemies, team level, time and Second Winds; any records set; and a table of every player's kills, damage dealt and taken, downs, revives given and biggest hit, with awards: Slayer (most kills), Medic (most revives), Tank (most damage taken), Sharpshooter (biggest hit) - only with teammates to beat - and Untouchable (never downed). After Endless Waves the title is "GAME OVER" and the wave reached takes the place of the levels. **Play again** starts a new game right away with the same team, heroes, difficulty and mode; **Change heroes** goes to character select with everyone still joined and their last hero picked.
+  - **Main menu:** Start Run, Endless Waves, Test Room (drop-in sandbox), Options, Quit. Start Run and Endless Waves set `GameState.mode`, which character select, the Game and the end screen follow. The main, pause and end menus use Godot focus navigation, so keyboard, any gamepad or mouse all work, with move/confirm sounds (`UiSounds`).
   - **Character select:** 4 quadrants. Each shows the hero running on the spot, toughness / damage / speed as pips, a difficulty tag (Easy / Medium / Hard) and the four abilities with that player's own buttons.
     - Press A/Enter to join (holding that button doesn't also ready you up).
     - Left/right to browse the 8-hero roster.
@@ -306,6 +306,50 @@ Beating the mini boss opens a **LEGENDARY** round ("LEGENDARY!  TRANSFORM AN ABI
 - **Shared camera:** follows the middle of the group with fixed zoom, and players can't leave the screen. The leash blocks the player who is running away rather than dragging the others along.
 - **Disconnects:** if an assigned controller is unplugged, the game pauses until it is reconnected, or until another controller presses A and takes over that player.
 - **Bots** (`BotDriver`) follow the current objective with A* over the level grid and use their abilities. The test suite has four god-mode bots finish every level and second layout and every boss's level, and `./tools/dev.sh run res://src/main/game.tscn -- --bots=4 --level=4` shows a bot mini boss fight (`--level=8` the final boss; add `--boss=grove` and so on for a particular one).
+
+## Endless Waves
+
+The second mode (main menu → Endless Waves): no dungeon, just waves that keep getting harder, until the team falls. The score is the wave reached, and the best wave is kept per difficulty.
+
+- **The Pit** (`src/levels/data/waves.tres`, built by `tools/gen_levels.py`, not part of the run) is one sealed arena of about 60×40 tiles. It has four pillars, a pool on either side, spike beds at the top and bottom, powder kegs by the walls, a few urns, the team's spawn in the middle, and four `B` spots for bosses. It has no doors, exit, nests, chests or shrines, and no chasms, because frost wraiths could hover over one out of reach. Each game mirrors it at random and dresses it in one of the 12 tile themes (`WaveDirector.arena_for()`).
+- **The loop:**
+  - A break: 4 s before wave 1 (under the "ENDLESS WAVES" banner), then 5 s, counted down in the objective ("Wave 3 cleared!  Next wave in 4").
+  - Then the wave: "WAVE n" and the horn, and its enemies come in through portals on the arena's floor, as in arena fights ("Wave 7  -  42 left").
+  - The wave is cleared once all of it has come in and nothing is left alive. If three or fewer hold out for 20 s, it counts as cleared anyway, and they stay in the fight. With five or fewer left, the arrow (and the bots) go for the nearest one.
+  - A clear drops a heart at the team, pulls in every XP gem (`arena_cleared`, as for an arena) and says "WAVE n CLEARED".
+- **Picks** earned during a wave wait for the break after it, and the HUD shows "+2" as in arena fights. During a boss wave they open at once. The countdown stops while the pick screen is up.
+- **Every wave is harder than the last** (`WaveDirector.settings()`, per wave w; the difficulty's multipliers come on top):
+
+  | | Rule | w1 | w5 | w10 | w20 | w30 |
+  |---|---|---|---|---|---|---|
+  | Enemies (solo) | 24 + 9 per wave, at most 300; ×(1 + 0.4 per extra player) | 24 | 60 | 105 | 195 | 285 |
+  | Enemy HP | +0.115 a wave up to wave 20 (×3.2, the final boss level's), then ×1.07 a wave | ×1.0 | ×1.46 | ×2.04 | ×3.19 | ×6.27 |
+  | Spawns per second | 24 + 1.2 per wave, at most 48 | 24 | 29 | 35 | 47 | 48 |
+  | Enemy damage | +3% a wave after wave 10 | ×1.0 | ×1.0 | ×1.0 | ×1.3 | ×1.6 |
+  | Elites | from wave 4: `Elites.CHANCE`, +10% a wave, at most ×3 | – | ×1.1 | ×1.6 | ×2.6 | ×3 |
+
+  - The mix: swarmers throughout. Brutes join on wave 2, spitters on 3 and exploders on 4, and each grows more common up to 0.25 / 0.16 / 0.22, a little above the Molten Forge's.
+  - From wave 2, each regular wave features one of the 12 level enemies (bats, drowned, bone archers, revenants, sporecaps, frost boars, salamanders, imps, sporelings, eels, puffballs, frost wraiths) at weight 0.15, in an order shuffled per game. From wave 12 the one before it stays on, and from wave 24 the two before.
+  - At most as many enemies are alive at once as in the run (the alive cap by player count), so bigger waves last longer rather than crowding more.
+- **Boss waves:** every 5th wave. Waves 5, 15, 25… bring a mini boss and waves 10, 20, 30… a final boss. Each game shuffles the three of each kind, so all three come before any repeats. The pools are read from `RunConfig` (its levels and boss pools), so a boss added to the run joins Endless Waves too.
+  - The boss comes through a portal (1 s) at the `B` furthest from the team, with "BOSS WAVE" and the boss music. Its HP scales with its wave, like the horde's, on the bosses' player curve.
+  - The spawner stays off, as in the run's boss rooms: the boss brings its own servants.
+  - Beating it says "<NAME> SLAIN!" and opens a **legendary round** (see Legendary upgrades). Here every boss counts, not only mini bosses, until each hero has taken all three of its legendaries. After that no legendary round is queued at all (`World.legendaries_left()`), rather than an empty one. A treasure round (a bonus pick) comes after it, and the team's lives are refilled. It never ends the game.
+- **Team lives:** the difficulty's lives per level at the start, refilled after every boss wave, so five waves play the part of a run's level. A wipe with no life left ends the game: "GAME OVER / You reached wave n", then the end screen.
+- **Records:** `Profile.record_waves()` keeps the furthest wave per difficulty, shown in character select ("Best: wave 12") and announced on the end screen ("NEW BEST WAVE!"). Reaching wave 20 on Normal also unlocks Hard (`Profile.HARD_UNLOCK_WAVE`).
+- **Code:**
+  - `WaveDirector` extends `LevelDirector`, and the World uses it instead when `wave_mode` is on. It reuses the base's arena spawning (`SpawnDirector.start_arena`), enemy counting, boss spawning (`_spawn_boss(at, scene)`) and boss objective. It replaces `tick()`, `picks_held()` (the World asks the director) and the boss's death.
+  - The Game builds one World for the whole game (`_load_waves()`).
+  - `GameState.wave` is the last wave that started.
+  - Debug: `--waves` plays Endless Waves, and `--wave=N` starts at wave N.
+  - `tests/test_waves.gd` checks:
+    - the curve, the boss schedule and the mix
+    - The Pit
+    - the loop, stragglers and held picks
+    - boss waves, with every boss fighting in The Pit
+    - records and screens
+    - a full wave-33 horde
+    - four bots holding out through the first waves and a boss wave
 
 ## Map features
 
@@ -379,9 +423,9 @@ src/
               final bosses BossDemon, SporeMother, FrostQueen)
   upgrades/   UpgradeData, UpgradePool, data/*.tres
   levels/     Level (tiles + grid + arena rooms from LevelData), LevelDirector (arenas, exit, bosses),
-              RunConfig, data/*.tres (generated by tools/gen_levels.py)
+              WaveDirector (Endless Waves), RunConfig, data/*.tres (generated by tools/gen_levels.py)
   ui/         HUD, level-up screen, main menu, character select, pause menu, end screen
-  main/       Game (run controller: levels, banners, victory/defeat)
+  main/       Game (run controller: levels or Endless Waves, banners, victory/defeat)
 assets/fonts  Pixel5x8 proportional bitmap font (BMFont, generated), default theme font
 tests/        headless test runner + test_*.gd
 tools/        dev.sh helper, stress test scene
@@ -478,6 +522,7 @@ docs/         this document
 | 13 | Level enemies: every level's own enemy (bats, drowned, bone archers, revenants, sporecaps, frost boars, salamanders, imps) with its behaviour, art, sounds and warnings; bosses raise revenants and summon imps | done |
 | 14 | More bosses: boss pools (each run meets one of three mini bosses and one of three final bosses); the Toadstool Tyrant and the Mire Serpent (mini), the Spore Mother and the Frost Queen (final), each with a level, theme and servant of its own (sporelings, eels, puffballs, frost wraiths) | done |
 | 15 | Legendary upgrades: beating the mini boss offers each player three legendaries, each turning one of the hero's abilities into a new form (24 in all), with their shots, minions, sounds and tests | done |
+| 16 | Endless Waves: a second mode where the team holds one arena (The Pit) against waves that keep getting harder until it falls; a boss every 5th wave, each a legendary round; best wave per difficulty | done |
 
 ## Performance results
 

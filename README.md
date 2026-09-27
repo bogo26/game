@@ -1,6 +1,6 @@
 # Horde Crawler (working title)
 
-1–4 player **local co-op** top-down pixel-art horde crawler for **macOS and Windows**. Pick a hero, fight through hordes of up to 300 enemies, and upgrade on every level-up.
+1–4 player **local co-op** top-down pixel-art horde crawler for **macOS and Windows**. Pick a hero, fight through hordes of up to 300 enemies, and upgrade on every level-up. Play the 8-level dungeon run, or hold out in **Endless Waves** for as long as you can.
 
 Design, controls, heroes and architecture: [docs/DESIGN.md](docs/DESIGN.md).
 
@@ -113,11 +113,20 @@ Upgrades include four **elemental chains** for your attack: fire, ice, poison an
 
 **Test Room** on the main menu is a drop-in sandbox with an endless horde and one of everything. Add `-- --upgrades=fire_3,ice_2` to `./tools/dev.sh run` to start with those upgrades and the tiers before them; legendaries work too (`--upgrades=knight_crescent_wave,mage_singularity`: each hero only takes its own).
 
-**Replaying:** pick Casual, Normal or Hard in character select (LB / RB or Q / E; Hard unlocks after a Normal win). Every run picks one of two layouts for each regular level and may mirror it, and from the second level on some enemies arrive as elites (Swift, Volatile, Splitting). The end screen shows everyone's numbers and awards, and records best times.
+**Replaying:** pick Casual, Normal or Hard in character select (LB / RB or Q / E; Hard unlocks after a Normal win, or after reaching wave 20 of Endless Waves on Normal). Every run picks one of two layouts for each regular level and may mirror it, and from the second level on some enemies arrive as elites (Swift, Volatile, Splitting). The end screen shows everyone's numbers and awards, and records best times.
 
-Debug flags (after `--`): `--level=3` (the run's 1-based position: `--level=4` is the mini boss, `--level=8` the final boss), `--boss=grove` (which boss: `lair`, `grove` or `cistern` for the mini boss, `boss`, `mycelium` or `glacier` for the final one), `--bots=4`, `--heroes=rogue,mage`, `--layout=b`, `--mirror=hv`, `--elite-chance=0.3`, `--debug-levelups=2`, `--show-map`.
+**Endless Waves** (main menu): no dungeon, just waves that keep getting harder, until the team falls. Join and pick heroes and a difficulty as for a run.
+- The team holds **The Pit**, one sealed arena (pillars, pools, spike beds, powder kegs), in a different tile theme each game.
+- Each wave comes in through portals. Once it's beaten there's a short break with a heart, the XP pulled in and any upgrade picks earned during the wave, then the next wave comes. If three or fewer enemies hold out for 20 s, the wave counts as cleared anyway, and they stay in the fight. The arrow points at the last five.
+- Every wave is harder than the last: more enemies, more HP, a faster pace, tougher kinds (brutes from wave 2, spitters from 3, exploders from 4), elites from wave 4, and each wave features one of the levels' own enemies (two from wave 12, three from wave 24). After wave 10 enemies hit harder, and after wave 20 their HP climbs faster and faster.
+- **Every 5th wave is a boss:** a random mini boss on waves 5, 15, 25…, a random final boss on waves 10, 20, 30…. Beating one opens a legendary round (each player transforms another of their hero's abilities, until all three are taken), refills the team's lives and gives everyone a bonus upgrade.
+- The end screen shows the wave you reached, and your best wave is kept per difficulty.
+
+Debug flags (after `--`): `--level=3` (the run's 1-based position: `--level=4` is the mini boss, `--level=8` the final boss), `--boss=grove` (which boss: `lair`, `grove` or `cistern` for the mini boss, `boss`, `mycelium` or `glacier` for the final one), `--waves` (Endless Waves) and `--wave=5` (from that wave), `--bots=4`, `--heroes=rogue,mage`, `--layout=b`, `--mirror=hv`, `--elite-chance=0.3`, `--debug-levelups=2`, `--show-map`. For example, `./tools/dev.sh run res://src/main/game.tscn -- --waves --wave=5 --bots=4` shows bots fighting a boss wave.
 
 ## Status
+
+Milestone 16 (Endless Waves) is done: a second mode on the main menu, where the team holds one arena against waves that keep getting harder, with a boss every 5th wave (each one a legendary round) and a best wave per difficulty.
 
 Milestone 15 (legendary upgrades) is done: beating the mini boss offers each player their hero's three legendaries, and each of the 24 turns one ability into a new form with its own look, behaviour and sounds.
 
