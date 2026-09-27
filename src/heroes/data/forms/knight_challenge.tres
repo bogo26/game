@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="ChallengeAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/challenge.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Challenge"
+description = "Drag every enemy near you to your feet and stun it. Take less damage for each one caught."
+cooldown = 6.0
+target = 0
+radius = 80.0
+damage = 10.0
+knockback = 0.0
+stun_time = 1.2
+color = Color(1.0, 0.85, 0.4, 1.0)
+pull_to = 12.0
+guard_per_enemy = 0.04
+max_guard = 0.4
+guard_time = 5.0

@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="HauntAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/haunt.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Haunt"
+description = "Soul bolts. Enemies they kill rise as wisps that seek another enemy and burst on it."
+cooldown = 0.35
+hold_to_repeat = true
+damage = 9.0
+speed = 200.0
+radius = 4.0
+lifetime = 1.2
+pierce = 1
+knockback = 30.0
+look = 6
+reap = true
+wisp_share = 0.7
+wisp_speed = 120.0
+wisp_turn = 6.0
+wisp_range = 140.0
+wisp_life = 2.0
+wisp_burst = 16.0
+max_wisps = 10

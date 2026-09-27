@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="JuggernautAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/juggernaut.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Juggernaut"
+description = "Charge, carrying everything in your path, then slam it all down in a shockwave."
+cooldown = 3.5
+direction = 0
+distance = 72.0
+duration = 0.22
+iframes = 0.3
+damage = 10.0
+hit_radius = 14.0
+knockback = 0.0
+stun_time = 0.0
+color = Color(0.5, 0.7, 1.0, 0.7)
+max_carried = 10
+carry_offset = 12.0
+crash_radius = 34.0
+crash_damage = 14.0
+crash_per_enemy = 3.0
+crash_stun = 0.6
+crash_knockback = 180.0
+wall_bonus = 1.5
+wall_stun = 0.5

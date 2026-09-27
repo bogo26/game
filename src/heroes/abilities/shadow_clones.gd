@@ -21,6 +21,11 @@ func bind(p_hero: Hero, p_slot: Slot) -> void:
 	hero.attack_performed.connect(_on_attack)
 
 
+func unbind() -> void:
+	if hero.attack_performed.is_connected(_on_attack):
+		hero.attack_performed.disconnect(_on_attack)
+
+
 func _activate(_aim: Vector2) -> void:
 	_time_left = duration + mod(&"duration")
 	_clear_ghosts()

@@ -12,12 +12,31 @@ const ATLAS_COLUMNS := 8
 enum Team { PLAYER, ENEMY }
 ## Shader tint code for enemy shots (they throb; see atlas_instance.gdshader).
 const HOSTILE_TINT := 6.0
-## Cell indices in assets/sprites/fx/fx_atlas.png: row 0, and the bone
-## archers' shard in row 3.
-enum Look { ARROW, BOLT, ORB, SPIT, KNIFE, RIVET, SOUL, FIRE, SHARD = 24 }
+## Cell indices in assets/sprites/fx/fx_atlas.png: row 0, then row 3: the
+## bone archers' shard and the legendary forms' shots.
+enum Look { ARROW, BOLT, ORB, SPIT, KNIFE, RIVET, SOUL, FIRE, SHARD = 24, CRESCENT, AXE, ICE_SHARD, FLAME, PRISM,
+	HEAVY_ARROW, ICE_ORB }
 
 ## Optional on-hit effects applied to enemies.
-enum Effect { NONE, SLOW, STUN }
+enum Effect { NONE, SLOW, STUN, BURN }
+## BURN sets the enemy on fire for this share of the hit per second.
+const BURN_SHARE := 0.5
+
+## Trait bits (set_traits). RICOCHET: after a hit the shot turns toward the
+## nearest enemy ahead of it (Ricochet). REAP: kills it makes are logged in
+## `reaped` (Haunt).
+const TRAIT_RICOCHET := 1
+const TRAIT_REAP := 2
+const RICOCHET_RANGE := 80.0
+## "Ahead": within about 100 degrees of the way the shot was flying.
+const RICOCHET_AHEAD := -0.17
+## A shot that turns has at least this long left to get there.
+const RICOCHET_LIFE := 0.35
+## Prism: a shot with splits left forks in three at a wall bounce, each fork
+## with this share of its damage and a little more time.
+const SPLIT_ANGLE := deg_to_rad(25.0)
+const SPLIT_DAMAGE := 0.7
+const SPLIT_LIFE := 0.3
 
 var count := 0
 var pos := PackedVector2Array()
@@ -37,6 +56,8 @@ var effect_time := PackedFloat32Array()
 var splash := PackedFloat32Array()     # > 0: area damage on impact
 var crit := PackedByteArray()          # 1: rolled a crit at spawn (glows, hits show as crits)
 var elemental := PackedByteArray()     # 1: a hero's attack carrying its elements (see Elements)
+var traits := PackedByteArray()        # TRAIT_* bits
+var splits := PackedByteArray()        # forks left (Prism)
 
 ## Splash impacts this frame (for FX): position + radius pairs.
 var impacts := PackedVector2Array()
@@ -49,6 +70,14 @@ var hero_hits := PackedFloat32Array()
 ## pairs, and each hit's damage. The World applies the elements.
 var element_hits := PackedInt32Array()
 var element_hit_damage := PackedFloat32Array()
+## Ricochets this frame (for FX): from / to pairs.
+var ricochets := PackedVector2Array()
+## Kills by REAP shots this frame: where, and whose shot (read before the next update).
+var reaped := PackedVector2Array()
+var reaped_owner := PackedInt32Array()
+## Prism forks waiting for the end of update(): a copy of the bounced shot
+## (see _fork_record()).
+var _forks: Array[Array] = []
 
 
 func _init() -> void:
@@ -69,6 +98,8 @@ func _init() -> void:
 	splash.resize(CAPACITY)
 	crit.resize(CAPACITY)
 	elemental.resize(CAPACITY)
+	traits.resize(CAPACITY)
+	splits.resize(CAPACITY)
 
 
 ## Returns the projectile index, or -1 when full.
@@ -95,6 +126,8 @@ func spawn(p: Vector2, v: Vector2, dmg: float, r: float, lifetime: float, p_team
 	splash[i] = 0.0
 	crit[i] = 0
 	elemental[i] = 0
+	traits[i] = 0
+	splits[i] = 0
 	return i
 
 
@@ -117,6 +150,15 @@ func set_elemental(i: int) -> void:
 	elemental[i] = 1
 
 
+func set_traits(i: int, bits: int) -> void:
+	traits[i] = bits
+
+
+## Prism: how many times the shot may fork at a wall bounce.
+func set_splits(i: int, n: int) -> void:
+	splits[i] = n
+
+
 func clear() -> void:
 	count = 0
 
@@ -137,6 +179,27 @@ func clear_enemy_shots(area: Rect2) -> void:
 	life = L
 
 
+## Removes every enemy shot inside a circle (the Cleric's Bastion) and
+## returns where they were.
+func clear_enemy_shots_in_circle(center: Vector2, radius: float) -> PackedVector2Array:
+	var gone := PackedVector2Array()
+	var r2 := radius * radius
+	var P := pos
+	var V := vel
+	var L := life
+	var i := 0
+	while i < count:
+		if team[i] == Team.ENEMY and center.distance_squared_to(P[i]) <= r2:
+			gone.append(P[i])
+			_remove_at(i, P, V, L)
+		else:
+			i += 1
+	pos = P
+	vel = V
+	life = L
+	return gone
+
+
 ## Enemy shots hit heroes within `hero_radius` of `hero_bodies` (the middle
 ## of each hero's sprite, not the feet) whose `hero_targetable` flag is set.
 func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_bodies: PackedVector2Array,
@@ -146,6 +209,9 @@ func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_bodies: PackedVect
 	element_hit_damage.clear()
 	impacts.clear()
 	impact_radius.clear()
+	ricochets.clear()
+	reaped.clear()
+	reaped_owner.clear()
 	var P := pos
 	var V := vel
 	var L := life
@@ -189,6 +255,11 @@ func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_bodies: PackedVect
 					v.y = -v.y
 				V[i] = v
 				np = p
+				if splits[i] > 0:
+					splits[i] -= 1
+					damage[i] *= SPLIT_DAMAGE
+					L[i] += SPLIT_LIFE
+					_forks.append(_fork_record(i, p, v, L[i]))
 			else:
 				dead = true
 		if not dead:
@@ -227,6 +298,14 @@ func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_bodies: PackedVect
 										dead = true
 										hit_done = true
 										break
+									if traits[i] & TRAIT_RICOCHET:
+										var turned := _ricochet(i, np, v, horde)
+										if turned != v:
+											v = turned
+											V[i] = v
+											L[i] = maxf(L[i], RICOCHET_LIFE)
+										hit_done = true  # one hit a frame, then fly on
+										break
 							j = nxt[j]
 			else:
 				for h in hero_count:
@@ -248,18 +327,80 @@ func update(dt: float, horde: HordeSim, grid: LevelGrid, hero_bodies: PackedVect
 	pos = P
 	vel = V
 	life = L
+	if not _forks.is_empty():
+		_spawn_forks()
+
+
+## A ricochet: the velocity toward the nearest living enemy ahead of the shot
+## within RICOCHET_RANGE (not the one just hit), or `v` when there is none.
+func _ricochet(i: int, p: Vector2, v: Vector2, horde: HordeSim) -> Vector2:
+	var speed := v.length()
+	if speed <= 0.0:
+		return v
+	horde.query_circle(p, RICOCHET_RANGE, _scratch)
+	var heading := v / speed
+	var best := Vector2.INF
+	var best_d2 := INF
+	for k in _scratch:
+		if horde.uid[k] == last_hit[i] or horde.is_object(k):
+			continue
+		var to := horde.body_center(k) - p
+		var d2 := to.length_squared()
+		if d2 < 1.0 or d2 >= best_d2 or heading.dot(to / sqrt(d2)) < RICOCHET_AHEAD:
+			continue
+		best_d2 = d2
+		best = to
+	if not best.is_finite():
+		return v
+	ricochets.append(p)
+	ricochets.append(p + best)
+	return best.normalized() * speed
+
+
+## What a fork copies from shot `i` as it bounces (removals later in the
+## frame can move the shot to another index).
+func _fork_record(i: int, p: Vector2, v: Vector2, remaining: float) -> Array:
+	return [p, v, remaining, damage[i], radius[i], team[i], owner[i], look[i], pierce[i], knockback[i],
+		bounces[i], effect[i], effect_time[i], splash[i], crit[i], elemental[i], traits[i], splits[i]]
+
+
+## Prism forks queued during update(): two copies at ±SPLIT_ANGLE from the
+## bounced shot, spawned after the loop (which works on copies of the
+## position, velocity and life arrays).
+func _spawn_forks() -> void:
+	var forks := _forks
+	_forks = []
+	for f in forks:
+		var v: Vector2 = f[1]
+		for side: float in [-1.0, 1.0]:
+			var k := spawn(f[0], v.rotated(SPLIT_ANGLE * side), f[3], f[4], f[2], f[5] as Team, f[6],
+				f[7] as Look, f[8], f[9], f[10])
+			if k < 0:
+				return
+			effect[k] = f[11]
+			effect_time[k] = f[12]
+			splash[k] = f[13]
+			crit[k] = f[14]
+			elemental[k] = f[15]
+			traits[k] = f[16]
+			splits[k] = f[17]
 
 
 ## `at`: where the shot touched the body (sparks and numbers appear there).
 func _hit_enemy(i: int, j: int, horde: HordeSim, v: Vector2, at: Vector2) -> void:
 	var kb := v.normalized() * knockback[i] if v != Vector2.ZERO else Vector2.ZERO
 	var is_crit := crit[i] != 0
-	horde.damage(j, damage[i], kb, owner[i], is_crit, at)
+	var target_pos := horde.pos[j]
+	if horde.damage(j, damage[i], kb, owner[i], is_crit, at) and traits[i] & TRAIT_REAP:
+		reaped.append(target_pos)
+		reaped_owner.append(owner[i])
 	match effect[i]:
 		Effect.SLOW:
 			horde.apply_slow(j, effect_time[i])
 		Effect.STUN:
 			horde.apply_stun(j, effect_time[i])
+		Effect.BURN:
+			horde.ignite(j, damage[i] * BURN_SHARE, effect_time[i], owner[i])
 	if elemental[i] != 0:
 		element_hits.append(j)
 		element_hits.append(owner[i])
@@ -299,6 +440,8 @@ func _remove_at(i: int, P: PackedVector2Array, V: PackedVector2Array, L: PackedF
 		splash[i] = splash[last]
 		crit[i] = crit[last]
 		elemental[i] = elemental[last]
+		traits[i] = traits[last]
+		splits[i] = splits[last]
 	count = last
 
 

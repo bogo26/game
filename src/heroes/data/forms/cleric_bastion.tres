@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="BastionAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/bastion.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Bastion"
+description = "A dome of light for 5s: enemy shots fizzle, enemies are pushed out, allies inside heal."
+cooldown = 9.0
+target = 0
+radius = 44.0
+duration = 5.0
+interval = 0.5
+heal = 4.0
+color = Color(1.0, 0.95, 0.5, 1.0)
+push_speed = 160.0

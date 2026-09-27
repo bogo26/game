@@ -28,7 +28,7 @@ const INTERVALS := {
 	&"fuse": 0.12, &"spawn": 0.12, &"windup": 0.2, &"bow": 0.12, &"bones": 0.1, &"rattle": 0.2, &"spores": 0.12,
 	&"snort": 0.3, &"thud": 0.15, &"lob": 0.15, &"sizzle": 0.12, &"imp": 0.15,
 	&"boing": 0.1, &"splash": 0.2, &"bubbles": 0.3, &"bite": 0.15, &"sprout": 0.3, &"roots": 0.2, &"nova": 0.3,
-	&"beam": 0.5, &"blizzard": 1.0,
+	&"beam": 0.5, &"blizzard": 1.0, &"flame": 0.09,
 	&"heartbeat": 3.0, &"help": 3.0, &"denied": 0.15, &"ready": 0.1, &"revive_tick": 0.22, &"ult_ready": 0.3,
 }
 ## Per-sound volume trims (dB).

@@ -70,6 +70,8 @@ const ENEMY_COLORS := {
 	&"frost_wraith": Color(0.66, 0.84, 1.0),
 }
 const MAX_SPARKS_PER_FRAME := 40
+const MAX_RICOCHET_STREAKS := 24
+const RICOCHET_COLOR := Color(0.6, 1.0, 0.55, 0.7)
 const MAX_PUFFS_PER_FRAME := 30
 const NUMBER_THRESHOLD := 12.0
 const CRIT_COLOR := Color(1.0, 0.72, 0.15)
@@ -87,6 +89,9 @@ const RESUME_GRACE := 0.75
 ## Pick rounds held during an arena fight open this long after it's cleared
 ## (the vacuumed XP lands first).
 const PICKS_AFTER_CLEAR := 1.0
+## The legendary round opens this long after the mini boss dies (game time,
+## so after its death slow motion).
+const LEGENDARY_DELAY := 1.6
 ## Second Wind: everyone back up at this share of HP, enemies around each hero
 ## shoved away and stunned, enemy shots on screen gone.
 const SECOND_WIND_HP := 0.5
@@ -612,6 +617,10 @@ func _snapshot_heroes() -> void:
 		_hero_need[i] = 1.0 - hero.hp / hero.max_hp if hero.max_hp > 0.0 else 0.0
 		if not hero.is_downed():
 			target_positions.append(hero.position)
+	# Decoys and the bone golem draw the horde as if they were heroes.
+	for m in minions:
+		if m.lure and not m.is_expired():
+			target_positions.append(m.position)
 
 
 ## Downed heroes are revived by living teammates standing next to them.
@@ -1093,6 +1102,10 @@ func _apply_projectile_hits() -> void:
 			heroes[index].take_hit(hits[k + 1])
 	for k in projectiles.impacts.size():
 		fx.ring(projectiles.impacts[k], projectiles.impact_radius[k], Color(0.8, 0.6, 1.0), 0.2)
+	# Ricochet: a streak where each arrow turns toward its next target.
+	var turns := projectiles.ricochets
+	for k in range(0, mini(turns.size(), MAX_RICOCHET_STREAKS * 2), 2):
+		fx.line(turns[k], turns[k + 1], RICOCHET_COLOR, 0.12)
 
 
 func _update_zones(dt: float) -> void:
@@ -1245,7 +1258,7 @@ func _process_kills() -> void:
 		if killer >= 0:
 			var hero := hero_for_slot(killer)
 			if hero:
-				hero.on_kill()
+				hero.on_kill(p)
 				GameState.slots[killer].kills += 1
 		if killer != HordeSim.SELF_KILL:
 			var drop := grid.nearest_open(p) if grid.is_solid_at(p) else p  # fell into a chasm
@@ -1348,9 +1361,12 @@ func _on_arena_cleared(_room_id: int) -> void:
 		tip(&"exit", "The exit is open: everyone into the portal!")
 
 
-## A mini boss fell: its room opens, and so does the exit behind it.
+## A mini boss fell: its room opens, and so does the exit behind it, and
+## every player picks a legendary.
 func _on_mini_boss_defeated(boss_name: String) -> void:
 	hud.callout("%s SLAIN!" % boss_name.to_upper(), Color(1, 0.9, 0.5))
+	GameState.add_legendary_pick()
+	level_up_delay = maxf(level_up_delay, LEGENDARY_DELAY)
 
 
 func _on_wave_started(wave: int, waves: int) -> void:
@@ -1425,7 +1441,8 @@ func _apply_leash() -> void:
 
 
 ## Debug: --upgrades=fire_3,ice_1 gives every hero those upgrades (and the
-## tiers they require) for this level.
+## tiers they require) for this level; hero cards (legendaries included) only
+## go to their own hero, so one list can hold several heroes' legendaries.
 func _apply_debug_upgrades(hero: Hero) -> void:
 	for arg in OS.get_cmdline_user_args():
 		if not arg.begins_with("--upgrades="):
@@ -1434,6 +1451,8 @@ func _apply_debug_upgrades(hero: Hero) -> void:
 		for id in arg.get_slice("=", 1).split(",", false):
 			var chain: Array[UpgradeData] = []
 			var upgrade := library.find(StringName(id))
+			if upgrade and upgrade.hero_id != &"" and upgrade.hero_id != hero.hero_id:
+				continue
 			while upgrade:
 				chain.push_front(upgrade)
 				upgrade = library.find(upgrade.requires) if upgrade.requires != &"" else null

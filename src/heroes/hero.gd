@@ -184,9 +184,31 @@ func apply_upgrade(upgrade: UpgradeData, record: bool = true) -> void:
 	if not UpgradePool.apply_effects(upgrade, stats, abilities):
 		return
 	upgrade_stacks[upgrade.id] = int(upgrade_stacks.get(upgrade.id, 0)) + 1
+	if upgrade.is_legendary():
+		_take_form(upgrade)
 	_refresh_stats()
 	if record:
 		GameState.slots[slot].upgrades.append(upgrade.id)
+
+
+## A legendary: the ability in its slot becomes a new form (an ability
+## template, see tools/gen_hero_data.py) that keeps the upgrades and the
+## cooldown the old one had. Forms extend the class they replace, so those
+## upgrades mean the same thing.
+func _take_form(upgrade: UpgradeData) -> void:
+	var template := load(upgrade.form_path()) as Ability
+	if template == null:
+		push_error("upgrade %s: no form at %s" % [upgrade.id, upgrade.form_path()])
+		return
+	var ability_slot := upgrade.form_slot as Ability.Slot
+	var old := abilities[ability_slot]
+	old.cancel()
+	old.unbind()
+	var form := template.duplicate(true) as Ability
+	form.mods = old.mods.duplicate()
+	form.cooldown_left = old.cooldown_left
+	form.bind(self, ability_slot)
+	abilities[ability_slot] = form
 
 
 func _refresh_stats() -> void:
@@ -443,11 +465,14 @@ func on_hits(_count: int) -> void:
 	pass
 
 
-## Called by the World when an enemy this hero damaged last dies.
-func on_kill() -> void:
+## Called by the World when an enemy this hero damaged last dies (at `at`).
+func on_kill(at: Vector2 = Vector2.INF) -> void:
 	var amount := life_on_kill + buff_sum(&"heal_on_kill")
 	if amount > 0.0:
 		heal(amount)
+	if at.is_finite():
+		for ability in abilities:
+			ability.on_kill(at)
 
 
 ## Called by the World with the damage this hero (and its minions) dealt.
@@ -559,6 +584,8 @@ func _update_visuals(delta: float) -> void:
 		sprite.modulate = CHILL_TINT
 	else:
 		sprite.modulate = Color.WHITE
+	for ability in abilities:
+		sprite.modulate *= ability.sprite_modulate()  # a form's own look (Lich Form)
 	var outline := color
 	if _low_hp:
 		outline = color.lerp(LOW_HP_COLOR, 0.5 + 0.5 * sin(_anim_time * 9.0))

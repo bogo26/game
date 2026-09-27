@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CrescentWaveAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/crescent_wave.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Crescent Wave"
+description = "Sword arc; every 3rd swing also sends a crescent of light through a whole line."
+cooldown = 0.42
+hold_to_repeat = true
+reach = 26.0
+arc_degrees = 120.0
+damage = 12.0
+knockback = 90.0
+combo_every = 3
+combo_multiplier = 1.5
+wave_speed = 230.0
+wave_lifetime = 0.55
+wave_radius = 7.0
+wave_knockback = 70.0

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ChronoshiftAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/chronoshift.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Chronoshift"
+description = "Blink, leaving an echo. 2.5s later you snap back to it and undo half the damage taken."
+cooldown = 3.0
+distance = 80.0
+iframes = 0.15
+echo_time = 2.5
+undo_share = 0.5
+return_iframes = 0.3

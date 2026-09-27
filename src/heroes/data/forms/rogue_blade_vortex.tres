@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="BladeVortexAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/blade_vortex.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Blade Vortex"
+description = "12 knives whirl around you for 3s, cutting whatever comes close, then fly outward."
+cooldown = 5.0
+count = 12
+spread_degrees = 360.0
+damage = 9.0
+speed = 260.0
+radius = 3.0
+lifetime = 0.6
+pierce = 1
+knockback = 30.0
+look = 4
+whirl_time = 3.0
+orbit_radius = 26.0
+orbit_speed = 7.0
+whirl_share = 0.6
+rehit = 0.4

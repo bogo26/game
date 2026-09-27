@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="ClusterArrowAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/cluster_arrow.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Cluster Arrow"
+description = "A heavy arrow that bursts into a ring of 12 arrows where it lands."
+cooldown = 4.0
+count = 12
+spread_degrees = 50.0
+damage = 8.0
+speed = 270.0
+radius = 3.0
+lifetime = 0.45
+pierce = 1
+knockback = 40.0
+look = 0
+heavy_damage = 20.0
+heavy_speed = 240.0
+heavy_lifetime = 0.6
+heavy_radius = 5.0
+heavy_knockback = 60.0

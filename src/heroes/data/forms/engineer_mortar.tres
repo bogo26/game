@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="SummonAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/summon_ability.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Deploy Mortar"
+description = "Place a mortar that lobs shells at the biggest pack in range (max 2)."
+cooldown = 6.0
+kind = 3
+count = 1
+max_active = 2
+lifetime = 20.0
+minion_damage = 14.0
+attack_interval = 1.4
+attack_range = 220.0
