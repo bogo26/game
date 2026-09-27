@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Builds the run's level layouts and writes src/levels/data/*.tres (levels
-1-6 and their second layouts, the mini boss's lair and the final boss's
-throne; src/levels/run_config.tres lists the run's order).
+1-6 and their second layouts, and a level for each boss: the mini bosses'
+ossuary, grove and cistern, the final bosses' throne, mycelium and glacier;
+src/levels/run_config.tres lists the run's order and the boss pools).
 
 Levels are designed here on a character canvas (legend in
 src/levels/level_data.gd) from shapes: rectangles, octagons, discs, caves,
@@ -12,6 +13,7 @@ room becomes a door. A seeded RNG keeps the output stable, so layouts stay
 easy to review in diffs.
 Run: python3 tools/gen_levels.py
 """
+import math
 import os
 import random
 
@@ -1042,6 +1044,128 @@ def level6b():
     return c
 
 
+# --- the other bosses: a run meets one mini boss and one final boss (RunConfig) ----------
+
+def grove():
+    """Toadstool Hollow (mini boss): through a mossy antechamber of mushroom
+    stalks to the round glade where the Toadstool Tyrant bounces, pools and
+    giant stalks around it, and behind it the way on."""
+    c = Canvas(76, 70, seed=61)
+    c.rect(27, 58, 49, 67)
+    c.put(38, 63, "P")
+    for (x, y) in ((28, 59), (48, 59), (28, 66), (48, 66)):
+        c.put(x, y, "u")
+    c.rect(23, 61, 26, 63)                       # shrine alcove
+    c.put(24, 62, "A")
+    c.hall(35, 52, 41, 57)                       # the approach...
+    c.rect(28, 44, 48, 51)                       # ...a mossy antechamber of stalks
+    c.pillar(31, 46)
+    c.pillar(44, 46)
+    c.fill(c.rect_cells(36, 45, 40, 46), "~")
+    c.put(30, 50, "S")
+    c.put(46, 50, "S")
+    c.hall(35, 40, 41, 43, "n")                  # the glade's doors
+    glade = c.disc_cells(38, 24, 16)             # the Toadstool Tyrant's glade
+    c.arena(1, glade)
+    for (x, y) in ((29, 16), (46, 16), (29, 31), (46, 31)):
+        c.pillar(x, y)                           # giant mushroom stalks
+    for (x, y) in ((25, 24), (51, 24)):
+        c.fill(c.disc_cells(x, y, 2), "~")
+    c.put(38, 17, "B")
+    c.hall(35, 1, 41, 9, "s")                    # behind it, the way on
+    c.rect(27, 1, 49, 5)
+    c.fill(c.rect_cells(37, 2, 39, 4), "X")
+    c.put(30, 3, "C")
+    c.put(47, 2, "u")
+    return c
+
+
+def cistern():
+    """The Sunken Cistern (mini boss): a flooded way in to a vaulted cistern -
+    rows of columns, channels of black water with bridges over them - where
+    the Mire Serpent hunts, and behind it the way on."""
+    c = Canvas(80, 72, seed=73)
+    c.rect(30, 60, 50, 69)
+    c.put(40, 65, "P")
+    for (x, y) in ((31, 61), (49, 61), (31, 68), (49, 68)):
+        c.put(x, y, "u")
+    c.rect(26, 63, 29, 65)                       # shrine alcove
+    c.put(27, 64, "A")
+    c.hall(37, 52, 43, 59)                       # the approach...
+    c.rect(29, 44, 51, 51)                       # ...a hall with a channel across it
+    c.fill(c.rect_cells(29, 47, 51, 48), "~")
+    for x in (31, 48):
+        c.pillar(x, 44)
+    c.put(33, 50, "S")
+    c.put(47, 50, "S")
+    c.hall(37, 40, 43, 43, "n")                  # the cistern's doors
+    vault = c.rect_cells(8, 10, 72, 39)          # the Mire Serpent's cistern
+    c.arena(1, vault)
+    for y in (19, 30):                           # channels, bridged three times
+        c.fill([(x, yy) for x in range(12, 69) for yy in (y, y + 1) if not 25 <= x <= 27 and not 39 <= x <= 41
+                and not 53 <= x <= 55], "~")
+    for x in (16, 32, 47, 63):
+        for y in (14, 34):
+            c.pillar(x, y)                       # the cistern's columns
+    c.put(40, 25, "B")
+    c.hall(37, 1, 43, 9, "s")                    # behind it, the way on
+    c.rect(30, 1, 50, 5)
+    c.fill(c.rect_cells(39, 2, 41, 4), "X")
+    c.put(32, 3, "C")
+    c.put(48, 2, "u")
+    return c
+
+
+def mycelium():
+    """The Mycelium Deep (final boss): a gauntlet of thorny roots and barrels
+    down into a vast round cavern of living fungus, the Spore Mother rooted in
+    its heart and a ring of stalks around her."""
+    c = Canvas(72, 68, seed=97)
+    c.rect(26, 56, 44, 64)
+    c.put(35, 60, "P")
+    c.put(43, 57, "A")
+    c.put(27, 63, "u")
+    c.put(43, 63, "u")
+    c.hall(32, 44, 38, 55)                       # the approach
+    c.fill(c.rect_cells(32, 47, 38, 50), "^")
+    c.cluster(32, 52, pattern=((0, 0), (0, 1)))
+    c.cluster(38, 52, pattern=((0, 0), (0, 1)))
+    deep = c.disc_cells(35, 23, 20)              # the Spore Mother's cavern
+    c.arena(1, deep)
+    for k in range(6):                           # a ring of stalks, far out
+
+        a = math.pi * (k / 3.0 + 1.0 / 6.0)
+        c.pillar(round(35 + math.cos(a) * 14) - 1, round(23 + math.sin(a) * 14) - 1)
+    c.put(35, 23, "B")
+    return c
+
+
+def glacier():
+    """The Frozen Court (final boss): past crevasses and icicle traps into
+    the Frost Queen's hall of ice - pillars to hide behind, crevasses on
+    either side."""
+    c = Canvas(72, 64, seed=53)
+    c.rect(26, 52, 44, 60)
+    c.put(35, 56, "P")
+    c.put(43, 53, "A")
+    c.put(27, 59, "u")
+    c.put(43, 59, "u")
+    c.hall(32, 48, 38, 51)                       # the approach...
+    c.rect(26, 41, 44, 47)                       # ...an antechamber of crevasses and icicles
+    c.fill(c.disc_cells(29, 44, 1), ":")
+    c.fill(c.disc_cells(41, 44, 1), ":")
+    c.fill(c.rect_cells(33, 43, 37, 45), "^")
+    c.hall(32, 37, 38, 40, "n")                  # the court's doors
+    court = c.octagon_cells(8, 3, 62, 36, 6)     # the Frost Queen's court
+    c.arena(1, court)
+    for (x, y) in ((19, 11), (50, 11), (19, 27), (50, 27)):
+        c.pillar(x, y)                           # pillars of ice
+    for (x, y) in ((13, 20), (57, 20)):
+        c.fill(c.disc_cells(x, y, 2), ":")       # crevasses
+    c.put(35, 12, "B")
+    return c
+
+
 def _open_spot(c, cells, near):
     """The cell of `cells` nearest to `near` with room around it."""
     best, best_d = None, 1 << 30
@@ -1089,6 +1213,29 @@ LEVELS = [
         "arena_quotas": [0, 0, 0, 0, 0, 0, 0, 0, 0], "arena_spawn_rate": 20.0,
         "theme": "throne", "tint": (1.0, 1.0, 1.0), "is_boss_level": True, "is_final_boss": True,
         "boss_scene": "res://src/enemies/boss/boss_demon.tscn", "boss_room": "throne room"}),
+    # The other bosses: each can take its kind's place in a run (run_config.tres boss_pool).
+    ("grove", "Toadstool Hollow", grove, {
+        "enemy_weights": {"swarmer": 1.0, "brute": 0.08, "exploder": 0.06, "sporeling": 0.24},
+        "hp_multiplier": 2.0, "corridor_cap_fraction": 0.3, "corridor_spawn_rate": 12.0,
+        "arena_quotas": [0], "arena_spawn_rate": 20.0, "theme": "grove", "tint": (1.0, 1.0, 1.0),
+        "is_boss_level": True, "boss_scene": "res://src/enemies/boss/toadstool_tyrant.tscn", "boss_room": "hollow"}),
+    ("cistern", "The Sunken Cistern", cistern, {
+        "enemy_weights": {"swarmer": 1.0, "brute": 0.08, "exploder": 0.06, "eel": 0.24},
+        "hp_multiplier": 2.0, "corridor_cap_fraction": 0.3, "corridor_spawn_rate": 12.0,
+        "arena_quotas": [0], "arena_spawn_rate": 20.0, "theme": "cistern", "tint": (1.0, 1.0, 1.0),
+        "is_boss_level": True, "boss_scene": "res://src/enemies/boss/mire_serpent.tscn", "boss_room": "cistern"}),
+    ("mycelium", "The Mycelium Deep", mycelium, {
+        "enemy_weights": {"swarmer": 1.0, "exploder": 0.1, "puffball": 0.3},
+        "hp_multiplier": 3.2, "corridor_cap_fraction": 0.0, "corridor_spawn_rate": 0.0,
+        "arena_quotas": [0], "arena_spawn_rate": 20.0,
+        "theme": "mycelium", "tint": (1.0, 1.0, 1.0), "is_boss_level": True, "is_final_boss": True,
+        "boss_scene": "res://src/enemies/boss/spore_mother.tscn", "boss_room": "deep"}),
+    ("glacier", "The Frozen Court", glacier, {
+        "enemy_weights": {"swarmer": 1.0, "exploder": 0.1, "frost_wraith": 0.3},
+        "hp_multiplier": 3.2, "corridor_cap_fraction": 0.0, "corridor_spawn_rate": 0.0,
+        "arena_quotas": [0], "arena_spawn_rate": 20.0,
+        "theme": "glacier", "tint": (1.0, 1.0, 1.0), "is_boss_level": True, "is_final_boss": True,
+        "boss_scene": "res://src/enemies/boss/frost_queen.tscn", "boss_room": "court"}),
     ("level_1b", "Crypt Entrance", level1b, None),
     ("level_2b", "Flooded Halls", level2b, None),
     ("level_3b", "Bone Pits", level3b, None),

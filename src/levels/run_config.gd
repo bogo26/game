@@ -3,13 +3,18 @@ extends Resource
 ## The sequence of levels in a run (src/levels/run_config.tres): levels 1-3,
 ## the mini boss, levels 4-6 and the final boss. Each level may have a second
 ## layout; every run picks one per level and randomly mirrors it (boss levels
-## only left-right), so the run isn't memorised.
+## only left-right), so the run isn't memorised. The boss levels come from
+## pools: every run meets one of the mini bosses and one of the final bosses,
+## each in a level of its own.
 
 const PATH := "res://src/levels/run_config.tres"
 
 @export var levels: Array[LevelData] = []
 ## Second layouts: alternates[i] can stand in for levels[i] (null = none).
 @export var alternates: Array[LevelData] = []
+## Other boss levels: each can stand in for the boss level in `levels` of the
+## same kind (mini or final boss).
+@export var boss_pool: Array[LevelData] = []
 
 
 ## Every layout a run can use (tests check them all).
@@ -19,17 +24,34 @@ func all_layouts() -> Array[LevelData]:
 	for data in alternates:
 		if data:
 			out.append(data)
+	out.append_array(boss_pool)
+	return out
+
+
+## The levels that can be level `index` of a run: a boss level's whole pool
+## (the one in `levels` first), otherwise just that level.
+func choices(index: int) -> Array[LevelData]:
+	var data := levels[index]
+	var out: Array[LevelData] = [data]
+	if data.is_boss_level:
+		for other in boss_pool:
+			if other.is_final_boss == data.is_final_boss:
+				out.append(other)
 	return out
 
 
 ## The layout for level `index` of a run seeded with `seed_value`: which
-## layout and how it's mirrored come from the seed, so a run is repeatable.
+## layout (or which boss) and how it's mirrored come from the seed, so a run
+## is repeatable.
 func layout_for(index: int, seed_value: int) -> LevelData:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(seed_value * 7919 + index)
 	var data := levels[index]
 	if index < alternates.size() and alternates[index] and rng.randf() < 0.5:
 		data = alternates[index]
+	elif data.is_boss_level:
+		var bosses := choices(index)
+		data = bosses[rng.randi_range(0, bosses.size() - 1)]
 	var flip_h := rng.randf() < 0.5
 	var flip_v := rng.randf() < 0.5 and not data.is_boss_level
 	return data.mirrored(flip_h, flip_v)

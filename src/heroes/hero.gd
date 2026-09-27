@@ -36,6 +36,9 @@ const LOW_HP_COLOR := Color(1.0, 0.16, 0.2)
 ## How long the HUD flashes a bar after a press it couldn't act on / when an
 ## ability comes back.
 const DENIED_TIME := 0.25
+## Chilled (the Frost Queen's frost): walks this much slower, tinted icy.
+const CHILL_SPEED := 0.6
+const CHILL_TINT := Color(0.72, 0.9, 1.35)
 const READY_FLASH_TIME := 0.3
 
 var slot := 0
@@ -63,6 +66,8 @@ var invulnerable_time := 0.0
 ## 0..1; the ultimate is usable at 1.
 var ult_charge := 0.0
 var revive_progress := 0.0
+## Seconds left chilled (slowed; see chill()).
+var chill_time := 0.0
 ## Seconds left showing the "P1" tag (HeroOverlay).
 var tag_time := TAG_TIME
 ## Seconds left of the gold shimmer that shows a fresh revive's invulnerability.
@@ -235,6 +240,7 @@ func tick(delta: float) -> void:
 	invulnerable_time = maxf(0.0, invulnerable_time - delta)
 	tag_time = maxf(0.0, tag_time - delta)
 	revive_shield = maxf(0.0, revive_shield - delta)
+	chill_time = maxf(0.0, chill_time - delta)
 	for k in 4:
 		denied_time[k] = maxf(0.0, denied_time[k] - delta)
 		ready_flash[k] = maxf(0.0, ready_flash[k] - delta)
@@ -329,7 +335,14 @@ func _update_low_hp() -> void:
 
 func _speed_factor() -> float:
 	var terrain := world.grid.speed_factor_at(position) if world and world.grid else 1.0
-	return buff_product(&"move_speed_factor") * terrain
+	var chilled := CHILL_SPEED if chill_time > 0.0 else 1.0
+	return buff_product(&"move_speed_factor") * terrain * chilled
+
+
+## Slows the hero for `seconds` (a longer chill replaces a shorter one).
+func chill(seconds: float) -> void:
+	if state == State.ALIVE:
+		chill_time = maxf(chill_time, seconds)
 
 
 ## Product of a buff hook (e.g. &"damage_factor") over all four abilities,
@@ -479,6 +492,7 @@ func go_down() -> void:
 	_low_hp = false
 	revive_progress = 0.0
 	dash_time_left = 0.0
+	chill_time = 0.0
 	velocity = Vector2.ZERO
 	for ability in abilities:
 		ability.cancel()
@@ -541,6 +555,8 @@ func _update_visuals(delta: float) -> void:
 			sprite.modulate = Color(1, 1, 1, 0.7)  # steady instead of blinking
 		else:
 			sprite.modulate = Color(1, 1, 1, 0.55 if int(invulnerable_time * 20.0) % 2 == 0 else 1.0)
+	elif state == State.ALIVE and chill_time > 0.0:
+		sprite.modulate = CHILL_TINT
 	else:
 		sprite.modulate = Color.WHITE
 	var outline := color

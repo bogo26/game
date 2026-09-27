@@ -43,6 +43,10 @@ const SHOT_ORIGIN := Vector2(0, -8)
 const HERO_BODY := Vector2(0, -6)  # Hero.SPRITE_FEET_OFFSET
 ## Weaving flyers (bats) swing from side to side at this rate (radians/s).
 const WEAVE_RATE := 6.0
+## Hoppers (sporelings) spend this share of each hop in the air, going this
+## many times their speed, and sit still for the rest.
+const HOP_AIR := 0.55
+const HOP_BOOST := 1.8
 ## Chargers: a charge that ends in the open leaves them catching their breath
 ## this long; one that ends in a wall dazes them for longer. A charge hits
 ## this many times harder than a touch.
@@ -104,6 +108,11 @@ var frozen := PackedFloat32Array()        # seconds left frozen solid (also stun
 var ice_power := PackedFloat32Array()     # hit damage behind the frost (shatter nova)
 var status_time := PackedFloat32Array()   # longest status left; 0 = none (fast skip)
 var status_flags := PackedByteArray()
+## Bosses: 1 while out of reach (under the ground or the water) - nothing
+## hits, finds or touches it - and the share of every hit it shrugs off
+## while shielded (0 = none).
+var hidden := PackedByteArray()
+var guard := PackedFloat32Array()
 
 # Per-type tables (index = type id).
 var types: Array[EnemyData] = []
@@ -133,6 +142,7 @@ var t_weave := PackedFloat32Array()
 var t_flying := PackedByteArray()
 var t_charge_speed := PackedFloat32Array()
 var t_charge_time := PackedFloat32Array()
+var t_hop := PackedFloat32Array()         # hops per second (0: walks)
 ## 1 for types that never walk on their own (bosses, breakable objects, nests, bone piles).
 var t_static := PackedByteArray()
 var t_scale := PackedFloat32Array()      # drawn size (elites are bigger)
@@ -250,6 +260,8 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	ice_power.resize(CAPACITY)
 	status_time.resize(CAPACITY)
 	status_flags.resize(CAPACITY)
+	hidden.resize(CAPACITY)
+	guard.resize(CAPACITY)
 	count = 0
 	t_speed.clear()
 	t_radius.clear()
@@ -277,6 +289,7 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	t_flying.clear()
 	t_charge_speed.clear()
 	t_charge_time.clear()
+	t_hop.clear()
 	t_static.clear()
 	t_scale.clear()
 	t_elite.clear()
@@ -309,6 +322,7 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 		t_flying.append(1 if data.flying else 0)
 		t_charge_speed.append(data.charge_speed)
 		t_charge_time.append(data.charge_time)
+		t_hop.append(data.hop)
 		t_static.append(1 if data.is_static() else 0)
 		t_scale.append(data.draw_scale)
 		t_elite.append(data.elite_trait)
@@ -373,6 +387,8 @@ func spawn(type_id: int, p: Vector2, hp_multiplier: float = 1.0) -> int:
 	ice_power[i] = 0.0
 	status_time[i] = 0.0
 	status_flags[i] = 0
+	hidden[i] = 0
+	guard[i] = 0.0
 	_type_count[type_id] += 1
 	hurt_max_half_width = maxf(hurt_max_half_width, t_hurt_half_width[type_id])
 	hurt_max_height = maxf(hurt_max_height, t_hurt_height[type_id])
@@ -424,13 +440,14 @@ func alive_count() -> int:
 func damage(i: int, amount: float, knockback: Vector2, source_slot: int, crit: bool = false,
 		at: Vector2 = Vector2.INF) -> bool:
 	var h := hp[i]
-	if h <= 0.0 or fall[i] > 0.0:
+	if h <= 0.0 or fall[i] > 0.0 or hidden[i] != 0:
 		return false
 	if source_slot >= 0:
 		last_slot[i] = source_slot
 	if mark[i] > 0.0 and not crit:
 		amount *= MARK_DAMAGE_MULT
 		crit = true
+	amount *= 1.0 - guard[i]
 	var remaining := h - amount
 	hp[i] = remaining
 	flash[i] = FLASH_TIME
@@ -459,9 +476,10 @@ func damage(i: int, amount: float, knockback: Vector2, source_slot: int, crit: b
 
 # --- elemental statuses --------------------------------------------------------------------
 
-## Scenery (barrels, urns) and enemies on their way down a chasm don't burn.
+## Scenery (barrels, urns), enemies on their way down a chasm and bosses out
+## of reach don't burn.
 func can_take_status(i: int) -> bool:
-	return hp[i] > 0.0 and fall[i] <= 0.0 and t_behavior[type[i]] != EnemyData.Behavior.OBJECT
+	return hp[i] > 0.0 and fall[i] <= 0.0 and hidden[i] == 0 and t_behavior[type[i]] != EnemyData.Behavior.OBJECT
 
 
 ## Sets it on fire: `dps` for `seconds` (a stronger or longer burn replaces
@@ -694,6 +712,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	var flying_t := t_flying
 	var charge_speed_t := t_charge_speed
 	var charge_time_t := t_charge_time
+	var hop_t := t_hop
 	var static_t := t_static
 	var head := hash.head
 	var nxt := hash.next
@@ -758,6 +777,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 			if fz > 0.0:
 				FRZ[i] = fz - dt
 			if dot > 0.0:
+				dot *= 1.0 - guard[i]  # a shielded boss shrugs most of it off
 				var before := HP[i]
 				HP[i] = before - dot
 				var slot := last_slot[i]
@@ -930,6 +950,10 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 			if wv > 0.0 and desired != Vector2.ZERO:
 				desired = (desired + desired.orthogonal() * (wv * sin(AN[i] * WEAVE_RATE))).normalized()
 			var spd := move_speed
+			var hop := hop_t[t]
+			if hop > 0.0:
+				# Hoppers leap (faster than they'd walk), then sit a moment.
+				spd *= HOP_BOOST if fmod(AN[i] * hop, 1.0) < HOP_AIR else 0.0
 			if sl > 0.0:
 				spd *= SLOW_FACTOR
 			if ci >= 0 and ci < ncells and terr[ci] == LevelGrid.Terrain.WATER:
@@ -1131,6 +1155,8 @@ func _remove_at(i: int) -> void:
 		ice_power[i] = ice_power[last]
 		status_time[i] = status_time[last]
 		status_flags[i] = status_flags[last]
+		hidden[i] = hidden[last]
+		guard[i] = guard[last]
 	count = last
 
 
@@ -1142,7 +1168,7 @@ func query_circle(center: Vector2, radius: float, out: PackedInt32Array) -> int:
 	_scratch.clear()
 	hash.gather(center, radius + max_radius, _scratch)
 	for j in _scratch:
-		if j < count and hp[j] > 0.0 and fall[j] <= 0.0:
+		if j < count and hp[j] > 0.0 and fall[j] <= 0.0 and hidden[j] == 0:
 			var rr := radius + t_radius[type[j]]
 			if center.distance_squared_to(pos[j]) <= rr * rr:
 				out.append(j)
@@ -1173,7 +1199,7 @@ func nearest(center: Vector2, max_distance: float, include_objects: bool = true)
 	var best := -1
 	var best_d2 := max_distance * max_distance
 	for j in _scratch:
-		if j < count and hp[j] > 0.0 and fall[j] <= 0.0 \
+		if j < count and hp[j] > 0.0 and fall[j] <= 0.0 and hidden[j] == 0 \
 				and (include_objects or t_behavior[type[j]] != EnemyData.Behavior.OBJECT):
 			var d2 := center.distance_squared_to(pos[j])
 			if d2 < best_d2:
@@ -1189,7 +1215,7 @@ func contact_damage_at(center: Vector2, body_radius: float) -> float:
 	hash.gather(center, body_radius + max_radius, _scratch)
 	var worst := 0.0
 	for j in _scratch:
-		if j < count and hp[j] > 0.0 and stun[j] <= 0.0 and fall[j] <= 0.0:
+		if j < count and hp[j] > 0.0 and stun[j] <= 0.0 and fall[j] <= 0.0 and hidden[j] == 0:
 			var t := type[j]
 			var rr := body_radius + t_radius[t]
 			if center.distance_squared_to(pos[j]) <= rr * rr:
@@ -1198,6 +1224,14 @@ func contact_damage_at(center: Vector2, body_radius: float) -> float:
 					d *= CHARGE_HIT_MULT
 				worst = maxf(worst, d)
 	return worst * damage_mult
+
+
+## A hopper's atlas column for where it is in its hop (0..1): sitting, then
+## squashed as it lands; stretched taking off and coming down, tucked up high.
+static func hop_frame(phase: float) -> int:
+	if phase >= HOP_AIR:
+		return 1 if phase < HOP_AIR + 0.1 else 0
+	return 2 if phase < 0.12 or phase > HOP_AIR - 0.12 else 3
 
 
 ## True while enemy `i` is charging (chargers).
@@ -1284,7 +1318,9 @@ func render(layer: InstanceLayer) -> void:
 				frame += 4 + int(AN[i] * 16.0) % 2  # rattling: about to get up
 		elif STN[i] <= 0.0:
 			var ci := int(p.y * INV_TILE) * gw + int(p.x * INV_TILE)
-			if t_water[t] > 1.0 and ci >= 0 and ci < ncells and terr[ci] == LevelGrid.Terrain.WATER:
+			if t_hop[t] > 0.0:
+				frame += hop_frame(fmod(AN[i] * t_hop[t], 1.0))
+			elif t_water[t] > 1.0 and ci >= 0 and ci < ncells and terr[ci] == LevelGrid.Terrain.WATER:
 				frame += 4 + int(AN[i] * fps[t]) % 2  # swimming
 			else:
 				frame += int(AN[i] * fps[t]) % frames[t]

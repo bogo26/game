@@ -19,7 +19,7 @@ enum OnDeath {
 	NONE,
 	EXPLODE,  ## blasts enemies (and other objects) in explosion_radius
 	LOOT,     ## scatters loot_xp worth of XP gems, sometimes a heart
-	SPORES,   ## leaves a spore cloud (explosion_radius, cloud_time) that hurts heroes inside
+	SPORES,   ## leaves a spore cloud (explosion_radius, cloud_time) that hurts heroes inside (cloud_damage)
 	BONES,    ## collapses into a bone pile that gets back up unless it's smashed
 }
 ## What a RANGED enemy fires.
@@ -52,6 +52,9 @@ enum Shot {
 @export var swim_speed := 0.0
 ## Flutters from side to side as it goes (a share of its speed).
 @export var weave := 0.0
+## > 0: gets about in hops, this many a second, sitting still between them
+## (atlas columns 0-3: sitting, landing, taking off, up high).
+@export var hop := 0.0
 ## Spawns in packs of this many.
 @export var pack := 1
 
@@ -73,8 +76,10 @@ enum Shot {
 
 @export_group("Breakables and remains")
 @export var loot_xp := 0
-## SPORES: how long the cloud lasts (it hurts for explosion_damage a tick).
+## SPORES: how long the cloud lasts, and what it hurts a hero standing in
+## it each time (their invulnerability after a hit spaces the ticks out).
 @export var cloud_time := 4.0
+@export var cloud_damage := 6.0
 ## PILE: seconds until it gets back up.
 @export var reform_time := 4.0
 

@@ -39,6 +39,17 @@ const ENEMY_TYPES: Array[String] = [
 	"res://src/enemies/data/frost_boar.tres",
 	"res://src/enemies/data/salamander.tres",
 	"res://src/enemies/data/imp.tres",
+	# The other bosses (a run meets one mini boss and one final boss), each
+	# with the servant that's its level's own enemy, and the Spore Mother's pods:
+	"res://src/enemies/data/toadstool_tyrant.tres",
+	"res://src/enemies/data/sporeling.tres",
+	"res://src/enemies/data/mire_serpent.tres",
+	"res://src/enemies/data/eel.tres",
+	"res://src/enemies/data/spore_mother.tres",
+	"res://src/enemies/data/spore_pod.tres",
+	"res://src/enemies/data/puffball.tres",
+	"res://src/enemies/data/frost_queen.tres",
+	"res://src/enemies/data/frost_wraith.tres",
 ]
 const HORDE_ATLAS := preload("res://assets/sprites/enemies/horde_atlas.png")
 const FX_ATLAS := preload("res://assets/sprites/fx/fx_atlas.png")
@@ -53,7 +64,10 @@ const ENEMY_COLORS := {
 	&"bone_colossus": Color(0.9, 0.86, 0.72), &"bat": Color(0.5, 0.38, 0.6), &"drowned": Color(0.36, 0.62, 0.6),
 	&"bone_archer": Color(0.9, 0.88, 0.78), &"revenant": Color(0.82, 0.84, 0.8), &"bone_pile": Color(0.86, 0.82, 0.7),
 	&"sporecap": Color(0.92, 0.4, 0.66), &"frost_boar": Color(0.7, 0.85, 1.0), &"salamander": Color(1.0, 0.5, 0.18),
-	&"imp": Color(0.88, 0.22, 0.3),
+	&"imp": Color(0.88, 0.22, 0.3), &"toadstool_tyrant": Color(0.86, 0.3, 0.26), &"sporeling": Color(0.95, 0.55, 0.45),
+	&"mire_serpent": Color(0.34, 0.58, 0.46), &"eel": Color(0.4, 0.55, 0.34), &"spore_mother": Color(0.78, 0.42, 0.78),
+	&"spore_pod": Color(0.84, 0.46, 0.78), &"puffball": Color(0.9, 0.86, 0.78), &"frost_queen": Color(0.72, 0.88, 1.0),
+	&"frost_wraith": Color(0.66, 0.84, 1.0),
 }
 const MAX_SPARKS_PER_FRAME := 40
 const MAX_PUFFS_PER_FRAME := 30
@@ -95,12 +109,15 @@ const BLESSING_TIME := 30.0
 const WRATH_DAMAGE := 60.0
 ## A revenant collapses into one of these (EnemyData.OnDeath.BONES).
 const BONE_PILE := &"bone_pile"
-## Enemy hazards on the ground: sporecaps' spore clouds, and the slag a
-## salamander's bomb leaves burning (for this long, a share of its blast a hit).
+## Enemy hazards on the ground: sporecaps' spore clouds, and what lobbed
+## bombs leave behind (for this long, a share of the blast a hit): burning
+## slag (salamanders) or a spore cloud (the mushroom bosses).
 const SPORE_COLOR := Color(1.0, 0.36, 0.72)
 const SLAG_COLOR := Color(1.0, 0.45, 0.18)
 const SLAG_TIME := 1.5
 const SLAG_DAMAGE_SHARE := 0.35
+const SPORE_LOB_TIME := 3.0
+const SPORE_LOB_SHARE := 0.4
 ## How high a lobbed bomb flies.
 const LOB_HEIGHT := 26.0
 
@@ -178,7 +195,8 @@ var _lit_fuses := PackedInt32Array()
 var _lit_hints := PackedInt32Array()
 ## Enemy hazards on the ground: [position, radius, seconds left, damage a hit, colour].
 var _hazards: Array[Array] = []
-## Lobbed bombs in the air: [landing spot, seconds left, blast radius, damage].
+## Lobbed bombs in the air: [landing spot, seconds left, blast radius, damage,
+## what it leaves (&"slag" or &"spores")].
 var _lobs: Array[Array] = []
 ## Aimed shooters and chargers winding up (uids), and where they were last seen.
 var _aimers := PackedInt32Array()
@@ -942,10 +960,7 @@ func _play_horde_events() -> void:
 		if view.has_point(p):
 			Audio.play(&"rattle")
 	for k in horde.lob_from.size():
-		var land := horde.lob_to[k]
-		_lobs.append([land, HordeSim.LOB_TIME, horde.lob_radius[k], horde.lob_damage[k]])
-		fx.lob(horde.lob_from[k], land, LOB_HEIGHT, FxLayer.DANGER, HordeSim.LOB_TIME)
-		warn_fx.telegraph(land, horde.lob_radius[k] + Hero.RADIUS, FxLayer.DANGER, HordeSim.LOB_TIME)
+		lob(horde.lob_from[k], horde.lob_to[k], horde.lob_radius[k], horde.lob_damage[k])
 	if not horde.lob_from.is_empty():
 		Audio.play(&"lob")
 	for k in horde.blink_from.size():
@@ -967,23 +982,39 @@ func _play_horde_events() -> void:
 	horde.clear_event_logs()
 
 
+## A bomb lobbed from `from` to `to`, with its landing circle shown until it
+## lands `flight` seconds later: a burst of `damage` in `radius`, then what
+## it leaves (&"slag" burns for a moment, &"spores" hang in a cloud).
+func lob(from: Vector2, to: Vector2, radius: float, damage: float, remains: StringName = &"slag",
+		flight: float = HordeSim.LOB_TIME) -> void:
+	_lobs.append([to, flight, radius, damage, remains])
+	fx.lob(from, to, LOB_HEIGHT, FxLayer.DANGER, flight)
+	warn_fx.telegraph(to, radius + Hero.RADIUS, FxLayer.DANGER, flight)
+
+
 ## Lobbed bombs land where their telegraph said: a burst that hurts heroes it
-## reaches (walls stop it), then burning slag for a moment.
+## reaches (walls stop it), then burning slag or a spore cloud.
 func _update_lobs(dt: float) -> void:
 	var k := 0
 	while k < _lobs.size():
-		var lob := _lobs[k]
-		lob[1] = float(lob[1]) - dt
-		if float(lob[1]) > 0.0:
+		var bomb := _lobs[k]
+		bomb[1] = float(bomb[1]) - dt
+		if float(bomb[1]) > 0.0:
 			k += 1
 			continue
 		_lobs.remove_at(k)
-		var p: Vector2 = lob[0]
-		var r: float = lob[2]
-		var damage: float = lob[3]
+		var p: Vector2 = bomb[0]
+		var r: float = bomb[2]
+		var damage: float = bomb[3]
 		for hero in heroes:
 			if hero.position.distance_to(p) <= r + Hero.RADIUS and grid.line_of_sight(p, hero.position):
 				hero.take_hit(damage)
+		if bomb[4] == &"spores":
+			add_hazard(p, r * 0.9, SPORE_LOB_TIME, damage * SPORE_LOB_SHARE, SPORE_COLOR)
+			fx.disc(p, r, Color(SPORE_COLOR, 0.6), 0.25)
+			particles.burst(p - Vector2(0, 4), 14, SPORE_COLOR, 80.0, 0.8, 3, Vector2.UP, PI, -20.0)
+			Audio.play(&"spores")
+			continue
 		add_hazard(p, r * 0.8, SLAG_TIME, damage * SLAG_DAMAGE_SHARE, SLAG_COLOR)
 		fx.disc(p, r, Color(1.0, 0.5, 0.2, 0.7), 0.2)
 		fx.ring(p, r * 1.1, Color(1.0, 0.85, 0.5), 0.25)
@@ -1021,7 +1052,7 @@ func _update_hazards(dt: float) -> void:
 ## A sporecap burst: a cloud that hurts heroes standing in it.
 func _release_spores(p: Vector2, t: int) -> void:
 	var data := horde.types[t]
-	add_hazard(p, data.explosion_radius, data.cloud_time, data.explosion_damage * horde.damage_mult, SPORE_COLOR)
+	add_hazard(p, data.explosion_radius, data.cloud_time, data.cloud_damage * horde.damage_mult, SPORE_COLOR)
 	particles.burst(p - Vector2(0, 6), 16, SPORE_COLOR, 70.0, 0.8, 3, Vector2.UP, PI, -20.0)
 	Audio.play(&"spores")
 

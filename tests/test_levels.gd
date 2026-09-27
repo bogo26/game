@@ -33,6 +33,19 @@ func test_run_config_lists_the_run() -> void:
 	for index in last:
 		assert_true(run.levels[index + 1].hp_multiplier > run.levels[index].hp_multiplier,
 			"%s is tougher than %s" % [run.levels[index + 1].display_name, run.levels[index].display_name])
+	# The boss pools: three mini bosses and three final bosses, each in a level
+	# of its own, as tough as the boss level it stands in for.
+	var scenes := {3: [], last: []}
+	for index: int in scenes:
+		for data in run.choices(index):
+			assert_true(data.is_boss_level, "%s is a boss level" % data.display_name)
+			assert_eq(data.is_final_boss, index == last, "%s: in the right pool" % data.display_name)
+			assert_eq(data.hp_multiplier, run.levels[index].hp_multiplier, "%s: as tough as %s"
+				% [data.display_name, run.levels[index].display_name])
+			scenes[index].append(data.boss_scene.get_file().get_basename())
+	assert_eq(scenes[3], ["bone_colossus", "toadstool_tyrant", "mire_serpent"], "the mini bosses")
+	assert_eq(scenes[last], ["boss_demon", "spore_mother", "frost_queen"], "the final bosses")
+	assert_eq(run.choices(0).size(), 1, "a regular level is just itself")
 
 
 func test_every_level_is_connected_and_complete() -> void:
@@ -71,11 +84,19 @@ func test_runs_pick_their_layouts_from_the_seed() -> void:
 		if run.layout_for(0, seed_value).layout != a:
 			different = true
 	assert_true(different, "other runs get other layouts")
+	var met := {}
 	for seed_value in range(1, 40):
 		for index in run.levels.size():
 			var picked := run.layout_for(index, seed_value)
 			assert_eq(picked.is_boss_level, run.levels[index].is_boss_level, "boss levels stay boss levels")
-			assert_eq(picked.display_name, run.levels[index].display_name, "and every level stays itself")
+			assert_eq(picked.is_final_boss, run.levels[index].is_final_boss, "and the final boss stays last")
+			var names: Array[String] = []
+			for data in run.choices(index):
+				names.append(data.display_name)
+			assert_true(picked.display_name in names, "every level stays itself (or its boss's pool)")
+			met[picked.display_name] = true
+	for data in run.boss_pool:
+		assert_true(met.has(data.display_name), "runs meet %s too" % data.display_name)
 
 
 func _check_level(data: LevelData) -> void:
@@ -285,6 +306,10 @@ func test_bots_can_finish_every_level() -> void:
 			var mirrored := alternate.mirrored(true, true)
 			mirrored.display_name += " (second layout, mirrored)"
 			playthroughs.append(mirrored)
+	for boss in run.boss_pool:
+		var mirrored := boss.mirrored(true, false)
+		mirrored.display_name += " (mirrored)"
+		playthroughs.append(mirrored)
 	for index in playthroughs.size():
 		var data: LevelData = playthroughs[index]
 		var world := _run_world(data, [&"knight", &"ranger", &"mage", &"cleric"])

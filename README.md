@@ -65,11 +65,22 @@ The macOS build runs on your own Mac; other people have to right-click → Open 
    | 1 | Crypt Entrance | spike traps, barrels, urns | **Bats**: fast, frail, weaving flocks of three |
    | 2 | Flooded Halls | water, nests | **Drowned**: slow on land, fast in water |
    | 3 | Bone Pits | chasms and bridges | **Bone archers**: show their aim as a line, then shoot along it |
-   | Mini boss | The Ossuary | the **Bone Colossus**: club sweeps, grave spikes, and once enraged, leaps and risen dead. Beat it to open the way on. | **Revenants**: fall apart into bone piles that get back up unless smashed |
+   | Mini boss | *one of three bosses (below)* | beat it to open the way on | its servants |
    | 4 | Fungal Caverns | toxic pools, spore nests | **Sporecaps**: burst into spore clouds when killed |
    | 5 | Frozen Vaults | crevasses, slush, spike galleries | **Frost boars**: charge down a marked lane, into walls or over crevasse edges |
    | 6 | Molten Forge | lava channels, powder kegs, four arenas | **Salamanders**: lob molten slag where you stand |
-   | Final boss | Demon's Throne | the **Demon Lord**: beat it to win the run | **Imps**, its servants: blink to your side through small portals |
+   | Final boss | *one of three bosses (below)* | beat it to win the run | its servants |
+
+   Every run meets one of three mini bosses and one of three final bosses, each in a level of its own:
+
+   | | Level | Boss | Its own enemy |
+   |---|---|---|---|
+   | Mini boss | The Ossuary | the **Bone Colossus**: club sweeps, grave spikes, and once enraged, leaps and risen dead | **Revenants**: fall apart into bone piles that get back up unless smashed |
+   | Mini boss | Toadstool Hollow | the **Toadstool Tyrant**, a giant toadstool: bounces onto you hop after hop, puffs rings of spore clouds, and once enraged, lobs spore bombs | **Sporelings**: little mushrooms that hop |
+   | Mini boss | The Sunken Cistern | the **Mire Serpent**: dives out of reach, hunts you as a fin and bursts up under you; spits and lunges when it surfaces | **Eels**: slither, and swim fast through the channels |
+   | Final boss | Demon's Throne | the **Demon Lord**: fireball fans, slams, fire rings and charges | **Imps**, its servants: blink to your side through small portals |
+   | Final boss | The Mycelium Deep | the **Spore Mother**, a towering fungus: shielded by spore pods until you burst them; roots, spore rain, spore spirals and fairy rings | **Puffballs**: burst into spore clouds |
+   | Final boss | The Frozen Court | the **Frost Queen**: ice lances, frost novas to dash through, icicle hail, a sweeping beam and blizzards; her frost slows you | **Frost wraiths**: flying ghosts that shoot ice |
 
 Things to use in the levels:
 - **Barrels** explode and chain; they hurt enemies, never heroes.
@@ -91,9 +102,11 @@ Upgrades include four **elemental chains** for your attack: fire, ice, poison an
 
 **Replaying:** pick Casual, Normal or Hard in character select (LB / RB or Q / E; Hard unlocks after a Normal win). Every run picks one of two layouts for each regular level and may mirror it, and from the second level on some enemies arrive as elites (Swift, Volatile, Splitting). The end screen shows everyone's numbers and awards, and records best times.
 
-Debug flags (after `--`): `--level=3` (the run's 1-based position: `--level=4` is the mini boss, `--level=8` the final boss), `--bots=4`, `--heroes=rogue,mage`, `--layout=b`, `--mirror=hv`, `--elite-chance=0.3`, `--debug-levelups=2`, `--show-map`.
+Debug flags (after `--`): `--level=3` (the run's 1-based position: `--level=4` is the mini boss, `--level=8` the final boss), `--boss=grove` (which boss: `lair`, `grove` or `cistern` for the mini boss, `boss`, `mycelium` or `glacier` for the final one), `--bots=4`, `--heroes=rogue,mage`, `--layout=b`, `--mirror=hv`, `--elite-chance=0.3`, `--debug-levelups=2`, `--show-map`.
 
 ## Status
+
+Milestone 14 (more bosses) is done: every run now meets one of three mini bosses and one of three final bosses. New are the Toadstool Tyrant and the Mire Serpent (mini bosses) and the Spore Mother and the Frost Queen (final bosses), each with a level, tile theme, sounds and servant enemy of its own (sporelings, eels, puffballs, frost wraiths).
 
 Milestone 13 (level enemies) is done: eight new enemies, one of its own for every level (bats, drowned, bone archers, revenants, sporecaps, frost boars, salamanders, imps), each with its own behaviour, art, sounds and warnings; the Bone Colossus raises revenants and the Demon Lord summons imps.
 

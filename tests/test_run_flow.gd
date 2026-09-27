@@ -146,32 +146,40 @@ func test_rounds_earned_as_a_level_ends_carry_over() -> void:
 
 
 func test_the_mini_boss_does_not_end_the_run() -> void:
-	InputRouter.unassign_all()
-	GameState.clear_players()
-	GameState.reset_run()
-	for i in 2:
-		InputRouter.assign(i, PlayerInput.DEVICE_BOT)
-		GameState.slots[i].hero_id = &"knight"
-	GameState.level_index = 3
-	var game: Node = (load(GAME_SCENE) as PackedScene).instantiate()
-	_tree().root.add_child(game)
-	assert_eq((game.get_node("%Banner") as Label).text, "MINI BOSS")
-	assert_eq((game.get_node("%BannerSub") as Label).text, "The Ossuary")
-	var world: World = game.get("world")
-	var room: LevelDirector.Room = world.director.rooms[0]
-	for hero in world.heroes:
-		hero.god_mode = true
-		hero.position = world.grid.nearest_open(room.center + Vector2(0, 60))
-	for f in 2:
-		world._process(DT)
-	assert_true(world.boss is BoneColossus)
-	world.horde.damage(world.horde.index_of_uid(world.boss.uid), 1e9, Vector2.ZERO, 0)
-	for f in 3:
-		world._process(DT)
-	assert_true(world.boss == null, "the Colossus is dead")
-	assert_false(game.get("_ending"), "but the run goes on")
-	assert_true(world.director.exit_open, "through the exit behind its hall")
-	_teardown(game)
+	# Whichever mini boss the run meets.
+	var run := RunConfig.load_default()
+	for choice in run.choices(3):
+		InputRouter.unassign_all()
+		GameState.clear_players()
+		GameState.reset_run()
+		for i in 2:
+			InputRouter.assign(i, PlayerInput.DEVICE_BOT)
+			GameState.slots[i].hero_id = &"knight"
+		GameState.level_index = 3
+		var seed_value := 1
+		while run.layout_for(3, seed_value).display_name != choice.display_name:
+			seed_value += 1
+		GameState.run_seed = seed_value
+		var game: Node = (load(GAME_SCENE) as PackedScene).instantiate()
+		_tree().root.add_child(game)
+		assert_eq((game.get_node("%Banner") as Label).text, "MINI BOSS")
+		assert_eq((game.get_node("%BannerSub") as Label).text, choice.display_name)
+		var world: World = game.get("world")
+		var room: LevelDirector.Room = world.director.rooms[0]
+		for hero in world.heroes:
+			hero.god_mode = true
+			hero.position = world.grid.nearest_open(room.center + Vector2(0, 60))
+		for f in 2:
+			world._process(DT)
+		assert_true(world.boss != null and world.boss.scene_file_path == choice.boss_scene,
+			"%s: its boss woke up" % choice.display_name)
+		world.horde.damage(world.horde.index_of_uid(world.boss.uid), 1e9, Vector2.ZERO, 0)
+		for f in 3:
+			world._process(DT)
+		assert_true(world.boss == null, "%s: the boss is dead" % choice.display_name)
+		assert_false(game.get("_ending"), "but the run goes on")
+		assert_true(world.director.exit_open, "through the exit behind its room")
+		_teardown(game)
 	GameState.level_index = 0
 
 

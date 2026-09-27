@@ -8,7 +8,8 @@ extends Node2D
 ## fuses, archers' aim lines and chargers' bands follow their enemy and vanish
 ## when it dies).
 
-enum Kind { RING, DISC, SLASH, LINE, TELEGRAPH, ZONE, WARN_LINE, BOLT, WARN_BAND, DOT_RING, PORTAL, WARN_ARC, LOB }
+enum Kind { RING, DISC, SLASH, LINE, TELEGRAPH, ZONE, WARN_LINE, BOLT, WARN_BAND, DOT_RING, PORTAL, WARN_ARC, LOB,
+	NOVA, BEAM, WARN_RING }
 
 ## Everything hostile warns in this colour (enemy shots use it too).
 const DANGER := Color(1.0, 0.24, 0.5)
@@ -102,6 +103,12 @@ func warn_arc(p: Vector2, radius: float, angle: float, arc: float, color: Color,
 	_add(Kind.WARN_ARC, p, p, radius, duration, angle, arc, color)
 
 
+## Warning ring `width` px wide centred on `radius` around p, filling up
+## until it erupts - exactly where it will hit.
+func warn_ring(p: Vector2, radius: float, width: float, color: Color, duration: float) -> void:
+	_add(Kind.WARN_RING, p, p, radius, duration, 0.0, width, color)
+
+
 ## A ring of `dots` points turning around p (a ring of shots is coming).
 func dot_ring(p: Vector2, radius: float, dots: int, color: Color, duration: float) -> void:
 	_add(Kind.DOT_RING, p, p, radius, duration, 0.0, float(dots), color)
@@ -133,6 +140,19 @@ func set_live_bands(from: PackedVector2Array, to: PackedVector2Array, width: Pac
 ## shadow on the ground under it.
 func lob(a: Vector2, b: Vector2, height: float, color: Color, duration: float) -> void:
 	_add(Kind.LOB, a, b, height, duration, 0.0, 0.0, color)
+
+
+## A ring `width` px thick growing steadily from p out to `radius` over
+## `duration` (a boss's nova: whatever it passes over is hit, so its size at
+## any moment is exactly radius * elapsed / duration).
+func nova(p: Vector2, radius: float, width: float, color: Color, duration: float) -> void:
+	_add(Kind.NOVA, p, p, radius, duration, 0.0, width, color)
+
+
+## A solid beam `width` px wide from a to b with a white-hot core, fading out
+## over `duration` (redrawn every frame while it lasts, it leaves a short trail).
+func beam(a: Vector2, b: Vector2, width: float, color: Color, duration: float) -> void:
+	_add(Kind.BEAM, a, b, width, duration, 0.0, 0.0, color)
 
 
 ## Persistent area (ground effects); fades in the last 20%.
@@ -222,6 +242,13 @@ func _draw() -> void:
 				draw_arc(p, r, a0, a1, steps, Color(c, 0.9), 1.0, false)
 				draw_line(p, (p + Vector2.from_angle(a0) * r).round(), Color(c, 0.9), -1.0, false)
 				draw_line(p, (p + Vector2.from_angle(a1) * r).round(), Color(c, 0.9), -1.0, false)
+			Kind.WARN_RING:
+				var w := _arc[i]
+				var seg := clampi(int(r * 0.8), 12, 96)
+				draw_arc(p, r, 0.0, TAU, seg, Color(c, 0.08 + 0.22 * t), w, false)
+				draw_arc(p, r + w * 0.5, 0.0, TAU, seg, Color(c, 0.9), 1.0, false)
+				if r - w * 0.5 >= 1.0:
+					draw_arc(p, r - w * 0.5, 0.0, TAU, seg, Color(c, 0.9), 1.0, false)
 			Kind.DOT_RING:
 				var dots := int(_arc[i])
 				var turn := t * 1.2
@@ -248,6 +275,23 @@ func _draw() -> void:
 				var fade := clampf((1.0 - t) / 0.2, 0.0, 1.0)
 				draw_circle(p, r, Color(c, c.a * 0.25 * fade), true, -1.0, false)
 				draw_arc(p, r, 0.0, TAU, _segments(r), Color(c, c.a * 0.8 * fade), 1.0, false)
+			Kind.NOVA:
+				var rr := r * t
+				if rr >= 1.0:
+					var w := _arc[i]
+					var seg := clampi(int(rr * 0.8), 12, 96)
+					draw_arc(p, rr, 0.0, TAU, seg, Color(c, 0.45), w, false)
+					draw_arc(p, rr + w * 0.5, 0.0, TAU, seg, Color(c, 0.95), 1.0, false)
+					draw_arc(p, maxf(0.5, rr - w * 0.5), 0.0, TAU, seg, Color(c, 0.95), 1.0, false)
+					draw_arc(p, rr, 0.0, TAU, seg, Color(1, 1, 1, 0.8), 1.0, false)
+			Kind.BEAM:
+				var b := _pos2[i].round()
+				if p.distance_squared_to(b) >= 4.0:
+					var fade := 1.0 - t
+					var side := (b - p).orthogonal().normalized() * (r * 0.5)
+					draw_colored_polygon(PackedVector2Array([p + side, b + side, b - side, p - side]),
+						Color(c, 0.6 * fade))
+					draw_line(p, b, Color(1, 1, 1, 0.9 * fade), -1.0 if r < 6.0 else 2.0, false)
 			Kind.LOB:
 				# Leaves from the thrower's mouth (8 px up), lands on the ground.
 				var ground := _pos[i].lerp(_pos2[i], t) + Vector2(0, 8.0 * (1.0 - t))

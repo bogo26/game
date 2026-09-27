@@ -225,10 +225,13 @@ func test_hurtboxes_match_the_art() -> void:
 			assert_true(boss != null, "%s has a sprite sheet" % data.id)
 			if boss == null:
 				continue
-			var size := Vector2i(boss.get_width() / Boss.FRAMES, boss.get_height())
-			assert_eq(size, Vector2i(Boss.FRAME_SIZE, Boss.FRAME_SIZE), "%s frames" % data.id)
-			var feet := Vector2(size) * 0.5 - Boss.SPRITE_OFFSET
-			for f in Boss.FRAMES:
+			# A row of square frames (see Boss), four or more of them.
+			var count := Boss.frame_count(boss.get_width(), boss.get_height())
+			var size := Vector2i(boss.get_height(), boss.get_height())
+			assert_eq(boss.get_width(), count * size.x, "%s: a row of square frames" % data.id)
+			assert_true(count >= 4, "%s: walk, walk, wind-up and action frames" % data.id)
+			var feet := Vector2(size) * 0.5 - Boss.sprite_offset(size.y)
+			for f in count:
 				if _check_frame(data, boss, Rect2i(Vector2i(f * size.x, 0), size), feet, "%s frame %d" % [data.id, f]):
 					frames += 1
 		else:

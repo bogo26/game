@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"sporeling"
+max_hp = 8.0
+speed = 44.0
+radius = 4.0
+hurt_size = Vector2(14, 14)
+contact_damage = 6.0
+xp = 1
+knockback_taken = 1.3
+behavior = 0
+hop = 1.6
+pack = 3
+atlas_row = 17
+anim_fps = 8.0
