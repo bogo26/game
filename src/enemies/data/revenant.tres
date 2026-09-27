@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"revenant"
+max_hp = 30.0
+speed = 36.0
+radius = 6.0
+hurt_size = Vector2(16, 20)
+contact_damage = 9.0
+xp = 1
+knockback_taken = 0.7
+behavior = 0
+on_death = 4
+atlas_row = 11
+anim_fps = 7.0

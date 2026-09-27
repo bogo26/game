@@ -8,7 +8,8 @@ extends SceneTree
 ##   assets/sprites/heroes/<id>.png        8 frames of 16x16 (see HERO_FRAMES)
 ##   assets/sprites/enemies/horde_atlas.png 32x32 cells; one row per enemy kind,
 ##                                          cols 0-3 walk, 4-5 action (see ENEMY_ROWS)
-##   assets/sprites/fx/fx_atlas.png         16x16 cells; row 0 projectiles, row 1 pickups
+##   assets/sprites/fx/fx_atlas.png         16x16 cells; row 0 projectiles, row 1 pickups,
+##                                          row 2 particles, row 3 more projectiles
 ##   assets/fonts/pixel5x8.png + .fnt       proportional 5x8 pixel font (BMFont), ASCII 32-126
 ##   assets/sprites/enemies/boss_demon.png  4 frames of 64x64: walk0, walk1, windup, charge
 ##   assets/sprites/enemies/bone_colossus.png 4 frames of 64x64: walk0, walk1, windup, leap
@@ -46,7 +47,10 @@ const HEROES := {
 
 
 ## Row index of each enemy kind in the horde atlas (EnemyData.atlas_row).
-const ENEMY_ROWS := ["swarmer", "brute", "spitter", "exploder", "skeleton", "barrel", "urn", "nest"]
+const ENEMY_ROWS := ["swarmer", "brute", "spitter", "exploder", "skeleton", "barrel", "urn", "nest",
+	"bat", "drowned", "bone_archer", "revenant", "bone_pile", "sporecap", "frost_boar", "salamander", "imp"]
+## Flyers get a soft shadow on the ground under them.
+const FLYERS := ["bat", "imp"]
 ## Column index of each projectile / pickup in row 0 / row 1 of the fx atlas.
 const PROJECTILES := ["arrow", "bolt", "orb", "spit", "knife", "rivet", "soul", "fire"]
 const PICKUPS := ["gem_small", "gem_medium", "gem_large", "heart"]
@@ -672,7 +676,7 @@ func _draw_downed(img: Image, ox: int, look: Dictionary) -> void:
 # --- enemies (32x32 cells, feet at y=24, centred on x=16) -------------------------
 
 func _gen_horde_atlas() -> void:
-	var img := _img(256, 256)
+	var img := _img(256, ENEMY_ROWS.size() * 32)
 	for row in ENEMY_ROWS.size():
 		for col in 6:
 			var ox := col * 32
@@ -694,7 +698,27 @@ func _gen_horde_atlas() -> void:
 					_draw_urn(img, ox, oy, col)
 				"nest":
 					_draw_nest(img, ox, oy, col)
+				"bat":
+					_draw_bat(img, ox, oy, col)
+				"drowned":
+					_draw_drowned(img, ox, oy, col)
+				"bone_archer":
+					_draw_bone_archer(img, ox, oy, col)
+				"revenant":
+					_draw_revenant(img, ox, oy, col)
+				"bone_pile":
+					_draw_bone_pile(img, ox, oy, col)
+				"sporecap":
+					_draw_sporecap(img, ox, oy, col)
+				"frost_boar":
+					_draw_frost_boar(img, ox, oy, col)
+				"salamander":
+					_draw_salamander(img, ox, oy, col)
+				"imp":
+					_draw_imp(img, ox, oy, col)
 			_outline(img, Rect2i(ox, oy, 32, 32))
+			if ENEMY_ROWS[row] in FLYERS and (col < 4 or ENEMY_ROWS[row] == "imp"):
+				_rect(img, ox + 13, oy + 23, 6, 1, Color(0, 0, 0, 0.3))
 	_save(img, "res://assets/sprites/enemies/horde_atlas.png")
 
 
@@ -859,6 +883,301 @@ func _draw_nest(img: Image, ox: int, oy: int, col: int) -> void:
 	_px(img, ox + 15, oy + 17 - bulge, Color.WHITE if glow > 0.6 else core.lightened(0.3))
 
 
+## Draws `rows` of [y, x from, x to] (cell coordinates) and their mirror
+## image around the cell's middle (x -> 31 - x): wings.
+func _mirrored_rows(img: Image, ox: int, oy: int, rows: Array, c: Color) -> void:
+	for r: Array in rows:
+		var w := int(r[2]) - int(r[1]) + 1
+		_rect(img, ox + int(r[1]), oy + int(r[0]), w, 1, c)
+		_rect(img, ox + 31 - int(r[2]), oy + int(r[0]), w, 1, c)
+
+
+## Bat (Crypt Entrance): a furry little body on wide wings, flying over its
+## shadow. Frames 0-3 flap: up, level, down, level.
+func _draw_bat(img: Image, ox: int, oy: int, col: int) -> void:
+	if col > 3:
+		return
+	var fur := Color("4a3048")
+	var wing := Color("70487e")
+	var flap: int = [0, 1, 2, 1][col]
+	var y0 := 11 + (1 if flap == 2 else 0)
+	var rows: Array = [
+		[[y0 - 3, 8, 9], [y0 - 2, 8, 11], [y0 - 1, 9, 13], [y0, 10, 13], [y0 + 1, 11, 13], [y0 + 2, 12, 13]],
+		[[y0 + 2, 8, 13], [y0 + 3, 7, 13], [y0 + 4, 8, 9], [y0 + 4, 11, 13]],
+		[[y0 + 3, 11, 13], [y0 + 4, 9, 13], [y0 + 5, 8, 12], [y0 + 6, 7, 10], [y0 + 7, 7, 8]],
+	][flap]
+	_mirrored_rows(img, ox, oy, rows, wing)
+	_rect(img, ox + 14, oy + y0, 4, 7, fur)
+	_px(img, ox + 14, oy + y0 - 1, fur)
+	_px(img, ox + 17, oy + y0 - 1, fur)
+	_rect(img, ox + 15, oy + y0 + 4, 2, 2, Color("6a4a60"))
+	_px(img, ox + 15, oy + y0 + 1, Color("f04040"))
+	_px(img, ox + 16, oy + y0 + 1, Color("f04040"))
+	_px(img, ox + 15, oy + y0 + 7, Color("2a1a28"))
+	_px(img, ox + 16, oy + y0 + 7, Color("2a1a28"))
+
+
+## Drowned (Flooded Halls): a hunched, waterlogged corpse, weed for hair,
+## reaching out. Frames 0-3 shamble; 4-5 swim (legs lost in a wake of foam).
+func _draw_drowned(img: Image, ox: int, oy: int, col: int) -> void:
+	var skin := Color("7fa89a")
+	var skin_dark := Color("587e72")
+	var rags := Color("3e4e60")
+	var weed := Color("2e5a36")
+	var swim := col >= 4
+	var w := _walk(col)
+	var b := w.x if not swim else col - 4
+	if swim:
+		_rect(img, ox + 11, oy + 21, 10, 1, Color("c8ecf4"))
+		_rect(img, ox + 10, oy + 22, 3, 1, Color("9ad4e4"))
+		_rect(img, ox + 19, oy + 22, 3, 1, Color("9ad4e4"))
+		_px(img, ox + 9 + (col - 4) * 2, oy + 20, Color("c8ecf4"))
+		_px(img, ox + 22 - (col - 4) * 2, oy + 20, Color("c8ecf4"))
+	else:
+		_rect(img, ox + 13, oy + 19, 2, 5 - maxi(w.y, 0), rags.darkened(0.3))
+		_rect(img, ox + 17, oy + 19, 2, 5 - maxi(-w.y, 0), rags.darkened(0.3))
+	_rect(img, ox + 12, oy + 12 + b, 8, 8 if not swim else 9 - b, rags)
+	_rect(img, ox + 14, oy + 14 + b, 2, 2, skin_dark)
+	_px(img, ox + 18, oy + 17 + b, skin_dark)
+	_rect(img, ox + 10, oy + 13 + b, 2, 4, skin_dark)
+	_rect(img, ox + 19, oy + 13 + b, 4, 2, skin)
+	_px(img, ox + 22, oy + 15 + b, skin_dark)
+	_rect(img, ox + 13, oy + 6 + b, 6, 6, skin)
+	_rect(img, ox + 13, oy + 11 + b, 6, 1, skin_dark)
+	_rect(img, ox + 12, oy + 5 + b, 8, 2, weed)
+	_rect(img, ox + 12, oy + 7 + b, 1, 5, weed)
+	_px(img, ox + 14, oy + 7 + b, weed)
+	_px(img, ox + 16, oy + 8 + b, Color("e0fff0"))
+	_px(img, ox + 18, oy + 8 + b, Color("e0fff0"))
+	_px(img, ox + 17, oy + 10 + b, Color("2a3a3a"))
+	_px(img, ox + 21, oy + 16 + b, Color("9ad4e4"))
+
+
+## Bone archer (Bone Pits): a skeleton in a tattered red hood with a bow.
+## Frames 0-3 walk; 4 draws (an arrow nocked, its tip glinting), 5 looses.
+func _draw_bone_archer(img: Image, ox: int, oy: int, col: int) -> void:
+	var bone := Color("e8e4d4")
+	var shade := Color("a8a494")
+	var hood := Color("8a2a2a")
+	var hood_dark := Color("5e1a1c")
+	var wood := Color("8a5a2a")
+	var string := Color("d8d0c0")
+	var w := _walk(col)
+	var b := w.x
+	_rect(img, ox + 14, oy + 19, 1, 5 - maxi(w.y, 0), bone)
+	_rect(img, ox + 17, oy + 19, 1, 5 - maxi(-w.y, 0), bone)
+	_rect(img, ox + 13, oy + 18 + b, 6, 1, shade)
+	_rect(img, ox + 15, oy + 12 + b, 2, 6, bone)
+	_rect(img, ox + 13, oy + 13 + b, 6, 1, bone)
+	_rect(img, ox + 13, oy + 15 + b, 6, 1, bone)
+	_rect(img, ox + 11, oy + 8 + b, 2, 7, hood_dark)
+	_rect(img, ox + 12, oy + 5 + b, 8, 3, hood)
+	_rect(img, ox + 12, oy + 8 + b, 1, 4, hood)
+	_rect(img, ox + 13, oy + 7 + b, 6, 5, bone)
+	_px(img, ox + 15, oy + 9 + b, EYE)
+	_px(img, ox + 17, oy + 9 + b, EYE)
+	_rect(img, ox + 14, oy + 11 + b, 4, 1, shade)
+	_rect(img, ox + 17, oy + 13 + b, 4, 1, bone)
+	# The bow: a stave with curled tips, its string pulled back on the draw.
+	_rect(img, ox + 21, oy + 9 + b, 1, 9, wood)
+	_px(img, ox + 20, oy + 8 + b, wood)
+	_px(img, ox + 20, oy + 18 + b, wood)
+	if col == 4:
+		for k in 5:
+			_px(img, ox + 19 - k, oy + 9 + k + b, string)
+			_px(img, ox + 19 - k, oy + 17 - k + b, string)
+		_rect(img, ox + 15, oy + 13 + b, 8, 1, Color("c8a070"))
+		_px(img, ox + 23, oy + 13 + b, Color("ff3d8b"))
+	else:
+		_rect(img, ox + 19, oy + 9 + b, 1, 9, string)
+
+
+## Revenant (the Ossuary): an armoured skeleton warrior with a shield and a
+## notched sword, eyes burning green. Frames 0-3 walk.
+func _draw_revenant(img: Image, ox: int, oy: int, col: int) -> void:
+	if col > 3:
+		return
+	var bone := Color("dcd8c8")
+	var shade := Color("9c988a")
+	var iron := Color("5a6270")
+	var iron_dark := Color("3c424e")
+	var glow := Color("7af0b0")
+	var w := _walk(col)
+	var b := w.x
+	_rect(img, ox + 13, oy + 19, 2, 5 - maxi(w.y, 0), iron_dark)
+	_rect(img, ox + 17, oy + 19, 2, 5 - maxi(-w.y, 0), iron_dark)
+	_rect(img, ox + 12, oy + 11 + b, 8, 8, iron)
+	_rect(img, ox + 12, oy + 11 + b, 8, 1, iron.lightened(0.25))
+	_rect(img, ox + 15, oy + 12 + b, 2, 6, iron_dark)
+	_rect(img, ox + 12, oy + 18 + b, 8, 1, iron_dark)
+	_rect(img, ox + 13, oy + 5 + b, 6, 6, bone)
+	_rect(img, ox + 12, oy + 4 + b, 8, 3, iron)
+	_px(img, ox + 16, oy + 3 + b, iron_dark)
+	_px(img, ox + 15, oy + 7 + b, glow)
+	_px(img, ox + 17, oy + 7 + b, glow)
+	_rect(img, ox + 14, oy + 10 + b, 4, 1, shade)
+	_rect(img, ox + 8, oy + 12 + b, 4, 7, iron_dark)
+	_rect(img, ox + 9, oy + 13 + b, 2, 5, Color("7a3a2a"))
+	_rect(img, ox + 20, oy + 13 + b, 2, 2, bone)
+	_rect(img, ox + 22, oy + 7 + b, 1, 8, Color("c8ccd4"))
+	_px(img, ox + 22, oy + 9 + b, Color("7a7e88"))
+	_rect(img, ox + 21, oy + 14 + b, 3, 1, iron_dark)
+
+
+## Bone pile: what a revenant leaves behind, eyes still smouldering. Frame 0
+## lies still; 4-5 rattle, eyes blazing, just before it gets back up.
+func _draw_bone_pile(img: Image, ox: int, oy: int, col: int) -> void:
+	if col in [1, 2, 3]:
+		return
+	var bone := Color("dcd8c8")
+	var shade := Color("9c988a")
+	var iron := Color("5a6270")
+	var rattle := col >= 4
+	var j := (1 if col == 5 else -1) if rattle else 0
+	_rect(img, ox + 10, oy + 21, 12, 3, shade)
+	_rect(img, ox + 11, oy + 20, 10, 1, bone)
+	for k in 5:
+		_rect(img, ox + 10 + k * 2 + (j if k % 2 == 0 else 0), oy + 19 + k % 2, 2, 1, bone)
+	_rect(img, ox + 8, oy + 22, 8, 1, Color("c8ccd4"))
+	var sy := 17 - (1 if rattle else 0)
+	_rect(img, ox + 14 + j, oy + sy, 5, 4, bone)
+	_rect(img, ox + 14 + j, oy + sy - 1, 5, 2, iron)
+	var eye := Color("b0ffd8") if rattle else Color("4ab884")
+	_px(img, ox + 15 + j, oy + sy + 2, eye)
+	_px(img, ox + 17 + j, oy + sy + 2, eye)
+
+
+## Sporecap (Fungal Caverns): a waddling mushroom, a big spotted pink cap on a
+## pale stalk with a face. Frames 0-3 waddle.
+func _draw_sporecap(img: Image, ox: int, oy: int, col: int) -> void:
+	if col > 3:
+		return
+	var cap := Color("d8487e")
+	var cap_dark := Color("9a2a5a")
+	var spot := Color("ffd0e6")
+	var stalk := Color("e8dcc4")
+	var stalk_dark := Color("b8a88a")
+	var w := _walk(col)
+	var b := w.x
+	_rect(img, ox + 13, oy + 22, 2, 2 - maxi(w.y, 0), stalk_dark)
+	_rect(img, ox + 17, oy + 22, 2, 2 - maxi(-w.y, 0), stalk_dark)
+	_rect(img, ox + 12, oy + 15 + b, 8, 7 - b, stalk)
+	_rect(img, ox + 12, oy + 20, 8, 1, stalk_dark)
+	_px(img, ox + 15, oy + 17 + b, EYE)
+	_px(img, ox + 17, oy + 17 + b, EYE)
+	_rect(img, ox + 15, oy + 19, 3, 1, stalk_dark)
+	var halves := [3, 5, 6, 7, 7, 8, 8, 8]
+	for y in 8:
+		var half: int = halves[y]
+		_rect(img, ox + 16 - half, oy + 8 + y + b, half * 2, 1, cap)
+	_rect(img, ox + 8, oy + 15 + b, 16, 1, cap_dark)
+	for sp: Array in [[11, 12], [14, 10], [18, 9], [20, 12], [16, 13]]:
+		_rect(img, ox + int(sp[0]), oy + int(sp[1]) + b, 2, 1, spot)
+
+
+## Frost boar (Frozen Vaults): a shaggy blue-grey boar with an icy mane and
+## white tusks. Frames 0-3 trot; 4 lines up a charge (head down, pawing,
+## breath steaming), 5 charges (legs stretched out).
+func _draw_frost_boar(img: Image, ox: int, oy: int, col: int) -> void:
+	var fur := Color("7e98b4")
+	var fur_dark := Color("54708e")
+	var mane := Color("dcefff")
+	var tusk := Color("f4f0e0")
+	var w := _walk(col)
+	var b := w.x if col < 4 else 0
+	var legs := [7, 10, 17, 20]
+	for k in 4:
+		var lift := 0
+		if col < 4:
+			lift = maxi(w.y if k % 2 == 0 else -w.y, 0)
+		elif col == 4 and k == 3:
+			lift = 2  # pawing the ground
+		var lx: int = legs[k]
+		if col == 5:
+			lx += -1 if k < 2 else 1
+		_rect(img, ox + lx, oy + 20, 2, 4 - lift, fur_dark)
+	_rect(img, ox + 7, oy + 12 + b, 14, 8, fur)
+	_rect(img, ox + 6, oy + 13 + b, 16, 6, fur)
+	_rect(img, ox + 7, oy + 18 + b, 14, 2, fur_dark)
+	for k in 6:
+		_rect(img, ox + 8 + k * 2, oy + 10 + b + k % 2, 1, 3 - k % 2, mane)
+	var hy := 13 + b + (1 if col == 4 else 0)
+	_rect(img, ox + 20, oy + hy, 5, 5, fur)
+	_rect(img, ox + 24, oy + hy + 2, 2, 3, fur_dark)
+	_px(img, ox + 22, oy + hy + 1, EYE)
+	_px(img, ox + 21, oy + hy - 1, fur_dark)
+	_px(img, ox + 25, oy + hy + 4, tusk)
+	_px(img, ox + 26, oy + hy + 3, tusk)
+	_px(img, ox + 26, oy + hy + 2, tusk)
+	if col == 4:
+		_px(img, ox + 27, oy + hy + 1, Color("e8f4ff"))
+		_px(img, ox + 28, oy + hy, Color("e8f4ff"))
+
+
+## Salamander (Molten Forge): a long fire lizard with a glowing belly.
+## Frames 0-3 crawl; 4 winds up (head up, fire in its mouth), 5 spits.
+func _draw_salamander(img: Image, ox: int, oy: int, col: int) -> void:
+	var skin := Color("d8582a")
+	var dark := Color("983418")
+	var glow := Color("ffc040")
+	var hot := Color("fff0a0")
+	var crawl: int = [0, 1, 0, -1, 0, 0][col]
+	_rect(img, ox + 4, oy + 19, 5, 2, skin)
+	_px(img, ox + 3, oy + 18, skin)
+	_px(img, ox + 3, oy + 17, dark)
+	_rect(img, ox + 8, oy + 16, 14, 5, skin)
+	_rect(img, ox + 9, oy + 20, 12, 1, glow)
+	for k in 4:
+		_px(img, ox + 10 + k * 3, oy + 17 + k % 2, glow)
+	for k in 4:
+		var lx: int = [9, 12, 17, 20][k]
+		var step := crawl if k % 2 == 0 else -crawl
+		_rect(img, ox + lx + step, oy + 21, 2, 3, dark)
+	var hy := 15 - (2 if col >= 4 else 0)
+	_rect(img, ox + 21, oy + hy, 6, 4, skin)
+	_rect(img, ox + 21, oy + hy + 3, 6, 1, dark)
+	_px(img, ox + 24, oy + hy + 1, EYE)
+	if col == 4:
+		_rect(img, ox + 25, oy + hy + 2, 2, 2, glow)
+		_px(img, ox + 26, oy + hy + 2, hot)
+	elif col == 5:
+		_rect(img, ox + 27, oy + hy + 1, 2, 2, hot)
+
+
+## Imp (Demon's Throne): a little red devil with horns, bat wings and a barbed
+## tail, flying over its shadow. Frames 0-3 hover; 4-5 blink away (sparkling).
+func _draw_imp(img: Image, ox: int, oy: int, col: int) -> void:
+	var skin := Color("c8303c")
+	var dark := Color("8a1a28")
+	var wing := Color("5a1a2a")
+	var horn := Color("f0e0c0")
+	var flap: int = [0, 1, 2, 1, 0, 2][col]
+	var y0: int = 7 + [0, 0, 1, 1, 0, 1][col]
+	var rows: Array = [
+		[[y0 + 1, 8, 9], [y0 + 2, 8, 12], [y0 + 3, 9, 12], [y0 + 4, 10, 12]],
+		[[y0 + 4, 7, 12], [y0 + 5, 7, 12], [y0 + 6, 9, 12]],
+		[[y0 + 6, 10, 12], [y0 + 7, 8, 12], [y0 + 8, 8, 10]],
+	][flap]
+	_mirrored_rows(img, ox, oy, rows, wing)
+	_rect(img, ox + 13, oy + y0 + 6, 6, 6, skin)
+	_rect(img, ox + 14, oy + y0 + 8, 4, 3, dark)
+	_rect(img, ox + 14, oy + y0 + 12, 1, 2, dark)
+	_rect(img, ox + 17, oy + y0 + 12, 1, 2, dark)
+	_rect(img, ox + 13, oy + y0, 6, 6, skin)
+	_px(img, ox + 13, oy + y0 - 1, horn)
+	_px(img, ox + 12, oy + y0 - 2, horn)
+	_px(img, ox + 18, oy + y0 - 1, horn)
+	_px(img, ox + 19, oy + y0 - 2, horn)
+	_px(img, ox + 15, oy + y0 + 2, Color("ffe040"))
+	_px(img, ox + 17, oy + y0 + 2, Color("ffe040"))
+	_rect(img, ox + 15, oy + y0 + 4, 3, 1, dark)
+	for tp: Array in [[19, 10], [20, 11], [21, 11], [22, 10], [22, 9], [23, 10]]:
+		_px(img, ox + int(tp[0]), oy + y0 + int(tp[1]), dark)
+	if col >= 4:
+		for sp: Array in [[10, 3], [21, 1], [11, 12], [20, 13], [16, -3]]:
+			_px(img, ox + int(sp[0]) + (col - 4), oy + y0 + int(sp[1]), Color("ff9ac4"))
+
+
 # --- props (chests, shrines: node sprites) ---------------------------------------------
 
 func _gen_props() -> void:
@@ -922,6 +1241,7 @@ func _gen_fx_atlas() -> void:
 		_draw_projectile(img, i * 16, 0, PROJECTILES[i])
 	for i in PICKUPS.size():
 		_draw_pickup(img, i * 16, 16, PICKUPS[i])
+	_draw_shard(img, 0, 48)
 	# Row 2: soft round particles (white, tinted in shader) of sizes 1..8.
 	for i in 8:
 		var r := float(i + 1) * 0.9
@@ -971,6 +1291,17 @@ func _draw_projectile(img: Image, ox: int, oy: int, kind: String) -> void:
 			_rect(img, ox + 5, oy + 5, 7, 6, Color("ff3d8b"))
 			_rect(img, ox + 6, oy + 6, 5, 4, Color("ff9ac4"))
 			_rect(img, ox + 7, oy + 7, 3, 2, Color("ffffff"))
+	_outline(img, Rect2i(ox, oy, 16, 16))
+
+
+## The bone archers' shot (row 3): a hot pink shard - every enemy shot is hot pink.
+func _draw_shard(img: Image, ox: int, oy: int) -> void:
+	_rect(img, ox + 3, oy + 7, 8, 1, Color("a8185a"))
+	_rect(img, ox + 2, oy + 6, 2, 1, Color("ff3d8b"))
+	_rect(img, ox + 2, oy + 8, 2, 1, Color("ff3d8b"))
+	_rect(img, ox + 10, oy + 6, 3, 3, Color("ff3d8b"))
+	_px(img, ox + 13, oy + 7, Color("ff9ac4"))
+	_px(img, ox + 11, oy + 7, Color("ffffff"))
 	_outline(img, Rect2i(ox, oy, 16, 16))
 
 

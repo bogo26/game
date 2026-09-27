@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"salamander"
+max_hp = 24.0
+speed = 26.0
+radius = 6.0
+hurt_size = Vector2(22, 12)
+contact_damage = 6.0
+xp = 3
+knockback_taken = 0.8
+behavior = 1
+attack_range = 150.0
+attack_cooldown = 3.0
+windup_time = 0.5
+shot = 2
+explosion_radius = 22.0
+explosion_damage = 14.0
+atlas_row = 15
+anim_fps = 6.0

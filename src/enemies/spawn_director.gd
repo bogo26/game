@@ -26,6 +26,8 @@ const HINT_MIN_DISTANCE := 96.0
 const CORRIDOR_MIN_DISTANCE := 110.0
 ## Seconds a spawn portal is open before its enemy steps out.
 const PORTAL_TIME := 0.5
+## Members of a pack (EnemyData.pack) land this far around the first one.
+const PACK_SPREAD := 10.0
 
 enum Mode {
 	OFF,       ## nothing spawns
@@ -178,14 +180,19 @@ func tick(dt: float, view: Rect2, hero_positions: PackedVector2Array) -> void:
 			else find_arena_point(hero_positions)
 		if not p.is_finite():
 			continue
-		var t := maybe_elite(pick_type())
-		if mode == Mode.ARENA:
-			queue_spawn(t, p, effective_hp_multiplier())  # on screen: through a portal
-			arena_remaining -= 1
-		else:
-			horde.spawn(t, p, effective_hp_multiplier())
-		alive += 1
-		_budget -= 1.0
+		var t := pick_type()
+		# Pack animals (bats) arrive together, each maybe an elite.
+		for k in maxi(1, horde.types[t].pack):
+			if k > 0 and (alive >= cap or (mode == Mode.ARENA and arena_remaining <= 0)):
+				break
+			var q := p if k == 0 else grid.nearest_open(p + Vector2.from_angle(_rng.randf() * TAU) * PACK_SPREAD)
+			if mode == Mode.ARENA:
+				queue_spawn(maybe_elite(t), q, effective_hp_multiplier())  # on screen: through a portal
+				arena_remaining -= 1
+			else:
+				horde.spawn(maybe_elite(t), q, effective_hp_multiplier())
+			alive += 1
+			_budget -= 1.0
 	if mode == Mode.CORRIDOR:
 		_recycle_in -= dt
 		if _recycle_in <= 0.0:

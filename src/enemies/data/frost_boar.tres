@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"frost_boar"
+max_hp = 60.0
+speed = 32.0
+radius = 8.0
+hurt_size = Vector2(20, 14)
+contact_damage = 10.0
+xp = 5
+knockback_taken = 0.35
+behavior = 6
+attack_range = 150.0
+attack_cooldown = 3.5
+windup_time = 0.7
+charge_speed = 190.0
+charge_time = 0.9
+atlas_row = 14
+anim_fps = 8.0

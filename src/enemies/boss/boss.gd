@@ -119,11 +119,34 @@ func _nearest_hero(p: Vector2) -> Vector2:
 
 ## Adds of type `type_id` in a ring around the boss, each through a spawn portal.
 func _summon(type_id: StringName, count: int, radius: float = 44.0) -> void:
-	var t := world.horde.type_index(type_id)
-	var center := position
+	var types: Array[StringName] = []
 	for k in count:
-		var spot := world.grid.nearest_open(center + Vector2.from_angle(TAU * k / count) * radius)
-		world.spawner.queue_spawn(t, spot, _add_hp_multiplier)
+		types.append(type_id)
+	_summon_mix(types, radius)
+
+
+## Adds in a ring around the boss, one of each type in `types` in ring order,
+## each through a spawn portal.
+func _summon_mix(types: Array[StringName], radius: float = 44.0) -> void:
+	var center := position
+	var n := types.size()
+	for k in n:
+		var spot := world.grid.nearest_open(center + Vector2.from_angle(TAU * k / n) * radius)
+		world.spawner.queue_spawn(world.horde.type_index(types[k]), spot, _add_hp_multiplier)
+
+
+## `count` adds, `special` of them of type `special_id` spread out among
+## swarmers (a boss's own servants in the crowd).
+static func _crowd(count: int, special_id: StringName, special: int) -> Array[StringName]:
+	var out: Array[StringName] = []
+	var left := special
+	for k in count:
+		# Spread the special ones evenly around the ring.
+		var due := left > 0 and k * special >= (special - left) * count
+		out.append(special_id if due else &"swarmer")
+		if due:
+			left -= 1
+	return out
 
 
 ## A new phase: a moment of hitstop, a shake, a ring and a roar.

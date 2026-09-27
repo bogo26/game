@@ -72,6 +72,18 @@ const SFX := {
 	"help": {"wave": "square", "f0": 880.0, "f1": 880.0, "dur": 0.34, "decay": 0.9, "vol": 0.16, "duty": 0.25, "arp": [0, -5], "arp_step": 0.17},
 	"wave": {"wave": "saw", "f0": 196.0, "f1": 196.0, "dur": 0.7, "decay": 0.8, "vol": 0.3, "attack": 0.03, "arp": [0, 5, 7], "arp_step": 0.12, "lp": 0.3},
 	"boss_death": {"wave": "saw", "f0": 150.0, "f1": 30.0, "dur": 1.6, "decay": 1.0, "vol": 0.5, "noise": 0.5, "vib": [0.12, 6.0], "lp": 0.25},
+	# Each level's own enemy: an archer's bow, a revenant falling apart and its
+	# bones getting back up, a sporecap bursting, a boar's snort and its crash
+	# into a wall, a salamander's lobbed slag and its landing, an imp's blink.
+	"bow": {"wave": "triangle", "f0": 900.0, "f1": 300.0, "dur": 0.12, "decay": 1.8, "vol": 0.2, "noise": 0.2},
+	"bones": {"wave": "noise", "f0": 3200.0, "f1": 900.0, "dur": 0.25, "pulses": 3, "decay": 1.2, "vol": 0.22, "lp": 0.5},
+	"rattle": {"wave": "noise", "f0": 2400.0, "f1": 3600.0, "dur": 0.35, "pulses": 4, "decay": 0.8, "vol": 0.18, "lp": 0.45},
+	"spores": {"wave": "noise", "f0": 700.0, "f1": 250.0, "dur": 0.35, "decay": 1.3, "vol": 0.25, "lp": 0.2},
+	"snort": {"wave": "noise", "f0": 380.0, "f1": 180.0, "dur": 0.3, "pulses": 2, "decay": 1.0, "vol": 0.26, "lp": 0.25},
+	"thud": {"wave": "sine", "f0": 110.0, "f1": 45.0, "dur": 0.22, "decay": 1.8, "vol": 0.45, "noise": 0.3, "lp": 0.3},
+	"lob": {"wave": "noise", "f0": 500.0, "f1": 1400.0, "dur": 0.25, "decay": 1.0, "vol": 0.18, "lp": 0.3},
+	"sizzle": {"wave": "noise", "f0": 6000.0, "f1": 2500.0, "dur": 0.45, "decay": 1.2, "vol": 0.22, "lp": 0.6},
+	"imp": {"wave": "square", "f0": 1200.0, "f1": 300.0, "dur": 0.16, "decay": 1.4, "vol": 0.12, "duty": 0.25, "vib": [0.1, 30.0]},
 	"victory": {"wave": "square", "f0": 523.0, "f1": 523.0, "dur": 1.3, "decay": 0.5, "vol": 0.22, "duty": 0.25, "arp": [0, 4, 7, 12, 16, 19, 24, 24], "arp_step": 0.11},
 	"defeat": {"wave": "triangle", "f0": 392.0, "f1": 262.0, "dur": 1.4, "decay": 0.6, "vol": 0.3, "arp": [0, -1, -3, -5, -7], "arp_step": 0.25, "lp": 0.4},
 }

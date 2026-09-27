@@ -58,16 +58,18 @@ The macOS build runs on your own Mac; other people have to right-click → Open 
 2. Every player presses **A** (gamepad) or **Enter** (keyboard) to join. Browse heroes with left/right and press A/Enter to ready up.
 3. Fight down through the dungeon: **1 → 2 → 3 → mini boss → 4 → 5 → 6 → final boss**. In each level, clear the lockdown arena rooms, then reach the exit portal. Hold **Tab** / **Back** for the map.
 
-   | Level | | |
-   |---|---|---|
-   | 1 | Crypt Entrance | spike traps, barrels, urns |
-   | 2 | Flooded Halls | water, nests |
-   | 3 | Bone Pits | chasms and bridges |
-   | Mini boss | The Ossuary | the **Bone Colossus**: club sweeps, grave spikes, and once enraged, leaps and risen dead. Beat it to open the way on. |
-   | 4 | Fungal Caverns | toxic pools, spore nests |
-   | 5 | Frozen Vaults | crevasses, slush, spike galleries |
-   | 6 | Molten Forge | lava channels, powder kegs, four arenas |
-   | Final boss | Demon's Throne | the **Demon Lord**: beat it to win the run |
+   Swarmers, brutes, spitters and exploders make up most of the horde, and every level has an enemy of its own:
+
+   | Level | | | Its own enemy |
+   |---|---|---|---|
+   | 1 | Crypt Entrance | spike traps, barrels, urns | **Bats**: fast, frail, weaving flocks of three |
+   | 2 | Flooded Halls | water, nests | **Drowned**: slow on land, fast in water |
+   | 3 | Bone Pits | chasms and bridges | **Bone archers**: show their aim as a line, then shoot along it |
+   | Mini boss | The Ossuary | the **Bone Colossus**: club sweeps, grave spikes, and once enraged, leaps and risen dead. Beat it to open the way on. | **Revenants**: fall apart into bone piles that get back up unless smashed |
+   | 4 | Fungal Caverns | toxic pools, spore nests | **Sporecaps**: burst into spore clouds when killed |
+   | 5 | Frozen Vaults | crevasses, slush, spike galleries | **Frost boars**: charge down a marked lane, into walls or over crevasse edges |
+   | 6 | Molten Forge | lava channels, powder kegs, four arenas | **Salamanders**: lob molten slag where you stand |
+   | Final boss | Demon's Throne | the **Demon Lord**: beat it to win the run | **Imps**, its servants: blink to your side through small portals |
 
 Things to use in the levels:
 - **Barrels** explode and chain; they hurt enemies, never heroes.
@@ -92,6 +94,8 @@ Upgrades include four **elemental chains** for your attack: fire, ice, poison an
 Debug flags (after `--`): `--level=3` (the run's 1-based position: `--level=4` is the mini boss, `--level=8` the final boss), `--bots=4`, `--heroes=rogue,mage`, `--layout=b`, `--mirror=hv`, `--elite-chance=0.3`, `--debug-levelups=2`, `--show-map`.
 
 ## Status
+
+Milestone 13 (level enemies) is done: eight new enemies, one of its own for every level (bats, drowned, bone archers, revenants, sporecaps, frost boars, salamanders, imps), each with its own behaviour, art, sounds and warnings; the Bone Colossus raises revenants and the Demon Lord summons imps.
 
 Milestone 12 (dungeon expansion) is done: the run is now 1-2-3, a mini boss (the Bone Colossus), 4-5-6 and the final boss, with three new levels (each with a second layout), four new tile themes and a shared `Boss` base for both bosses.
 

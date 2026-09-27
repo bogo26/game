@@ -65,16 +65,26 @@ Downed state:
 
 ## Enemies
 
-| Enemy | Role |
-|---|---|
-| Swarmer | Fast and weak; most of the horde |
-| Brute | Slow, tanky, heavy hits |
-| Spitter | Keeps distance and fires projectiles |
-| Exploder | Rushes in, telegraphs, explodes |
-| Bone Colossus (mini boss) | Guards the Ossuary halfway through the run: club sweeps, grave spikes, leaps; node-based |
-| Demon Lord (final boss) | Phase-based attack patterns, node-based |
+Four kinds make up most of the horde throughout the run. Every level adds an enemy of its own that no other level has (`tests/test_enemies.gd` checks it), and the bosses bring their own servants.
 
-**Elites** (`Elites`, from the second level on; always in the test room): about 1 in 40 spawns of the four kinds above arrives as an elite, at most 4 alive at once (×0.5 on Casual, ×2 on Hard).
+| Enemy | Where | Role |
+|---|---|---|
+| Swarmer | throughout | Fast and weak; most of the horde |
+| Brute | throughout | Slow, tanky, heavy hits |
+| Spitter | throughout | Keeps distance and fires projectiles |
+| Exploder | throughout | Rushes in, telegraphs, explodes |
+| Bat | Crypt Entrance | Fast and frail (5 HP), in flocks of three that weave from side to side. Flies: water doesn't slow it and it never goes over a chasm's edge |
+| Drowned | Flooded Halls | Shambles on land, but swims through water at twice its walking speed (drawn swimming there), so the pools belong to it |
+| Bone archer | Bone Pits | A sniper: aims for 0.8 s with a pink line from 185 px away (the aim is locked), then looses a fast shard along the line. Step out of it |
+| Revenant | The Ossuary; the Bone Colossus raises them | An armoured skeleton that falls apart into a bone pile when killed. Unless the pile is smashed (a kill of its own, with XP), it rattles and gets back up after 4 s |
+| Sporecap | Fungal Caverns | A slow mushroom that bursts into a spore cloud when killed (30 px, 4 s) that hurts heroes inside. Kill it from range, or step out |
+| Frost boar | Frozen Vaults | A charger: lines up for 0.7 s under a band exactly as wide as what it hits, then charges 170 px in a straight line and hits twice as hard. A charge into a wall dazes it for 1.3 s; one over a crevasse edge sends it down |
+| Salamander | Molten Forge | Lobs molten slag where a hero stands: the landing spot is marked for the 0.9 s flight, then it bursts (22 px) and the slag burns for 1.5 s |
+| Imp | Demon's Throne; the Demon Lord summons them | Flies, and every 3.5 s blinks to the side of a hero 56-220 px away: a portal shows where for 0.45 s while it fades out, then it steps out next to them |
+| Bone Colossus (mini boss) | The Ossuary | Club sweeps, grave spikes, leaps; raises swarmers and revenants; node-based |
+| Demon Lord (final boss) | Demon's Throne | Phase-based attack patterns; summons swarmers and imps; node-based |
+
+**Elites** (`Elites`, from the second level on; always in the test room): about 1 in 40 spawns of the walking kinds above (every one but the revenant, which already comes back once) arrives as an elite, at most 4 alive at once (×0.5 on Casual, ×2 on Hard).
 - An elite is drawn 1.5× bigger with a pulsing outline in its trait's colour (the instance shader draws it from a code in the tint channel), with its hurtbox and footprint scaled to match, ×6 HP, ×1.25 damage and half the knockback.
 - Traits: **Swift** (cyan, +60% speed), **Volatile** (orange: blows up 0.6 s after it dies, telegraphed, 25 damage in 36 px), **Splitting** (green: breaks into 3 ordinary enemies of its kind).
 - Each drops a big XP gem (10) and has a 30% chance of a heart.
@@ -156,19 +166,19 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
 - **Rendering:** `Level` turns a layout into a `TileMapLayer` for rendering and a `LevelGrid` for collision and pathfinding.
 - **Run order:** 1 → 2 → 3 → mini boss → 4 → 5 → 6 → final boss. `src/levels/run_config.tres` lists:
 
-  | # | Banner | Level | Theme | Arenas | Enemy HP |
-  |---|---|---|---|---|---|
-  | 1 | LEVEL 1 | Crypt Entrance | crypt | 2 | ×1.0 |
-  | 2 | LEVEL 2 | Flooded Halls | flooded | 2 | ×1.35 |
-  | 3 | LEVEL 3 | Bone Pits | bones | 3 | ×1.8 |
-  | 4 | MINI BOSS | The Ossuary: the Bone Colossus | ossuary | boss room | ×2.0 |
-  | 5 | LEVEL 4 | Fungal Caverns: toxic pools, spore nests | fungal | 3 | ×2.2 |
-  | 6 | LEVEL 5 | Frozen Vaults: crevasses, slush, spike galleries | frost | 3 | ×2.6 |
-  | 7 | LEVEL 6 | Molten Forge: lava channels, powder kegs | forge | 4 | ×3.0 |
-  | 8 | FINAL BOSS | Demon's Throne: the Demon Lord | throne | boss room | ×3.2 |
+  | # | Banner | Level | Theme | Arenas | Enemy HP | Its own enemy |
+  |---|---|---|---|---|---|---|
+  | 1 | LEVEL 1 | Crypt Entrance | crypt | 2 | ×1.0 | bats |
+  | 2 | LEVEL 2 | Flooded Halls | flooded | 2 | ×1.35 | drowned |
+  | 3 | LEVEL 3 | Bone Pits | bones | 3 | ×1.8 | bone archers |
+  | 4 | MINI BOSS | The Ossuary: the Bone Colossus | ossuary | boss room | ×2.0 | revenants |
+  | 5 | LEVEL 4 | Fungal Caverns: toxic pools, spore nests | fungal | 3 | ×2.2 | sporecaps |
+  | 6 | LEVEL 5 | Frozen Vaults: crevasses, slush, spike galleries | frost | 3 | ×2.6 | frost boars |
+  | 7 | LEVEL 6 | Molten Forge: lava channels, powder kegs | forge | 4 | ×3.0 | salamanders |
+  | 8 | FINAL BOSS | Demon's Throne: the Demon Lord | throne | boss room | ×3.2 | imps (summoned) |
 
   Banners number the regular levels on their own (`RunConfig.title()`). Each level sets:
-  - enemy mix (brutes, spitters and exploders grow more common level by level)
+  - enemy mix: brutes, spitters and exploders grow more common level by level, next to the level's own enemy
   - an HP multiplier (above)
   - corridor pressure
   - arena quotas
@@ -195,12 +205,12 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
   - **Every attack is telegraphed** during its wind-up: the boss glows hot pink (a flash shader, which hit flashes can't wash out) and growls, and the warning is drawn above the horde.
 - **Mini boss (Bone Colossus, `BoneColossus`):** 1100 HP. A lumbering heap of bones with a club, fighting up close and from below.
   - Phase 1 (100–50%): walks at the nearest hero; **club sweeps** (only when someone is in reach) and **grave spikes** that burst under every hero.
-  - Phase 2 (below 50%): enraged (faster, a roar and 8 risen swarmers); spikes also burst around each hero, it **leaps** onto the hero furthest away (bone shards burst from the landing), and it **raises the dead** (6 swarmers).
+  - Phase 2 (below 50%): enraged (faster, a roar and 8 risen dead: 3 revenants among 5 swarmers); spikes also burst around each hero, it **leaps** onto the hero furthest away (bone shards burst from the landing), and it **raises the dead** (2 revenants among 4 swarmers).
   - Telegraphs: sweep: a wedge exactly as wide as the swing, filling up (`FxLayer.warn_arc`); spikes: a filling circle under each hero, where they stood when it wound up; leap: the landing circle, until it lands; raise: the spawn portals.
   - In the air it deals no contact damage (its body counts as stunned).
 - **Final boss (Demon Lord, `BossDemon`):** 1800 HP, three phases:
   - fireball fans and ground slams
-  - plus fire rings and swarmer summons
+  - plus fire rings and summons: imps spread among swarmers (a phase change brings 9-12 adds, 3-4 of them imps; the summon attack 8, 3 of them imps)
   - enraged: faster, plus telegraphed charges
   - Telegraphs: slam: its exact circle filling up; charge: a band as wide as what it hits; fan: one aim line per fireball, with the aim locked when the wind-up starts; fire ring: a ring of turning dots around the boss; summon: the adds' spawn portals.
 - **Screens:** Main menu → Character select → Game (levels) → End screen → Play again / Change heroes / Main menu.
@@ -350,6 +360,15 @@ docs/         this document
 - **Ranged (spitter):** holds position inside its range, backs off when heroes get closer than 55% of it. When its cooldown is up and it has line of sight, it stands still and glows hot pink for 0.4 s (its shot pose), then fires at the nearest hero. It only starts a shot while it's inside the camera view, so nothing fires from off screen.
 - **Exploder:** lights its fuse when close, then blasts heroes in its radius that it has line of sight to (walls stop it, like the boss slam). Killing it during the fuse cancels the blast, and self-destructs drop no XP.
 - **Knockback:** damage pushes enemies away from the hit source, scaled per type (brutes resist). Stun freezes, slow halves speed, and marks make enemies take ×1.75 damage.
+- **Each level's own enemy** is data (`EnemyData`) plus a few behaviour switches in the horde's loop, so it costs about 0.1 ms per frame with every kind in the stress room:
+  - **Flocks and flyers (bats):** `pack` spawns that many together; `weave` adds a sideways swing to their steering (a sine per enemy); `flying` enemies ignore water and are never carried over a chasm's edge.
+  - **Swimmers (drowned):** `swim_speed` replaces the wading slow in water, where they're drawn with their swim frames.
+  - **Aimed shots (bone archers):** `EnemyData.Shot.AIMED` locks the aim when the wind-up starts (`HordeSim.aim`); the World draws it as a live line (`FxLayer.set_live_bands`) that ends at the first wall (`LevelGrid.shot_reach`) and vanishes if the archer dies or is stunned out of it.
+  - **Lobs (salamanders):** `Shot.LOB` logs the throw; the World flies the glob (`FxLayer.lob`), marks the landing, bursts it there (walls stop the burst) and leaves slag.
+  - **Chargers (frost boars, `Behavior.CHARGER`):** roam, line up (pink glow, a live band as wide as its reach), charge (`charge_speed` × `charge_time`, contact damage ×2), then catch their breath (0.6 s), or stay dazed (1.3 s) after a wall. The charge counts as a push, so it can carry the boar over a chasm's edge.
+  - **Blinkers (imps, `Behavior.BLINKER`):** pick a spot about 30 px from a hero, on their own side if they can, that the hero can see; a portal opens there while they fade out.
+  - **Bone piles (`Behavior.PILE`):** a revenant (`OnDeath.BONES`) leaves one that remembers what it was (`state`) and gets back up when its timer runs out. Piles count as enemies (arenas wait for them) but don't walk, block tiles or leave corpses.
+  - **Enemy hazards** (`World.add_hazard()`: spore clouds from `OnDeath.SPORES`, slag): heroes inside take a hit whenever their hit invulnerability runs out.
 
 ### Input
 - `InputRouter` (autoload) owns four `PlayerInput` slots and polls hardware directly, not through the InputMap. That keeps any mix of keyboard and gamepads separated per player.
@@ -379,6 +398,7 @@ docs/         this document
 | 10 | Map features: minimap, terrain (water, chasms, spikes), barrels / urns / nests, chests and shrines, level themes + decor, redesigned levels | done |
 | 11 | Player-experience pass: run-flow fixes, readability (telegraphs, portals, outlines), game feel (feedback, hitstop, audio), pacing (waves, team lives, held picks, solo fairness), options + accessibility, onboarding (button icons, tips, controls card), replay (stats and awards, difficulty and records, map variety, elites) | done |
 | 12 | Dungeon expansion: an 8-level run (levels 1–3, a mini boss, levels 4–6, the final boss), the Bone Colossus, Fungal Caverns / Frozen Vaults / Molten Forge with second layouts, four new themes | done |
+| 13 | Level enemies: every level's own enemy (bats, drowned, bone archers, revenants, sporecaps, frost boars, salamanders, imps) with its behaviour, art, sounds and warnings; bosses raise revenants and summon imps | done |
 
 ## Performance results
 
@@ -401,12 +421,13 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - Minions cost 0.3 ms and the whole frame 6.9 ms (146 fps).
   - Measured on an already heat-throttled Air: the plain baseline read 6.5 ms / 3.2 ms sim in the same state, versus 4.1 ms / 1.7 ms when cool. Summoners add about 0.1–0.3 ms over that throttled baseline.
   - After the change that writes only the instance fields that change, re-measure on a cool machine or a desktop.
+- **Milestone 13 re-check** (every level enemy in the stress room, 2026-09-27, same Air, fullscreen, back to back with the milestone 12 build): 4.95 ms average, 6.36 ms p99, 2.17 ms sim, against 4.79 / 6.32 / 2.06 ms before. The new behaviours cost about 0.1 ms of simulation.
 
 ## Art, effects and audio
 
 - **Art:** all sprites, tiles and the UI font are generated by `tools/gen_placeholder_art.gd` (deterministic and license-free):
   - 8 heroes (idle/run/dash/downed)
-  - 5 enemy kinds (walk + action frames)
+  - 12 enemy kinds and the bone pile (walk + action frames; flyers get a shadow)
   - two 64×64 bosses: the demon and the bone colossus
   - projectiles, pickups and particle blobs
   - dungeon tiles in eight themes
@@ -423,6 +444,7 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - **Draw order** (bottom to top): ground effects, props, gems, horde, hearts, warnings (`WarnFx`: telegraphs, fuses, spawn portals), heroes and bosses, particles, effects, damage numbers, **all projectiles**, then the hero overlay. Enemies never hide a warning, and nothing hides a shot.
   - **Hostile = hot pink** (`FxLayer.DANGER`): every enemy projectile uses it (spit and boss fireballs are pink orbs with a white core and a dark outline) and throbs in the shader, and so does every enemy warning. Heroes' own telegraphs (the Mage's Meteor) are dashed and in the caster's colour. The Cleric's orb is pale gold.
   - **Exploders:** a lit fuse shows as a filling circle exactly as big as the blast, with a hiss; it follows the fuse and vanishes if the exploder dies first.
+  - **Each level's own enemy** warns the same way: a bone archer's aim line and its hot pink shard, a frost boar's charge band, where a salamander's slag will land, an imp's portal. Spore clouds are pink zones; burning slag is orange.
   - **Heroes** have a 1 px outline in their player colour (`hero_outline.gdshader`), so two players on the same hero, or the dark Rogue and Necromancer on dark floors, are easy to find. A "P1" tag shows over each hero for 3 s at level start, after a revive and while downed. Reticles are drawn above everything (`HeroOverlay`).
   - Hearts are drawn above the horde and marked on the minimap; shrine blessings ring heroes in pale gold rather than a player-like colour. A heart heals 25% of max HP and only goes to a hurt hero: the most hurt one in range, never one at full HP. Holy Dash also heals the Cleric for half as much, so it works solo.
   - Lines 1 px wide are drawn as line primitives: with vertex snapping on, a 1 px quad at an angle collapses to nothing.
@@ -442,7 +464,7 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - white hit flash in the shader
   - frozen tint
   - pixel-snapped screen shake
-- **Audio:** `tools/gen_audio.gd` renders 58 SFX and 3 music loops (menu, dungeon, boss) with a small synth and sequencer into `assets/audio`.
+- **Audio:** `tools/gen_audio.gd` renders 67 SFX and 3 music loops (menu, dungeon, boss) with a small synth and sequencer into `assets/audio`.
 - **`Audio` autoload:**
   - Plays SFX through a 24-voice pool on an `SFX` bus. Six voices are reserved for cues players must not miss (down, revive, ult, level-up, heartbeat, help, boss wind-up and death, stings...), so a flood of hits can't cut them off.
   - Each sound has a minimum repeat interval (e.g. kills every 50 ms), so a horde never drowns everything out.
@@ -452,6 +474,7 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - Every ability plays a sound by type; ultimates add a swell.
   - World events cover hits, kills, explosions, pickups, hurt/down/revive and level-ups.
   - The level director plays door, clear and portal sounds; the bosses play roar, wind-up, slam, spikes and fireball.
+  - The level enemies: a bow, bones falling apart and rattling back up, a spore burst, a snort and a thud into a wall, a lob and its sizzle, an imp's blink.
   - UI sounds on moves and confirms.
 - **Fullscreen:** F11 / Alt+Enter toggles it anywhere; the pause menu also has a fullscreen switch.
 

@@ -199,6 +199,39 @@ func line_of_sight(a: Vector2, b: Vector2) -> bool:
 	return true
 
 
+## Where something flying from a toward b stops: b, or where the line enters
+## the first tile that stops shots (so warning lines end at the wall).
+func shot_reach(a: Vector2, b: Vector2) -> Vector2:
+	var cell := cell_of(a)
+	var end := cell_of(b)
+	if is_shot_solid(cell.x, cell.y):
+		return a
+	var d := b - a
+	var step_x := 1 if d.x > 0.0 else -1
+	var step_y := 1 if d.y > 0.0 else -1
+	var t_delta_x := INF if d.x == 0.0 else absf(TILE / d.x)
+	var t_delta_y := INF if d.y == 0.0 else absf(TILE / d.y)
+	var next_x := (cell.x + (1 if step_x > 0 else 0)) * TILE
+	var next_y := (cell.y + (1 if step_y > 0 else 0)) * TILE
+	var t_max_x := INF if d.x == 0.0 else (next_x - a.x) / d.x
+	var t_max_y := INF if d.y == 0.0 else (next_y - a.y) / d.y
+	var guard := absi(end.x - cell.x) + absi(end.y - cell.y) + 2
+	while cell != end and guard > 0:
+		guard -= 1
+		var t_enter := 0.0
+		if t_max_x < t_max_y:
+			t_enter = t_max_x
+			t_max_x += t_delta_x
+			cell.x += step_x
+		else:
+			t_enter = t_max_y
+			t_max_y += t_delta_y
+			cell.y += step_y
+		if is_shot_solid(cell.x, cell.y):
+			return a + d * t_enter
+	return b
+
+
 ## Furthest point along a→b that a body of half-size r can reach (for blinks).
 func sweep_until_blocked(a: Vector2, b: Vector2, r: float) -> Vector2:
 	var dist := a.distance_to(b)

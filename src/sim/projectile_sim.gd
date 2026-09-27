@@ -12,8 +12,9 @@ const ATLAS_COLUMNS := 8
 enum Team { PLAYER, ENEMY }
 ## Shader tint code for enemy shots (they throb; see atlas_instance.gdshader).
 const HOSTILE_TINT := 6.0
-## Frame indices in row 0 of assets/sprites/fx/fx_atlas.png.
-enum Look { ARROW, BOLT, ORB, SPIT, KNIFE, RIVET, SOUL, FIRE }
+## Cell indices in assets/sprites/fx/fx_atlas.png: row 0, and the bone
+## archers' shard in row 3.
+enum Look { ARROW, BOLT, ORB, SPIT, KNIFE, RIVET, SOUL, FIRE, SHARD = 24 }
 
 ## Optional on-hit effects applied to enemies.
 enum Effect { NONE, SLOW, STUN }
