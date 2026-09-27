@@ -186,7 +186,8 @@ var interactables: Array[Interactable] = []
 var blessing_name := ""
 var blessing_left := 0.0
 var blessing_color := Color.WHITE
-## Barrel blasts waiting to go off: [position, radius, damage, slot, delay].
+## Barrel blasts waiting to go off: [position, radius, damage, slot, delay,
+## set off by an ultimate].
 var _pending_blasts: Array[Array] = []
 ## Volatile elites that died: [position, seconds until they blow].
 var _volatile_blasts: Array[Array] = []
@@ -535,7 +536,9 @@ func revive_all(hp_fraction: float, credit_slot: int = -1) -> void:
 				GameState.slots[credit_slot].revives += 1
 
 
+## A minion summoned while an ultimate works is part of it (see Ability).
 func add_minion(minion: Minion) -> void:
+	minion.ultimate = horde.ult_hits
 	entities.add_child(minion)
 	minions.append(minion)
 
@@ -565,7 +568,10 @@ func _tick_minions(dt: float) -> void:
 			i += 1
 
 
+## A zone placed while an ultimate works is part of it too (Arrow Rain, or a
+## plague cloud from poison the ultimate applied).
 func add_zone(zone: EffectZone) -> void:
+	zone.ultimate = horde.ult_hits
 	zones.append(zone)
 	ground_fx.zone(zone.position, zone.radius, zone.color, zone.duration)
 
@@ -765,7 +771,7 @@ func _use_interactable(it: Interactable, hero: Hero) -> void:
 
 
 ## A barrel or urn broke: free its tile, then blow up or scatter loot.
-func _break_object(p: Vector2, t: int, killer: int) -> void:
+func _break_object(p: Vector2, t: int, killer: int, by_ult: bool) -> void:
 	var cell := grid.cell_of(p)
 	grid.set_blocker(cell.x, cell.y, false)
 	var data := horde.types[t]
@@ -773,7 +779,7 @@ func _break_object(p: Vector2, t: int, killer: int) -> void:
 	match data.on_death:
 		EnemyData.OnDeath.EXPLODE:
 			_pending_blasts.append([p, data.explosion_radius,
-				data.explosion_damage * spawner.effective_hp_multiplier(), killer, BLAST_DELAY])
+				data.explosion_damage * spawner.effective_hp_multiplier(), killer, BLAST_DELAY, by_ult])
 		EnemyData.OnDeath.LOOT:
 			Audio.play(&"break")
 			for g in URN_GEMS:
@@ -831,8 +837,11 @@ func _update_barrel_blasts(dt: float) -> void:
 		_pending_blasts.remove_at(i)
 		var p: Vector2 = blast[0]
 		var r: float = blast[1]
-		# Hurts enemies, nests and other barrels (chains), never heroes.
+		# Hurts enemies, nests and other barrels (chains), never heroes. One an
+		# ultimate set off is the ultimate's too.
+		horde.ult_hits = blast[5]
 		damage_enemies_in_circle(p, r, blast[2], BARREL_KNOCKBACK, blast[3])
+		horde.ult_hits = false
 		fx.disc(p, r, Color(1.0, 0.6, 0.25, 0.65), 0.25)
 		fx.ring(p, r * 1.1, Color(1.0, 0.9, 0.5), 0.3)
 		particles.burst(p, 22, Color(1.0, 0.55, 0.2), 150.0, 0.55, 4, Vector2.ZERO, TAU, 0.0, 3.0)
@@ -1091,11 +1100,13 @@ func _update_zones(dt: float) -> void:
 	while i < zones.size():
 		var zone := zones[i]
 		if zone.advance(dt):
+			horde.ult_hits = zone.ultimate
 			if zone.damage > 0.0 or zone.slow_time > 0.0 or zone.stun_time > 0.0:
 				damage_enemies_in_circle(zone.position, zone.radius, zone.damage, zone.knockback,
 					zone.owner_slot, zone.stun_time, zone.slow_time)
 			if zone.poison_dps > 0.0:
 				elements.poison_area(zone)
+			horde.ult_hits = false
 			if zone.heal > 0.0:
 				for hero in heroes:
 					if not hero.is_downed() and hero.position.distance_to(zone.position) <= zone.radius:
@@ -1211,7 +1222,7 @@ func _process_kills() -> void:
 		var killer := horde.kill_slot[k]
 		var behavior := horde.t_behavior[t]
 		if behavior == EnemyData.Behavior.OBJECT:
-			_break_object(p, t, killer)  # scenery: no kill, corpse or XP gem
+			_break_object(p, t, killer, horde.kill_ult[k] != 0)  # scenery: no kill, corpse or XP gem
 			continue
 		if behavior == EnemyData.Behavior.NEST:
 			var cell := grid.cell_of(p)
@@ -1256,16 +1267,20 @@ func _process_kills() -> void:
 
 func _apply_ult_charge() -> void:
 	var dealt := horde.damage_by_slot
+	var by_ult := horde.ult_damage_by_slot
 	var biggest := horde.biggest_hit_by_slot
 	for hero in heroes:
 		if hero.slot < dealt.size() and dealt[hero.slot] > 0.0:
-			hero.add_ult_charge(dealt[hero.slot])
+			# Everything but what the ultimate dealt: it never charges itself.
+			hero.add_ult_charge(dealt[hero.slot] - by_ult[hero.slot])
 			hero.on_damage_dealt(dealt[hero.slot])
 			var stats := GameState.slots[hero.slot]
 			stats.damage_dealt += dealt[hero.slot]
 			stats.biggest_hit = maxf(stats.biggest_hit, biggest[hero.slot])
 	dealt.fill(0.0)
 	horde.damage_by_slot = dealt
+	by_ult.fill(0.0)
+	horde.ult_damage_by_slot = by_ult
 	biggest.fill(0.0)
 	horde.biggest_hit_by_slot = biggest
 

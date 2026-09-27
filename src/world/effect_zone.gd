@@ -14,6 +14,8 @@ var slow_time := 0.0
 var stun_time := 0.0
 var knockback := 0.0
 var owner_slot := -1
+## Made by an ultimate (set by World.add_zone): its hits don't charge ultimates.
+var ultimate := false
 ## > 0: a toxic cloud (Plague) adding a poison stack of this strength per tick.
 var poison_dps := 0.0
 var color := Color.WHITE

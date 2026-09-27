@@ -108,6 +108,7 @@ var frozen := PackedFloat32Array()        # seconds left frozen solid (also stun
 var ice_power := PackedFloat32Array()     # hit damage behind the frost (shatter nova)
 var status_time := PackedFloat32Array()   # longest status left; 0 = none (fast skip)
 var status_flags := PackedByteArray()
+var status_ult := PackedByteArray()       # 1: the latest status came from an ultimate (see ult_hits)
 ## Bosses: 1 while out of reach (under the ground or the water) - nothing
 ## hits, finds or touches it - and the share of every hit it shrugs off
 ## while shielded (0 = none).
@@ -158,8 +159,19 @@ var hurt_max_height := 0.0
 var kill_pos := PackedVector2Array()
 var kill_type := PackedInt32Array()
 var kill_slot := PackedInt32Array()
-## Damage dealt per player slot since the last drain (ultimate charge).
+## 1 where an ultimate made the kill (see ult_hits): a barrel it breaks blows
+## up as the ultimate's.
+var kill_ult := PackedByteArray()
+## Damage dealt per player slot since the last drain (ultimate charge,
+## lifesteal, stats)...
 var damage_by_slot := PackedFloat32Array([0, 0, 0, 0])
+## ...and the part of it their ultimates dealt, which doesn't charge them.
+var ult_damage_by_slot := PackedFloat32Array([0, 0, 0, 0])
+## On while an ultimate is hitting: the ultimate itself, a minion or zone it
+## made, the burns and poison it applied and what they lead to, or a barrel
+## it set off. Those hits count as damage dealt but never charge an
+## ultimate. Whoever turns it on turns it off again.
+var ult_hits := false
 ## Biggest single hit per player slot since the World last read it.
 var biggest_hit_by_slot := PackedFloat32Array([0, 0, 0, 0])
 ## Hits since the last drain (position, damage) for sparks and numbers.
@@ -202,11 +214,13 @@ var reform_type := PackedInt32Array()
 ## Enemies that went over a chasm edge since the World last checked (sound).
 var falls := 0
 ## Elemental death effects since the last drain (the World plays them out):
-## position, DeathFx kind, power (the damage they're based on), credited slot.
+## position, DeathFx kind, power (the damage they're based on), credited slot,
+## and 1 if an ultimate applied the status behind it.
 var death_fx_pos := PackedVector2Array()
 var death_fx_kind := PackedByteArray()
 var death_fx_power := PackedFloat32Array()
 var death_fx_slot := PackedInt32Array()
+var death_fx_ult := PackedByteArray()
 ## Exploder blasts since the last drain (World damages heroes + draws FX).
 var blast_pos := PackedVector2Array()
 var blast_radius := PackedFloat32Array()
@@ -260,6 +274,7 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	ice_power.resize(CAPACITY)
 	status_time.resize(CAPACITY)
 	status_flags.resize(CAPACITY)
+	status_ult.resize(CAPACITY)
 	hidden.resize(CAPACITY)
 	guard.resize(CAPACITY)
 	count = 0
@@ -387,6 +402,7 @@ func spawn(type_id: int, p: Vector2, hp_multiplier: float = 1.0) -> int:
 	ice_power[i] = 0.0
 	status_time[i] = 0.0
 	status_flags[i] = 0
+	status_ult[i] = 0
 	hidden[i] = 0
 	guard[i] = 0.0
 	_type_count[type_id] += 1
@@ -459,17 +475,21 @@ func damage(i: int, amount: float, knockback: Vector2, source_slot: int, crit: b
 	if knockback != Vector2.ZERO:
 		vel[i] += knockback * t_knockback[type[i]]
 	if source_slot >= 0 and source_slot < damage_by_slot.size():
-		damage_by_slot[source_slot] += minf(amount, h)
+		var dealt := minf(amount, h)
+		damage_by_slot[source_slot] += dealt
+		if ult_hits:
+			ult_damage_by_slot[source_slot] += dealt
 		if amount > biggest_hit_by_slot[source_slot]:
 			biggest_hit_by_slot[source_slot] = amount
 	if remaining <= 0.0:
 		kill_pos.append(pos[i])
 		kill_type.append(type[i])
 		kill_slot.append(source_slot)
+		kill_ult.append(1 if ult_hits else 0)
 		_dead_pending += 1
 		if status_time[i] > 0.0:
 			_log_death_fx(pos[i], status_flags[i], burn[i] > 0.0, burn_dps[i], poison[i] > 0.0,
-				poison_dps[i], frozen[i] > 0.0, ice_power[i], last_slot[i])
+				poison_dps[i], frozen[i] > 0.0, ice_power[i], last_slot[i], status_ult[i])
 		return true
 	return false
 
@@ -536,6 +556,7 @@ func is_burning(i: int) -> bool:
 func _add_status(i: int, seconds: float, slot: int, flags: int) -> void:
 	status_time[i] = maxf(status_time[i], seconds)
 	status_flags[i] |= flags
+	status_ult[i] = 1 if ult_hits else 0
 	if slot >= 0:
 		last_slot[i] = slot
 
@@ -545,6 +566,7 @@ func clear_death_fx() -> void:
 	death_fx_kind.clear()
 	death_fx_power.clear()
 	death_fx_slot.clear()
+	death_fx_ult.clear()
 
 
 ## Removes the first `n` logged death effects (played).
@@ -553,25 +575,27 @@ func drop_death_fx(n: int) -> void:
 	death_fx_kind = death_fx_kind.slice(n)
 	death_fx_power = death_fx_power.slice(n)
 	death_fx_slot = death_fx_slot.slice(n)
+	death_fx_ult = death_fx_ult.slice(n)
 
 
 func _log_death_fx(p: Vector2, flags: int, burning: bool, burn_power: float, poisoned: bool,
-		poison_power: float, is_ice: bool, frost_power: float, slot: int) -> void:
+		poison_power: float, is_ice: bool, frost_power: float, slot: int, ult: int) -> void:
 	if burning and flags & FLAG_INFERNO:
-		_push_death_fx(p, DeathFx.INFERNO, burn_power, slot)
+		_push_death_fx(p, DeathFx.INFERNO, burn_power, slot, ult)
 	if is_ice and flags & FLAG_SHATTER:
-		_push_death_fx(p, DeathFx.SHATTER, frost_power, slot)
+		_push_death_fx(p, DeathFx.SHATTER, frost_power, slot, ult)
 	if poisoned and flags & FLAG_PLAGUE:
-		_push_death_fx(p, DeathFx.PLAGUE, poison_power, slot)
+		_push_death_fx(p, DeathFx.PLAGUE, poison_power, slot, ult)
 
 
-func _push_death_fx(p: Vector2, kind: DeathFx, power: float, slot: int) -> void:
+func _push_death_fx(p: Vector2, kind: DeathFx, power: float, slot: int, ult: int) -> void:
 	if death_fx_pos.size() >= 128:
 		return
 	death_fx_pos.append(p)
 	death_fx_kind.append(kind)
 	death_fx_power.append(power)
 	death_fx_slot.append(slot)
+	death_fx_ult.append(ult)
 
 
 func apply_stun(i: int, seconds: float) -> void:
@@ -660,6 +684,7 @@ func clear_kill_log() -> void:
 	kill_pos.clear()
 	kill_type.clear()
 	kill_slot.clear()
+	kill_ult.clear()
 
 
 func update(dt: float, targets: PackedVector2Array) -> void:
@@ -750,6 +775,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 				kill_pos.append(p)
 				kill_type.append(t)
 				kill_slot.append(last_slot[i])
+				kill_ult.append(0)
 				_dead_pending += 1
 			else:
 				FALLS[i] = falling
@@ -782,17 +808,22 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 				HP[i] = before - dot
 				var slot := last_slot[i]
 				if slot >= 0 and slot < damage_by_slot.size():
-					damage_by_slot[slot] += minf(dot, before)
+					var dealt := minf(dot, before)
+					damage_by_slot[slot] += dealt
+					if status_ult[i] != 0:  # burning or poisoned by an ultimate
+						ult_damage_by_slot[slot] += dealt
 				if before - dot <= 0.0:
 					kill_pos.append(p)
 					kill_type.append(t)
 					kill_slot.append(slot)
+					kill_ult.append(status_ult[i])
 					_dead_pending += 1
 					_log_death_fx(p, status_flags[i], b > 0.0, BDPS[i], ps > 0.0, PDPS[i], fz > 0.0,
-						ice_power[i], slot)
+						ice_power[i], slot, status_ult[i])
 					continue
 			if STT[i] <= 0.0:
 				status_flags[i] = 0  # all statuses over: forget their death effects
+				status_ult[i] = 0
 		var r := radius_t[t]
 		var fl := FL[i]
 		if fl > 0.0:
@@ -890,6 +921,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 						kill_pos.append(p)
 						kill_type.append(t)
 						kill_slot.append(SELF_KILL)
+						kill_ult.append(0)
 						_dead_pending += 1
 						continue
 			elif behavior == EnemyData.Behavior.CHARGER:
@@ -1155,6 +1187,7 @@ func _remove_at(i: int) -> void:
 		ice_power[i] = ice_power[last]
 		status_time[i] = status_time[last]
 		status_flags[i] = status_flags[last]
+		status_ult[i] = status_ult[last]
 		hidden[i] = hidden[last]
 		guard[i] = guard[last]
 	count = last

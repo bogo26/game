@@ -65,6 +65,8 @@ func _on_attack(aim: Vector2) -> void:
 		return
 	var w := world()
 	var arc := deg_to_rad(arc_degrees)
+	# They swing on the hero's attack, outside _tick_active: still the ultimate.
+	w.horde.ult_hits = slot == Slot.ULTIMATE
 	for i in _ghosts.size():
 		var p := _ghost_position(i) + Vector2(0, -4)
 		# Clones copy the attack, elements included.
@@ -72,6 +74,7 @@ func _on_attack(aim: Vector2) -> void:
 			scaled_damage(damage * damage_fraction), 30.0, hero.slot, 0.0,
 			hero if hero.has_elements() else null))
 		w.fx.slash(p + aim * 3.0, reach * 0.8, aim.angle(), arc, Color(0.6, 0.4, 1.0, 0.8), 0.1)
+	w.horde.ult_hits = false
 
 
 func _clear_ghosts() -> void:

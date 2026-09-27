@@ -241,8 +241,10 @@ func _spread_fire(dt: float) -> void:
 		horde.query_circle(horde.pos[i], horde.t_radius[horde.type[i]] + SPREAD_REACH, _hits)
 		for k in _hits:
 			if k != i and burning[k] <= 0.0 and horde.can_take_status(k):
+				horde.ult_hits = horde.status_ult[i] != 0  # an ultimate's fire stays the ultimate's
 				horde.ignite(k, horde.burn_dps[i], BURN_TIME[2], horde.last_slot[i],
 					flags[i] & (HordeSim.FLAG_WILDFIRE | HordeSim.FLAG_INFERNO))
+				horde.ult_hits = false
 				burning = horde.burn  # ignite() wrote to it (copy-on-write)
 				break
 
@@ -257,8 +259,11 @@ func _play_death_fx() -> void:
 	var kinds := horde.death_fx_kind.slice(0, n)
 	var powers := horde.death_fx_power.slice(0, n)
 	var slots := horde.death_fx_slot.slice(0, n)
+	var ults := horde.death_fx_ult.slice(0, n)
 	horde.drop_death_fx(n)
 	for k in n:
+		# From a status an ultimate applied: the blast (or cloud) is the ultimate's.
+		horde.ult_hits = ults[k] != 0
 		match kinds[k]:
 			HordeSim.DeathFx.INFERNO:
 				_inferno(positions[k], powers[k], slots[k])
@@ -266,6 +271,7 @@ func _play_death_fx() -> void:
 				_shatter(positions[k], powers[k], slots[k])
 			HordeSim.DeathFx.PLAGUE:
 				_plague(positions[k], powers[k], slots[k])
+	horde.ult_hits = false
 
 
 ## A burning enemy died: it explodes and sets everything around it on fire.

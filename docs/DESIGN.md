@@ -40,7 +40,7 @@ Each hero has four abilities:
 - **Attack:** spammable
 - **Special:** cooldown
 - **Movement:** dash or bash on a short cooldown, with brief i-frames
-- **Ultimate:** charged by dealing damage and getting kills, not by a timer
+- **Ultimate:** charged by the damage the other three deal (never by its own), plus a slow trickle
 
 Two players may pick the same hero. Every player has a colour (P1 red, P2 blue, P3 green, P4 yellow), which is used for their ring, reticle and HUD panel.
 
@@ -149,7 +149,7 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
 
 - Elements ride on the attack only: projectile attacks log the enemies they hit, and melee swings (and the Rogue's shadow clones) pass their hits to `Elements.on_attack_hit()`. Specials and ultimates don't carry them.
 - Heroes can mix elements. Tiers are ability mods on the attack (`ability attack fire 1` per tier), so they need no special handling in the upgrade code.
-- **Statuses** live in `HordeSim` arrays (burn, poison stacks, chill, frost, frozen). Damage over time ticks in the horde's movement loop and is credited to the last hero to hit, for kills and ultimate charge. Enemies are tinted by status: frozen, burning, poisoned or chilled.
+- **Statuses** live in `HordeSim` arrays (burn, poison stacks, chill, frost, frozen). Damage over time ticks in the horde's movement loop and is credited to the last hero to hit, for kills and ultimate charge (but statuses an ultimate applied don't charge it: see Ultimate charge). Enemies are tinted by status: frozen, burning, poisoned or chilled.
 - **Who is affected.** Barrels and urns take no statuses. Bosses burn and get poisoned, but never freeze or slow.
 - **Death effects** (Inferno, Shatter, Plague) are logged when an enemy dies, and at most 6 play per frame, so chains ripple outward. Fire spreading is checked for a share of the horde every frame.
 - **Cost.** In the worst case (all four elements at tier III on four heroes firing ~1000 elemental shots a second), the element code costs ~0.04 ms per frame. The stress test with `--elements` still meets the targets: 4.7 ms average, 7.9 ms p99.
@@ -368,12 +368,13 @@ docs/         this document
 - **Buff hooks:** the hero multiplies/sums hooks over its four abilities (`damage_factor`, `attack_speed_factor`, `area_factor`, `lifesteal`, …).
 - **Minions:** they are nodes ticked by the World.
   - Skeletons walk to and melee the nearest enemy and take contact damage. Turrets shoot rivets. Tesla towers chain lightning across 5 targets.
-  - Minion damage counts toward the owner's ultimate charge and lifesteal.
+  - Minion damage counts toward the owner's lifesteal and, unless an ultimate summoned them (Army of the Dead, the tesla tower), ultimate charge.
   - They retarget every 0.4 s.
   - Caps: Raise Dead 8, Army of the Dead 16, turrets 2, towers 1.
 - Upgrades tweak abilities through `Ability.mods` (e.g. `pierce`, `count`, `area_pct`, `max_active`, `minion_hp_pct`). There are 62 upgrades: 17 generic, 4–5 per hero, and 12 elemental.
 - Hero tuning lives in `tools/gen_hero_data.py`, which writes `src/heroes/data/*.tres`. Edit the table and re-run it, or edit the `.tres` in the Godot inspector.
 - **Ultimate charge:** damage dealt ÷ the hero's `ult_cost`, plus 1% per second passively. The player ring pulses when the ultimate is ready.
+  - An ultimate never charges itself (it could be chained otherwise). While one works (its `_activate` / `_tick_active`, the clones' swings) `HordeSim.ult_hits` is on, and its hits also go to `ult_damage_by_slot`, which `World._apply_ult_charge()` leaves out. Minions and zones made meanwhile keep that (`World.add_minion` / `add_zone`), and so do the statuses it applies (`status_ult`: their damage over time, spreading fire and death effects) and the barrels it sets off. It all still counts as damage dealt, for stats and lifesteal.
 - **Critical hits:**
   - Every hit rolls the attacker's crit chance: base 5%, Rogue 15%, Keen Eye +6%, Deadly Precision +8%.
   - A crit deals ×crit damage: base 1.75, +0.35 per Brutal Crits.

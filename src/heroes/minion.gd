@@ -5,7 +5,8 @@ extends Node2D
 ##             enemies hurt it on contact (they don't chase it)
 ##   TURRET    stationary, shoots rivets at the nearest enemy
 ##   TESLA     stationary, chain lightning that jumps between nearby enemies
-## Damage is credited to the owner's slot (ultimate charge, lifesteal).
+## Damage is credited to the owner's slot (ultimate charge, lifesteal); what
+## skeletons and tesla towers an ultimate summoned hit doesn't charge it.
 
 enum Kind { SKELETON, TURRET, TESLA }
 
@@ -31,6 +32,8 @@ var damage := 8.0
 var attack_interval := 0.6
 var attack_range := 140.0
 var lifetime := 20.0
+## Summoned by an ultimate (set by World.add_minion).
+var ultimate := false
 
 var _age := 0.0
 var _attack_cd := 0.0
@@ -118,7 +121,9 @@ func _tick_skeleton(dt: float) -> void:
 			move = _aim
 		elif _attack_cd <= 0.0:
 			_attack_cd = attack_interval
+			horde.ult_hits = ultimate
 			world.hit_enemy(_target, damage, _aim * 40.0, owner_hero.slot, owner_hero)
+			horde.ult_hits = false
 			world.fx.slash(position + Vector2(0, -6) + _aim * 3.0, 9.0, _aim.angle(), 1.6, Color(0.9, 0.9, 0.8, 0.8), 0.1)
 	else:
 		var to_owner := owner_hero.position - position
@@ -165,6 +170,7 @@ func _tick_tesla() -> void:
 	var from := position + Vector2(0, -16)
 	Audio.play(&"tesla")
 	var current := _target
+	horde.ult_hits = ultimate
 	for jump in CHAIN_JUMPS + 1:
 		if current < 0:
 			break
@@ -175,6 +181,7 @@ func _tick_tesla() -> void:
 		horde.apply_stun(current, 0.15)
 		from = p
 		current = _next_chain_target(p, hit)
+	horde.ult_hits = false
 
 
 func _next_chain_target(p: Vector2, hit: Dictionary) -> int:

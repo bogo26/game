@@ -4,6 +4,9 @@ extends Resource
 ## Base for hero abilities. Subclasses export their tuning and implement
 ## _activate(); per-hero runtime state (cooldowns, upgrade modifiers) lives on
 ## the duplicated instance bound to a Hero.
+## An ultimate never charges itself: while it works (_activate, _tick_active)
+## the horde logs its hits as an ultimate's (HordeSim.ult_hits), and minions
+## and zones made meanwhile keep that (World.add_minion, World.add_zone).
 
 enum Slot { ATTACK, SPECIAL, MOVEMENT, ULTIMATE }
 
@@ -32,7 +35,10 @@ func world() -> World:
 func tick(delta: float) -> void:
 	if cooldown_left > 0.0:
 		cooldown_left -= delta
+	var horde := world().horde
+	horde.ult_hits = slot == Slot.ULTIMATE
 	_tick_active(delta)
+	horde.ult_hits = false
 
 
 func can_activate() -> bool:
@@ -42,7 +48,10 @@ func can_activate() -> bool:
 func try_activate(aim: Vector2) -> bool:
 	if not can_activate():
 		return false
+	var horde := world().horde
+	horde.ult_hits = slot == Slot.ULTIMATE
 	_activate(aim)
+	horde.ult_hits = false
 	cooldown_left = effective_cooldown()
 	Audio.play(sound())
 	if slot == Slot.ULTIMATE:
