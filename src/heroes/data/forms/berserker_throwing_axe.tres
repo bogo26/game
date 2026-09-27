@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="ThrowingAxeAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/throwing_axe.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Throwing Axe"
+description = "Heavy cleave; every third swing hurls the axe out and back, hitting both ways."
+cooldown = 0.48
+hold_to_repeat = true
+reach = 24.0
+arc_degrees = 110.0
+damage = 13.0
+knockback = 80.0
+combo_every = 3
+combo_multiplier = 2.2
+color = Color(1.0, 0.75, 0.6, 0.9)
+throw_reach = 110.0
+throw_speed = 230.0
+return_speed = 260.0
+throw_radius = 6.0

@@ -37,6 +37,9 @@ enum Direction { MOVE_OR_AIM, AIM, AWAY_FROM_AIM }
 @export var color := Color(1, 1, 1, 0.6)
 
 var _active := false
+## Which way the current dash goes, and how long this leg of it lasts.
+var _dash_dir := Vector2.RIGHT
+var _leg_time := 0.18
 var _hit_uids: Dictionary = {}
 var _healed: Dictionary = {}
 var _trail_timer := 0.0
@@ -64,6 +67,8 @@ func _activate(aim: Vector2) -> void:
 		zone.color = Color(0.8, 0.8, 0.8)
 		w.add_zone(zone)
 	hero.start_dash(dir, distance * (1.0 + mod(&"distance_pct")), duration, iframes + mod(&"iframes"))
+	_dash_dir = dir.normalized() if dir != Vector2.ZERO else hero.aim_dir
+	_leg_time = duration
 	_active = true
 	_hit_uids.clear()
 	_healed.clear()
@@ -85,45 +90,15 @@ func _tick_active(delta: float) -> void:
 		return
 	var w := world()
 	if arc_height > 0.0:
-		var t := 1.0 - clampf(hero.dash_time_left / maxf(duration, 0.01), 0.0, 1.0)
+		var t := 1.0 - clampf(hero.dash_time_left / maxf(_leg_time, 0.01), 0.0, 1.0)
 		hero.air_height = sin(t * PI) * arc_height if hero.is_dashing() else 0.0
 	if not hero.is_dashing():
 		_active = false
 		hero.air_height = 0.0
-		if landing_damage > 0.0:
-			var r := landing_radius * area_scale()
-			hero.on_hits(w.damage_enemies_in_circle(hero.position, r, scaled_damage(landing_damage),
-				160.0, hero.slot, landing_stun + mod(&"stun_time")))
-			w.fx.disc(hero.position, r, Color(color, 0.45), 0.2)
-			w.fx.ring(hero.position, r * 1.15, color, 0.3)
-			w.shake(3.0)
-			Audio.play(&"slam")
-		var burst := mod(&"end_burst")
-		if burst > 0.0:
-			hero.on_hits(w.damage_enemies_in_circle(hero.position, 30.0, scaled_damage(burst), 150.0, hero.slot, 0.3))
-			w.fx.ring(hero.position, 30.0, color, 0.3)
-			w.shake(2.0)
+		_finish_dash()
 		return
 	w.fx.disc(hero.position + Vector2(0, -6), 4.0, Color(color, 0.35), 0.15)
-	if damage > 0.0 or knockback > 0.0 or stun_time > 0.0 or slow_time > 0.0 or mark_time > 0.0:
-		var horde := w.horde
-		horde.query_circle(hero.position, hit_radius, _scratch)
-		for j in _scratch:
-			var id := horde.uid[j]
-			if _hit_uids.has(id):
-				continue
-			_hit_uids[id] = true
-			var push := (horde.pos[j] - hero.position).normalized() * knockback
-			if damage > 0.0:
-				w.hit_enemy(j, scaled_damage(damage), push, hero.slot, hero)
-			elif push != Vector2.ZERO:
-				horde.push(j, push, hero.slot)
-			if stun_time > 0.0:
-				horde.apply_stun(j, stun_time + mod(&"stun_time"))
-			if slow_time > 0.0:
-				horde.apply_slow(j, slow_time)
-			if mark_time > 0.0:
-				horde.apply_mark(j, mark_time)
+	_hit_passed()
 	var heal_amount := heal_allies + mod(&"heal_allies")
 	if heal_amount > 0.0:
 		if not _healed.has(hero.slot):  # the dasher gets half (so it works solo too)
@@ -152,6 +127,56 @@ func _tick_active(delta: float) -> void:
 			zone.owner_slot = hero.slot
 			zone.color = Color(1.0, 0.5, 0.15)
 			w.add_zone(zone)
+
+
+## Enemies the dash passes through: hit, shoved, stunned, slowed or marked
+## (each once per dash).
+func _hit_passed() -> void:
+	if damage <= 0.0 and knockback <= 0.0 and stun_time <= 0.0 and slow_time <= 0.0 and mark_time <= 0.0:
+		return
+	var w := world()
+	var horde := w.horde
+	horde.query_circle(hero.position, hit_radius, _scratch)
+	for j in _scratch:
+		var id := horde.uid[j]
+		if _hit_uids.has(id):
+			continue
+		_hit_uids[id] = true
+		var push := (horde.pos[j] - hero.position).normalized() * knockback
+		if damage > 0.0:
+			w.hit_enemy(j, scaled_damage(damage), push, hero.slot, hero)
+		elif push != Vector2.ZERO:
+			horde.push(j, push, hero.slot)
+		if stun_time > 0.0:
+			horde.apply_stun(j, stun_time + mod(&"stun_time"))
+		if slow_time > 0.0:
+			horde.apply_slow(j, slow_time)
+		if mark_time > 0.0:
+			horde.apply_mark(j, mark_time)
+
+
+## The dash is over: a leap lands, and Shockwave Charge bursts.
+func _finish_dash() -> void:
+	if landing_damage > 0.0:
+		_land_leap(1.0, 1.0)
+	var burst := mod(&"end_burst")
+	if burst > 0.0:
+		var w := world()
+		hero.on_hits(w.damage_enemies_in_circle(hero.position, 30.0, scaled_damage(burst), 150.0, hero.slot, 0.3))
+		w.fx.ring(hero.position, 30.0, color, 0.3)
+		w.shake(2.0)
+
+
+## A leap's landing; `area` and `power` scale its radius and damage.
+func _land_leap(area: float, power: float) -> void:
+	var w := world()
+	var r := landing_radius * area_scale() * area
+	hero.on_hits(w.damage_enemies_in_circle(hero.position, r, scaled_damage(landing_damage * power),
+		160.0, hero.slot, landing_stun + mod(&"stun_time")))
+	w.fx.disc(hero.position, r, Color(color, 0.45), 0.2)
+	w.fx.ring(hero.position, r * 1.15, color, 0.3)
+	w.shake(3.0 * sqrt(power))
+	Audio.play(&"slam", 0.0, 1.0 / sqrt(power))
 
 
 func sound() -> StringName:

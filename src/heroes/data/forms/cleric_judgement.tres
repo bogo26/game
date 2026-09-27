@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="JudgementAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/judgement.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Judgement"
+description = "Revive and heal the team, then 12 pillars of light strike the toughest enemies on screen."
+cooldown = 0.5
+target = 2
+damage = 40.0
+knockback = 120.0
+heal_fraction = 0.4
+revive_allies = true
+color = Color(1.0, 0.95, 0.7, 1.0)
+pillars = 12
+pillar_interval = 0.12
+pillar_damage = 90.0
+pillar_radius = 22.0
+pillar_stun = 0.6
+pillar_knockback = 60.0

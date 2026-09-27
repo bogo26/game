@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="ShadowHuntAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/shadow_hunt.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Shadow Hunt"
+description = "3 clones hunt on their own for 6s, blinking from enemy to enemy to stab and mark them."
+cooldown = 0.5
+duration = 6.0
+clone_count = 3
+damage = 7.0
+reach = 22.0
+arc_degrees = 80.0
+hunt_range = 140.0
+hop_interval = 0.35
+hunt_mark = 2.0

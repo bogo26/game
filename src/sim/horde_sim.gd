@@ -1208,6 +1208,37 @@ func query_circle(center: Vector2, radius: float, out: PackedInt32Array) -> int:
 	return out.size()
 
 
+## Fills `out` with alive enemies whose drawn body (the hurtbox standing on
+## the feet) a circle at `p` touches: ProjectileSim's hit test, for shots the
+## abilities fly themselves (HeroMissile), so they connect with what's drawn.
+func query_bodies(p: Vector2, radius: float, out: PackedInt32Array) -> int:
+	out.clear()
+	var head := hash.head
+	var nxt := hash.next
+	var cols := hash.cols
+	var inv := hash.inv_cell
+	# Feet of a body the circle can touch lie between just above it and the
+	# tallest body's height below it.
+	var x0 := clampi(int((p.x - radius - hurt_max_half_width) * inv), 0, cols - 1)
+	var x1 := clampi(int((p.x + radius + hurt_max_half_width) * inv), 0, cols - 1)
+	var y0 := clampi(int((p.y - radius) * inv), 0, hash.rows - 1)
+	var y1 := clampi(int((p.y + radius + hurt_max_height) * inv), 0, hash.rows - 1)
+	var r2 := radius * radius
+	for cy in range(y0, y1 + 1):
+		for cx in range(x0, x1 + 1):
+			var j := head[cy * cols + cx]
+			while j != -1:
+				if j < count and hp[j] > 0.0 and fall[j] <= 0.0 and hidden[j] == 0:
+					var f := pos[j]
+					var t := type[j]
+					var dx := p.x - clampf(p.x, f.x - t_hurt_half_width[t], f.x + t_hurt_half_width[t])
+					var dy := p.y - clampf(p.y, f.y - t_hurt_height[t], f.y)
+					if dx * dx + dy * dy <= r2:
+						out.append(j)
+				j = nxt[j]
+	return out.size()
+
+
 ## Enemies within `radius` and inside a cone of `half_angle` around `dir`
 ## (enemies touching the centre always count).
 func query_arc(center: Vector2, dir: Vector2, radius: float, half_angle: float, out: PackedInt32Array) -> int:

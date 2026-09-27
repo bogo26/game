@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="BloodbathAbility" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/heroes/abilities/forms/bloodbath.gd" id="1_form"]
+
+[resource]
+script = ExtResource("1_form")
+display_name = "Bloodbath"
+description = "Pay 10% HP: frenzy for 5s. Every kill bursts in blood that hurts enemies and heals you."
+cooldown = 10.0
+duration = 5.0
+hp_cost = 0.1
+attack_speed_multiplier = 1.6
+lifesteal_fraction = 0.15
+color = Color(1.0, 0.25, 0.25, 1.0)
+burst_radius = 28.0
+burst_damage = 12.0
+burst_heal = 2.0
+burst_knockback = 60.0

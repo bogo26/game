@@ -65,7 +65,7 @@ The macOS build runs on your own Mac; other people have to right-click → Open 
    | 1 | Crypt Entrance | spike traps, barrels, urns | **Bats**: fast, frail, weaving flocks of three |
    | 2 | Flooded Halls | water, nests | **Drowned**: slow on land, fast in water |
    | 3 | Bone Pits | chasms and bridges | **Bone archers**: show their aim as a line, then shoot along it |
-   | Mini boss | *one of three bosses (below)* | beat it to open the way on | its servants |
+   | Mini boss | *one of three bosses (below)* | beat it to open the way on, and pick a **legendary** (below) | its servants |
    | 4 | Fungal Caverns | toxic pools, spore nests | **Sporecaps**: burst into spore clouds when killed |
    | 5 | Frozen Vaults | crevasses, slush, spike galleries | **Frost boars**: charge down a marked lane, into walls or over crevasse edges |
    | 6 | Molten Forge | lava channels, powder kegs, four arenas | **Salamanders**: lob molten slag where you stand |
@@ -98,7 +98,20 @@ Upgrades include four **elemental chains** for your attack: fire, ice, poison an
 - **Plague:** poisoned enemies leave toxic clouds.
 - **Thunderstrike:** every 5th hit calls down a bolt.
 
-**Test Room** on the main menu is a drop-in sandbox with an endless horde and one of everything. Add `-- --upgrades=fire_3,ice_2` to `./tools/dev.sh run` to start with those upgrades and the tiers before them.
+**Legendaries:** beating the mini boss lets every player pick one of their hero's three legendaries. Each turns one of the hero's abilities into something new for the rest of the run, with a new name, look and behaviour:
+
+| Hero | Attack | Special | Movement | Ultimate |
+|---|---|---|---|---|
+| Knight | **Crescent Wave**: every 3rd swing sends a crescent of light through a whole line | **Challenge**: yank nearby enemies to your feet, stunned; take less damage per enemy caught | **Juggernaut**: carry everything in your path, then slam it down | |
+| Ranger | **Ricochet**: arrows glance from enemy to enemy | **Cluster Arrow**: a heavy arrow bursts into a ring of 12 | **Decoy**: a scarecrow the horde goes after, then caltrops | |
+| Mage | | **Frozen Orb**: an ice orb sprays shards, then bursts into a Frost Nova | **Chronoshift**: snap back to where you blinked from, undoing damage | **Singularity**: a black hole drags enemies in, then collapses |
+| Cleric | **Prism Orbs**: orbs split in three at each wall bounce | **Bastion**: a dome that stops enemy shots and pushes enemies out | | **Judgement**: pillars of light strike the toughest enemies, bosses first |
+| Berserker | **Throwing Axe**: every 3rd swing throws the axe out and back | **Bloodbath**: kills burst in blood, chaining through the pack | **Rebound**: three slams in a row, each bigger | |
+| Rogue | | **Blade Vortex**: knives whirl around you, then fly out | **Shadowstrike**: appear behind an enemy for a sure crit | **Shadow Hunt**: clones hunt on their own |
+| Engineer | **Flamethrower**: a gout of fire that sets enemies burning | **Mortar**: mortars shell the biggest pack | | **Tesla Grid**: lightning links between the tower, you and your turrets |
+| Necromancer | **Haunt**: bolt kills rise as seeking wisps | **Bone Golem**: one big golem made of corpses draws the horde | | **Lich Form**: become a Lich; your kills rise as skeletons |
+
+**Test Room** on the main menu is a drop-in sandbox with an endless horde and one of everything. Add `-- --upgrades=fire_3,ice_2` to `./tools/dev.sh run` to start with those upgrades and the tiers before them; legendaries work too (`--upgrades=knight_crescent_wave,mage_singularity`: each hero only takes its own).
 
 **Replaying:** pick Casual, Normal or Hard in character select (LB / RB or Q / E; Hard unlocks after a Normal win, or after reaching wave 20 of Endless Waves on Normal). Every run picks one of two layouts for each regular level and may mirror it, and from the second level on some enemies arrive as elites (Swift, Volatile, Splitting). The end screen shows everyone's numbers and awards, and records best times.
 
@@ -113,7 +126,9 @@ Debug flags (after `--`): `--level=3` (the run's 1-based position: `--level=4` i
 
 ## Status
 
-Milestone 15 (Endless Waves) is done: a second mode on the main menu, where the team holds one arena against waves that keep getting harder, with a boss every 5th wave and a best wave per difficulty.
+Milestone 16 (Endless Waves) is done: a second mode on the main menu, where the team holds one arena against waves that keep getting harder, with a boss every 5th wave (each one a legendary round) and a best wave per difficulty.
+
+Milestone 15 (legendary upgrades) is done: beating the mini boss offers each player their hero's three legendaries, and each of the 24 turns one ability into a new form with its own look, behaviour and sounds.
 
 Milestone 14 (more bosses) is done: every run now meets one of three mini bosses and one of three final bosses. New are the Toadstool Tyrant and the Mire Serpent (mini bosses) and the Spore Mother and the Frost Queen (final bosses), each with a level, tile theme, sounds and servant enemy of its own (sporelings, eels, puffballs, frost wraiths).
 

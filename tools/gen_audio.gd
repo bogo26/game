@@ -83,6 +83,8 @@ const SFX := {
 	"thud": {"wave": "sine", "f0": 110.0, "f1": 45.0, "dur": 0.22, "decay": 1.8, "vol": 0.45, "noise": 0.3, "lp": 0.3},
 	"lob": {"wave": "noise", "f0": 500.0, "f1": 1400.0, "dur": 0.25, "decay": 1.0, "vol": 0.18, "lp": 0.3},
 	"sizzle": {"wave": "noise", "f0": 6000.0, "f1": 2500.0, "dur": 0.45, "decay": 1.2, "vol": 0.22, "lp": 0.6},
+	# The Engineer's Flamethrower: a short, soft roar (not the exploders' fuse hiss, which warns).
+	"flame": {"wave": "noise", "f0": 900.0, "f1": 380.0, "dur": 0.16, "decay": 1.1, "vol": 0.14, "lp": 0.22, "vib": [0.2, 25.0]},
 	"imp": {"wave": "square", "f0": 1200.0, "f1": 300.0, "dur": 0.16, "decay": 1.4, "vol": 0.12, "duty": 0.25, "vib": [0.1, 30.0]},
 	# The other bosses: the Toadstool Tyrant's springy hops, the Mire Serpent
 	# diving, bubbling up and biting, the Spore Mother's pods sprouting and

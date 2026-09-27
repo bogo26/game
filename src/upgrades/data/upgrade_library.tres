@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="UpgradeLibrary" load_steps=65 format=3]
+[gd_resource type="Resource" script_class="UpgradeLibrary" load_steps=89 format=3]
 
 [ext_resource type="Script" path="res://src/upgrades/upgrade_library.gd" id="1_library"]
 [ext_resource type="Script" path="res://src/upgrades/upgrade_data.gd" id="2_upgrade"]
@@ -668,6 +668,270 @@ element = &"lightning"
 tier = 3
 weight_bonus = 8.0
 
+[sub_resource type="Resource" id="Resource_knight_crescent_wave"]
+script = ExtResource("2_upgrade")
+id = &"knight_crescent_wave"
+display_name = "Crescent Wave"
+description = "Sword Slash: every 3rd swing also sends a crescent of light through a whole line"
+rarity = 3
+max_stacks = 1
+hero_id = &"knight"
+effects = PackedStringArray()
+form_slot = 0
+
+[sub_resource type="Resource" id="Resource_knight_challenge"]
+script = ExtResource("2_upgrade")
+id = &"knight_challenge"
+display_name = "Challenge"
+description = "Ground Slam: drag nearby enemies to your feet and stun them. -4% damage taken per enemy"
+rarity = 3
+max_stacks = 1
+hero_id = &"knight"
+effects = PackedStringArray()
+form_slot = 1
+
+[sub_resource type="Resource" id="Resource_knight_juggernaut"]
+script = ExtResource("2_upgrade")
+id = &"knight_juggernaut"
+display_name = "Juggernaut"
+description = "Shield Charge: carry everything in your path, then slam it all down (harder into walls)"
+rarity = 3
+max_stacks = 1
+hero_id = &"knight"
+effects = PackedStringArray()
+form_slot = 2
+
+[sub_resource type="Resource" id="Resource_ranger_ricochet"]
+script = ExtResource("2_upgrade")
+id = &"ranger_ricochet"
+display_name = "Ricochet"
+description = "Piercing Arrow: arrows glance off each enemy they hit to the next one, 3 times"
+rarity = 3
+max_stacks = 1
+hero_id = &"ranger"
+effects = PackedStringArray()
+form_slot = 0
+
+[sub_resource type="Resource" id="Resource_ranger_cluster_arrow"]
+script = ExtResource("2_upgrade")
+id = &"ranger_cluster_arrow"
+display_name = "Cluster Arrow"
+description = "Fan Volley: one heavy arrow that bursts into a ring of 12 arrows where it lands"
+rarity = 3
+max_stacks = 1
+hero_id = &"ranger"
+effects = PackedStringArray()
+form_slot = 1
+
+[sub_resource type="Resource" id="Resource_ranger_decoy"]
+script = ExtResource("2_upgrade")
+id = &"ranger_decoy"
+display_name = "Decoy"
+description = "Backflip: leave a straw decoy the horde goes after for 3s. It bursts into caltrops"
+rarity = 3
+max_stacks = 1
+hero_id = &"ranger"
+effects = PackedStringArray()
+form_slot = 2
+
+[sub_resource type="Resource" id="Resource_mage_frozen_orb"]
+script = ExtResource("2_upgrade")
+id = &"mage_frozen_orb"
+display_name = "Frozen Orb"
+description = "Frost Nova: hurl an ice orb that sprays slowing shards, then bursts into a Frost Nova"
+rarity = 3
+max_stacks = 1
+hero_id = &"mage"
+effects = PackedStringArray()
+form_slot = 1
+
+[sub_resource type="Resource" id="Resource_mage_chronoshift"]
+script = ExtResource("2_upgrade")
+id = &"mage_chronoshift"
+display_name = "Chronoshift"
+description = "Blink: leave an echo. 2.5s later you snap back to it and undo half the damage taken"
+rarity = 3
+max_stacks = 1
+hero_id = &"mage"
+effects = PackedStringArray()
+form_slot = 2
+
+[sub_resource type="Resource" id="Resource_mage_singularity"]
+script = ExtResource("2_upgrade")
+id = &"mage_singularity"
+display_name = "Singularity"
+description = "Meteor: a black hole drags enemies in for 3s, then collapses in the Meteor's blast"
+rarity = 3
+max_stacks = 1
+hero_id = &"mage"
+effects = PackedStringArray()
+form_slot = 3
+
+[sub_resource type="Resource" id="Resource_cleric_prism_orbs"]
+script = ExtResource("2_upgrade")
+id = &"cleric_prism_orbs"
+display_name = "Prism Orbs"
+description = "Holy Orb: orbs split in three each time they bounce off a wall (twice)"
+rarity = 3
+max_stacks = 1
+hero_id = &"cleric"
+effects = PackedStringArray()
+form_slot = 0
+
+[sub_resource type="Resource" id="Resource_cleric_bastion"]
+script = ExtResource("2_upgrade")
+id = &"cleric_bastion"
+display_name = "Bastion"
+description = "Sanctuary: a dome for 5s that stops enemy shots and pushes enemies out. Still heals"
+rarity = 3
+max_stacks = 1
+hero_id = &"cleric"
+effects = PackedStringArray()
+form_slot = 1
+
+[sub_resource type="Resource" id="Resource_cleric_judgement"]
+script = ExtResource("2_upgrade")
+id = &"cleric_judgement"
+display_name = "Judgement"
+description = "Divine Light: still revives and heals, then 12 pillars of light hit the toughest foes"
+rarity = 3
+max_stacks = 1
+hero_id = &"cleric"
+effects = PackedStringArray()
+form_slot = 3
+
+[sub_resource type="Resource" id="Resource_berserker_throwing_axe"]
+script = ExtResource("2_upgrade")
+id = &"berserker_throwing_axe"
+display_name = "Throwing Axe"
+description = "Axe Cleave: every 3rd swing hurls your axe out through the horde and back"
+rarity = 3
+max_stacks = 1
+hero_id = &"berserker"
+effects = PackedStringArray()
+form_slot = 0
+
+[sub_resource type="Resource" id="Resource_berserker_bloodbath"]
+script = ExtResource("2_upgrade")
+id = &"berserker_bloodbath"
+display_name = "Bloodbath"
+description = "Blood Frenzy: while it lasts, your kills burst in blood, hurting enemies and healing you"
+rarity = 3
+max_stacks = 1
+hero_id = &"berserker"
+effects = PackedStringArray()
+form_slot = 1
+
+[sub_resource type="Resource" id="Resource_berserker_rebound"]
+script = ExtResource("2_upgrade")
+id = &"berserker_rebound"
+display_name = "Rebound"
+description = "Leap Slam: each landing bounces you onto the next enemy: 3 slams in a row, each bigger"
+rarity = 3
+max_stacks = 1
+hero_id = &"berserker"
+effects = PackedStringArray()
+form_slot = 2
+
+[sub_resource type="Resource" id="Resource_rogue_blade_vortex"]
+script = ExtResource("2_upgrade")
+id = &"rogue_blade_vortex"
+display_name = "Blade Vortex"
+description = "Knife Ring: the knives whirl around you for 3s, cutting what comes close, then fly out"
+rarity = 3
+max_stacks = 1
+hero_id = &"rogue"
+effects = PackedStringArray()
+form_slot = 1
+
+[sub_resource type="Resource" id="Resource_rogue_shadowstrike"]
+script = ExtResource("2_upgrade")
+id = &"rogue_shadowstrike"
+display_name = "Shadowstrike"
+description = "Shadow Step: appear behind the enemy nearest your aim and stab it: a sure crit"
+rarity = 3
+max_stacks = 1
+hero_id = &"rogue"
+effects = PackedStringArray()
+form_slot = 2
+
+[sub_resource type="Resource" id="Resource_rogue_shadow_hunt"]
+script = ExtResource("2_upgrade")
+id = &"rogue_shadow_hunt"
+display_name = "Shadow Hunt"
+description = "Shadow Clones: your clones hunt on their own, blinking between enemies to stab them"
+rarity = 3
+max_stacks = 1
+hero_id = &"rogue"
+effects = PackedStringArray()
+form_slot = 3
+
+[sub_resource type="Resource" id="Resource_engineer_flamethrower"]
+script = ExtResource("2_upgrade")
+id = &"engineer_flamethrower"
+display_name = "Flamethrower"
+description = "Rivet Gun: becomes a flamethrower. Short gouts of fire that set enemies burning"
+rarity = 3
+max_stacks = 1
+hero_id = &"engineer"
+effects = PackedStringArray()
+form_slot = 0
+
+[sub_resource type="Resource" id="Resource_engineer_mortar"]
+script = ExtResource("2_upgrade")
+id = &"engineer_mortar"
+display_name = "Mortar"
+description = "Deploy Turret: build mortars instead, lobbing shells at the biggest pack in range"
+rarity = 3
+max_stacks = 1
+hero_id = &"engineer"
+effects = PackedStringArray()
+form_slot = 1
+
+[sub_resource type="Resource" id="Resource_engineer_tesla_grid"]
+script = ExtResource("2_upgrade")
+id = &"engineer_tesla_grid"
+display_name = "Tesla Grid"
+description = "Tesla Tower: links itself to you and your turrets with lightning that shocks enemies"
+rarity = 3
+max_stacks = 1
+hero_id = &"engineer"
+effects = PackedStringArray()
+form_slot = 3
+
+[sub_resource type="Resource" id="Resource_necro_haunt"]
+script = ExtResource("2_upgrade")
+id = &"necro_haunt"
+display_name = "Haunt"
+description = "Soul Bolt: enemies it kills rise as wisps that seek another enemy and burst on it"
+rarity = 3
+max_stacks = 1
+hero_id = &"necromancer"
+effects = PackedStringArray()
+form_slot = 0
+
+[sub_resource type="Resource" id="Resource_necro_bone_golem"]
+script = ExtResource("2_upgrade")
+id = &"necro_bone_golem"
+display_name = "Bone Golem"
+description = "Raise Dead: fuse corpses into one golem that draws the horde. Cast again to feed it"
+rarity = 3
+max_stacks = 1
+hero_id = &"necromancer"
+effects = PackedStringArray()
+form_slot = 1
+
+[sub_resource type="Resource" id="Resource_necro_lich_form"]
+script = ExtResource("2_upgrade")
+id = &"necro_lich_form"
+display_name = "Lich Form"
+description = "Army of the Dead: become a Lich for 10s: triple bolts, and your kills rise as skeletons"
+rarity = 3
+max_stacks = 1
+hero_id = &"necromancer"
+effects = PackedStringArray()
+form_slot = 3
+
 [resource]
 script = ExtResource("1_library")
-upgrades = Array[ExtResource("2_upgrade")]([SubResource("Resource_sharpened"), SubResource("Resource_quick_hands"), SubResource("Resource_swift_boots"), SubResource("Resource_vitality"), SubResource("Resource_iron_skin"), SubResource("Resource_keen_eye"), SubResource("Resource_brutal"), SubResource("Resource_magnet"), SubResource("Resource_recharge"), SubResource("Resource_regeneration"), SubResource("Resource_focus"), SubResource("Resource_nimble"), SubResource("Resource_amplify"), SubResource("Resource_bloodthirst"), SubResource("Resource_guardian_angel"), SubResource("Resource_glass_cannon"), SubResource("Resource_overcharge"), SubResource("Resource_knight_wide_slash"), SubResource("Resource_knight_aftershock"), SubResource("Resource_knight_shockwave"), SubResource("Resource_knight_endless_spin"), SubResource("Resource_ranger_twin_arrows"), SubResource("Resource_ranger_piercing"), SubResource("Resource_ranger_wide_volley"), SubResource("Resource_ranger_deluge"), SubResource("Resource_mage_bigger_bursts"), SubResource("Resource_mage_twin_bolts"), SubResource("Resource_mage_deep_freeze"), SubResource("Resource_mage_blink_nova"), SubResource("Resource_cleric_radiant"), SubResource("Resource_cleric_blessed_orbs"), SubResource("Resource_cleric_swift_grace"), SubResource("Resource_cleric_mending"), SubResource("Resource_cleric_wrath"), SubResource("Resource_berserker_cleaver"), SubResource("Resource_berserker_bloodlust"), SubResource("Resource_berserker_earthshaker"), SubResource("Resource_berserker_unstoppable"), SubResource("Resource_rogue_precision"), SubResource("Resource_rogue_fan"), SubResource("Resource_rogue_shadow_dance"), SubResource("Resource_rogue_legion"), SubResource("Resource_engineer_overclock"), SubResource("Resource_engineer_extra_turret"), SubResource("Resource_engineer_afterburner"), SubResource("Resource_engineer_supercoil"), SubResource("Resource_necro_bone_horde"), SubResource("Resource_necro_sturdy_bones"), SubResource("Resource_necro_soul_rend"), SubResource("Resource_necro_endless_legion"), SubResource("Resource_fire_1"), SubResource("Resource_fire_2"), SubResource("Resource_fire_3"), SubResource("Resource_ice_1"), SubResource("Resource_ice_2"), SubResource("Resource_ice_3"), SubResource("Resource_poison_1"), SubResource("Resource_poison_2"), SubResource("Resource_poison_3"), SubResource("Resource_lightning_1"), SubResource("Resource_lightning_2"), SubResource("Resource_lightning_3")])
+upgrades = Array[ExtResource("2_upgrade")]([SubResource("Resource_sharpened"), SubResource("Resource_quick_hands"), SubResource("Resource_swift_boots"), SubResource("Resource_vitality"), SubResource("Resource_iron_skin"), SubResource("Resource_keen_eye"), SubResource("Resource_brutal"), SubResource("Resource_magnet"), SubResource("Resource_recharge"), SubResource("Resource_regeneration"), SubResource("Resource_focus"), SubResource("Resource_nimble"), SubResource("Resource_amplify"), SubResource("Resource_bloodthirst"), SubResource("Resource_guardian_angel"), SubResource("Resource_glass_cannon"), SubResource("Resource_overcharge"), SubResource("Resource_knight_wide_slash"), SubResource("Resource_knight_aftershock"), SubResource("Resource_knight_shockwave"), SubResource("Resource_knight_endless_spin"), SubResource("Resource_ranger_twin_arrows"), SubResource("Resource_ranger_piercing"), SubResource("Resource_ranger_wide_volley"), SubResource("Resource_ranger_deluge"), SubResource("Resource_mage_bigger_bursts"), SubResource("Resource_mage_twin_bolts"), SubResource("Resource_mage_deep_freeze"), SubResource("Resource_mage_blink_nova"), SubResource("Resource_cleric_radiant"), SubResource("Resource_cleric_blessed_orbs"), SubResource("Resource_cleric_swift_grace"), SubResource("Resource_cleric_mending"), SubResource("Resource_cleric_wrath"), SubResource("Resource_berserker_cleaver"), SubResource("Resource_berserker_bloodlust"), SubResource("Resource_berserker_earthshaker"), SubResource("Resource_berserker_unstoppable"), SubResource("Resource_rogue_precision"), SubResource("Resource_rogue_fan"), SubResource("Resource_rogue_shadow_dance"), SubResource("Resource_rogue_legion"), SubResource("Resource_engineer_overclock"), SubResource("Resource_engineer_extra_turret"), SubResource("Resource_engineer_afterburner"), SubResource("Resource_engineer_supercoil"), SubResource("Resource_necro_bone_horde"), SubResource("Resource_necro_sturdy_bones"), SubResource("Resource_necro_soul_rend"), SubResource("Resource_necro_endless_legion"), SubResource("Resource_fire_1"), SubResource("Resource_fire_2"), SubResource("Resource_fire_3"), SubResource("Resource_ice_1"), SubResource("Resource_ice_2"), SubResource("Resource_ice_3"), SubResource("Resource_poison_1"), SubResource("Resource_poison_2"), SubResource("Resource_poison_3"), SubResource("Resource_lightning_1"), SubResource("Resource_lightning_2"), SubResource("Resource_lightning_3"), SubResource("Resource_knight_crescent_wave"), SubResource("Resource_knight_challenge"), SubResource("Resource_knight_juggernaut"), SubResource("Resource_ranger_ricochet"), SubResource("Resource_ranger_cluster_arrow"), SubResource("Resource_ranger_decoy"), SubResource("Resource_mage_frozen_orb"), SubResource("Resource_mage_chronoshift"), SubResource("Resource_mage_singularity"), SubResource("Resource_cleric_prism_orbs"), SubResource("Resource_cleric_bastion"), SubResource("Resource_cleric_judgement"), SubResource("Resource_berserker_throwing_axe"), SubResource("Resource_berserker_bloodbath"), SubResource("Resource_berserker_rebound"), SubResource("Resource_rogue_blade_vortex"), SubResource("Resource_rogue_shadowstrike"), SubResource("Resource_rogue_shadow_hunt"), SubResource("Resource_engineer_flamethrower"), SubResource("Resource_engineer_mortar"), SubResource("Resource_engineer_tesla_grid"), SubResource("Resource_necro_haunt"), SubResource("Resource_necro_bone_golem"), SubResource("Resource_necro_lich_form")])

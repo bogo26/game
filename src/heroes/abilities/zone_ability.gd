@@ -19,6 +19,9 @@ enum Target { SELF, AIM_POINT }
 @export var tick_visual := ""
 @export var color := Color.WHITE
 
+## The zone placed last.
+var _zone: EffectZone
+
 
 func _activate(aim: Vector2) -> void:
 	var w := world()
@@ -38,6 +41,7 @@ func _activate(aim: Vector2) -> void:
 	zone.color = color
 	zone.tick_visual = tick_visual
 	w.add_zone(zone)
+	_zone = zone
 
 
 func sound() -> StringName:

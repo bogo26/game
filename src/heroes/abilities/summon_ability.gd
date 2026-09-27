@@ -24,11 +24,7 @@ var _active: Array[Minion] = []
 
 func _activate(aim: Vector2) -> void:
 	var w := world()
-	var alive: Array[Minion] = []
-	for m in _active:
-		if is_instance_valid(m) and not m.is_expired():
-			alive.append(m)
-	_active = alive
+	_prune()
 	var n := count + int(mod(&"count"))
 	var spots: Array[Vector2] = []
 	if use_corpses:
@@ -37,20 +33,38 @@ func _activate(aim: Vector2) -> void:
 		var angle := TAU * float(spots.size()) / float(n) + aim.angle()
 		spots.append(hero.position + Vector2.from_angle(angle) * spawn_radius)
 	for spot in spots:
-		while _active.size() >= max_active + int(mod(&"max_active")):
-			var oldest: Minion = _active.pop_front()
-			if is_instance_valid(oldest):
-				oldest.expire()
-		var minion := Minion.create(kind, hero, w.grid.nearest_open(spot))
-		minion.max_hp = minion_hp * (1.0 + mod(&"minion_hp_pct"))
-		minion.hp = minion.max_hp
-		minion.damage = minion_damage * (1.0 + mod(&"damage_pct"))
-		minion.attack_interval = attack_interval
-		minion.attack_range = attack_range * area_scale()
-		minion.lifetime = lifetime + mod(&"duration")
-		w.add_minion(minion)
-		_active.append(minion)
-		w.fx.ring(minion.position, 10.0, hero.color, 0.35)
+		_summon(spot)
+
+
+## A minion of this ability's kind at `spot` (or the nearest open floor),
+## replacing the oldest one when the cap is reached.
+func _summon(spot: Vector2) -> Minion:
+	var w := world()
+	while _active.size() >= max_active + int(mod(&"max_active")):
+		var oldest: Minion = _active.pop_front()
+		if is_instance_valid(oldest):
+			oldest.expire()
+	var minion := Minion.create(kind, hero, w.grid.nearest_open(spot))
+	minion.max_hp = minion_hp * (1.0 + mod(&"minion_hp_pct"))
+	minion.hp = minion.max_hp
+	minion.damage = minion_damage * (1.0 + mod(&"damage_pct"))
+	minion.attack_interval = attack_interval
+	minion.attack_range = attack_range * area_scale()
+	minion.lifetime = lifetime + mod(&"duration")
+	minion.area = area_scale()
+	w.add_minion(minion)
+	_active.append(minion)
+	w.fx.ring(minion.position, 10.0, hero.color, 0.35)
+	return minion
+
+
+## Forgets minions that expired or were freed.
+func _prune() -> void:
+	var alive: Array[Minion] = []
+	for m in _active:
+		if is_instance_valid(m) and not m.is_expired():
+			alive.append(m)
+	_active = alive
 
 
 func sound() -> StringName:

@@ -124,6 +124,9 @@ static func build_lines(hero: Hero) -> Array:
 		var u := library.find(id)
 		if u == null:
 			continue
+		if u.is_legendary():  # first: it changed how the hero plays
+			lines.insert(1, [u.display_name, UpgradeData.RARITY_COLORS[UpgradeData.Rarity.LEGENDARY]])
+			continue
 		var element := Elements.MOD_KEYS.find(u.element)
 		if element != -1:
 			if u.tier > int(elements.get(element, [0])[0]):
