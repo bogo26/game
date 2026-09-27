@@ -14,5 +14,6 @@ xp = 1
 knockback_taken = 0.7
 behavior = 0
 on_death = 4
+agility = 6.0
 atlas_row = 11
 anim_fps = 7.0

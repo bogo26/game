@@ -166,6 +166,9 @@ func test_frostbite_slows() -> void:
 	var horde := world.horde
 	var cold := horde.uid[_enemy(world, Vector2(100, 40))]
 	var warm := horde.uid[_enemy(world, Vector2(100, 100))]
+	for id: int in [cold, warm]:
+		horde.pace[_at(world, id)] = 1.0
+		horde.bend[_at(world, id)] = 0.0
 	world.elements.on_attack_hit(hero, _at(world, cold), HIT)
 	var targets := PackedVector2Array([Vector2(440, 40), Vector2(440, 100)])
 	for f in 30:

@@ -13,6 +13,7 @@ contact_damage = 10.0
 xp = 5
 knockback_taken = 0.35
 behavior = 6
+agility = 3.0
 attack_range = 150.0
 attack_cooldown = 3.5
 windup_time = 0.7

@@ -13,6 +13,7 @@ contact_damage = 8.0
 xp = 1
 knockback_taken = 1.1
 behavior = 0
+agility = 10.0
 swim_speed = 2.2
 weave = 0.7
 pack = 2

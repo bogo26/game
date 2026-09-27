@@ -679,8 +679,10 @@ func test_eels_slither_fast_through_water() -> void:
 	var t := 0
 	var dry := h.spawn(t, _cell(2, 1))
 	var wet := h.spawn(t, _cell(2, 2))
-	h.anim[dry] = 0.0
-	h.anim[wet] = 0.0
+	for i: int in [dry, wet]:
+		h.anim[i] = 0.0
+		h.pace[i] = 1.0
+		h.bend[i] = 0.0
 	h.update(0.0, PackedVector2Array())
 	var dry_start := h.pos[dry].x
 	var wet_start := h.pos[wet].x

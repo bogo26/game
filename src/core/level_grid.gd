@@ -172,29 +172,44 @@ func move_and_slide(pos: Vector2, motion: Vector2, r: float) -> Vector2:
 ## Grid ray march (DDA). True if nothing that stops shots lies between a
 ## and b (chasms don't).
 func line_of_sight(a: Vector2, b: Vector2) -> bool:
-	var cell := cell_of(a)
-	var end := cell_of(b)
-	if is_shot_solid(cell.x, cell.y):
+	return _ray_clear(a, b, shot_solid)
+
+
+## True if a walker can go straight from a to b: no wall, closed door, chasm
+## or prop on the line (water doesn't stop it). Enemies head straight at a
+## hero while it holds, instead of following the flow field.
+func walk_line_clear(a: Vector2, b: Vector2) -> bool:
+	return _ray_clear(a, b, solid)
+
+
+## DDA from a to b: false if a cell set in `blocked` (or off the grid) lies on the way.
+func _ray_clear(a: Vector2, b: Vector2, blocked: PackedByteArray) -> bool:
+	var w := width
+	var h := height
+	var cx := floori(a.x * INV_TILE)
+	var cy := floori(a.y * INV_TILE)
+	var ex := floori(b.x * INV_TILE)
+	var ey := floori(b.y * INV_TILE)
+	if cx < 0 or cy < 0 or cx >= w or cy >= h or blocked[cy * w + cx] != 0:
 		return false
 	var d := b - a
 	var step_x := 1 if d.x > 0.0 else -1
 	var step_y := 1 if d.y > 0.0 else -1
 	var t_delta_x := INF if d.x == 0.0 else absf(TILE / d.x)
 	var t_delta_y := INF if d.y == 0.0 else absf(TILE / d.y)
-	var next_x := (cell.x + (1 if step_x > 0 else 0)) * TILE
-	var next_y := (cell.y + (1 if step_y > 0 else 0)) * TILE
+	var next_x := (cx + (1 if step_x > 0 else 0)) * TILE
+	var next_y := (cy + (1 if step_y > 0 else 0)) * TILE
 	var t_max_x := INF if d.x == 0.0 else (next_x - a.x) / d.x
 	var t_max_y := INF if d.y == 0.0 else (next_y - a.y) / d.y
-	var guard := absi(end.x - cell.x) + absi(end.y - cell.y) + 2
-	while cell != end and guard > 0:
-		guard -= 1
+	# Every step crosses into the next cell along x or y: b's cell is exactly this many away.
+	for s in absi(ex - cx) + absi(ey - cy):
 		if t_max_x < t_max_y:
 			t_max_x += t_delta_x
-			cell.x += step_x
+			cx += step_x
 		else:
 			t_max_y += t_delta_y
-			cell.y += step_y
-		if is_shot_solid(cell.x, cell.y):
+			cy += step_y
+		if cx < 0 or cy < 0 or cx >= w or cy >= h or blocked[cy * w + cx] != 0:
 			return false
 	return true
 

@@ -4,8 +4,8 @@ extends Resource
 ## per-type arrays at setup, so changing a resource at runtime has no effect.
 
 enum Behavior {
-	CHASER,    ## walks straight at the nearest hero along the flow field
-	RANGED,    ## keeps distance and fires projectiles when in line of sight
+	CHASER,    ## goes for the nearest hero: straight at them when the way is clear, else along the flow field
+	RANGED,    ## circles at a distance and fires projectiles when in line of sight
 	EXPLODER,  ## rushes in, stops to telegraph, then explodes
 	BOSS,      ## body only: a boss controller node moves it and drives attacks
 	OBJECT,    ## breakable scenery (barrels, urns): not an enemy, never moves
@@ -46,6 +46,9 @@ enum Shot {
 @export var on_death := OnDeath.NONE
 
 @export_group("Movement")
+## How quickly it gets up to speed and turns (per second): light, quick
+## kinds are high, heavy ones low.
+@export var agility := 8.0
 ## Flies: water doesn't slow it and it never goes over a chasm's edge.
 @export var flying := false
 ## > 0: swims, moving this many times its speed through water instead of wading.
