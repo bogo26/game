@@ -25,7 +25,8 @@ const INTERVALS := {
 	&"shoot_rivet": 0.06, &"shoot_knife": 0.05, &"spit": 0.12, &"tesla": 0.1, &"fireball": 0.08,
 	&"hurt": 0.1, &"explosion": 0.08, &"crit": 0.06, &"spikes": 0.1, &"fall": 0.08, &"break": 0.05,
 	&"nest": 0.15, &"zap": 0.06, &"thunder": 0.15, &"freeze": 0.08, &"shatter": 0.08, &"plague": 0.2,
-	&"fuse": 0.12, &"spawn": 0.12, &"windup": 0.2,
+	&"fuse": 0.12, &"spawn": 0.12, &"windup": 0.2, &"bow": 0.12, &"bones": 0.1, &"rattle": 0.2, &"spores": 0.12,
+	&"snort": 0.3, &"thud": 0.15, &"lob": 0.15, &"sizzle": 0.12, &"imp": 0.15,
 	&"heartbeat": 3.0, &"help": 3.0, &"denied": 0.15, &"ready": 0.1, &"revive_tick": 0.22, &"ult_ready": 0.3,
 }
 ## Per-sound volume trims (dB).

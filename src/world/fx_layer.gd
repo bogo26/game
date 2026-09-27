@@ -5,9 +5,10 @@ extends Node2D
 ## under the horde for ground effects, one just above the horde for warnings
 ## (telegraphs, spawn portals: enemies must never hide them) and one above
 ## heroes. "Live" warnings are replaced every frame by their owner (exploder
-## fuses follow the exploders and vanish when they die).
+## fuses, archers' aim lines and chargers' bands follow their enemy and vanish
+## when it dies).
 
-enum Kind { RING, DISC, SLASH, LINE, TELEGRAPH, ZONE, WARN_LINE, BOLT, WARN_BAND, DOT_RING, PORTAL, WARN_ARC }
+enum Kind { RING, DISC, SLASH, LINE, TELEGRAPH, ZONE, WARN_LINE, BOLT, WARN_BAND, DOT_RING, PORTAL, WARN_ARC, LOB }
 
 ## Everything hostile warns in this colour (enemy shots use it too).
 const DANGER := Color(1.0, 0.24, 0.5)
@@ -26,6 +27,10 @@ var _color := PackedColorArray()
 var _live_pos := PackedVector2Array()
 var _live_radius := PackedFloat32Array()
 var _live_progress := PackedFloat32Array()
+var _band_from := PackedVector2Array()
+var _band_to := PackedVector2Array()
+var _band_width := PackedFloat32Array()
+var _band_progress := PackedFloat32Array()
 
 
 func tick(delta: float) -> void:
@@ -112,6 +117,22 @@ func set_live(positions: PackedVector2Array, radii: PackedFloat32Array, progress
 	_live_pos = positions
 	_live_radius = radii
 	_live_progress = progress
+
+
+## Replaces this frame's live aim warnings: strips `width` wide from `from` to
+## `to` (1 px or less: a line) that grow more solid as progress goes 0..1.
+func set_live_bands(from: PackedVector2Array, to: PackedVector2Array, width: PackedFloat32Array,
+		progress: PackedFloat32Array) -> void:
+	_band_from = from
+	_band_to = to
+	_band_width = width
+	_band_progress = progress
+
+
+## A glob lobbed from a to b, `height` px high at the top of its arc, with a
+## shadow on the ground under it.
+func lob(a: Vector2, b: Vector2, height: float, color: Color, duration: float) -> void:
+	_add(Kind.LOB, a, b, height, duration, 0.0, 0.0, color)
 
 
 ## Persistent area (ground effects); fades in the last 20%.
@@ -227,6 +248,28 @@ func _draw() -> void:
 				var fade := clampf((1.0 - t) / 0.2, 0.0, 1.0)
 				draw_circle(p, r, Color(c, c.a * 0.25 * fade), true, -1.0, false)
 				draw_arc(p, r, 0.0, TAU, _segments(r), Color(c, c.a * 0.8 * fade), 1.0, false)
+			Kind.LOB:
+				# Leaves from the thrower's mouth (8 px up), lands on the ground.
+				var ground := _pos[i].lerp(_pos2[i], t) + Vector2(0, 8.0 * (1.0 - t))
+				var q := (_pos[i].lerp(_pos2[i], t) - Vector2(0, 4.0 * r * t * (1.0 - t))).round()
+				draw_circle(ground.round(), 2.0, Color(0, 0, 0, 0.35), true, -1.0, false)
+				draw_circle(q, 3.0, Color(0.1, 0.02, 0.06), true, -1.0, false)
+				draw_circle(q, 2.0, c, true, -1.0, false)
+				draw_rect(Rect2(q - Vector2(1, 1), Vector2(1, 1)), Color(1, 1, 1, 0.9))
+	for k in _band_from.size():
+		var a := _band_from[k].round()
+		var b := _band_to[k].round()
+		var w := _band_width[k]
+		var fill := clampf(_band_progress[k], 0.0, 1.0)
+		if a.distance_squared_to(b) < 4.0:
+			continue  # right against a wall: nothing to show (and no polygon to fill)
+		if w <= 1.0:
+			draw_line(a, b, Color(DANGER, 0.5 + 0.4 * fill), -1.0, false)
+			continue
+		var side := (b - a).orthogonal().normalized() * (w * 0.5)
+		draw_colored_polygon(PackedVector2Array([a + side, b + side, b - side, a - side]), Color(DANGER, 0.1 + 0.25 * fill))
+		draw_line((a + side).round(), (b + side).round(), Color(DANGER, 0.9), -1.0, false)
+		draw_line((a - side).round(), (b - side).round(), Color(DANGER, 0.9), -1.0, false)
 	for k in _live_pos.size():
 		var lp := _live_pos[k].round()
 		var lr := _live_radius[k]

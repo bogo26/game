@@ -3,7 +3,7 @@ extends Boss
 ## The Demon Lord, the final boss (see Boss for what every boss shares).
 ## Phase-based attack patterns:
 ##   phase 1 (100-60%): walks at the nearest hero, fireball fans and ground slams
-##   phase 2 (60-25%):  adds fire rings and summons swarmers
+##   phase 2 (60-25%):  adds fire rings and summons imps and swarmers
 ##   phase 3 (<25%):    enraged: faster, adds telegraphed charges
 ## Every attack is announced during its wind-up (the boss glows and growls),
 ## drawn above the horde: the slam's area, the charge's exact path, the fan's
@@ -34,6 +34,9 @@ const SLAM_WINDUP := 0.9
 const CHARGE_WINDUP := 0.7
 ## Fireball fans spread over ±FAN_SPREAD radians.
 const FAN_SPREAD := 0.6
+## A summon brings this many adds, SUMMON_IMPS of them imps (the rest swarmers).
+const SUMMON_COUNT := 8
+const SUMMON_IMPS := 3
 
 var phase: Phase = Phase.ONE
 var action: Action = Action.WALK
@@ -116,7 +119,7 @@ func _update_phase() -> void:
 	if new_phase != phase:
 		phase = new_phase
 		_announce_phase()
-		_summon(&"swarmer", 6 + 3 * phase)
+		_summon_mix(_crowd(6 + 3 * phase, &"imp", 2 + phase))
 
 
 func _begin_attack(p: Vector2, target: Vector2) -> void:
@@ -153,7 +156,7 @@ func wind_up(attack: Attack, p: Vector2, target: Vector2) -> void:
 			# On the top layer and wider than the body, so the boss can't hide it.
 			world.fx.dot_ring(p + MUZZLE, 44.0, 12, danger, _action_time)
 		Attack.SUMMON:
-			_summon(&"swarmer", 8)  # the adds step out of their portals as the wind-up ends
+			_summon_mix(_crowd(SUMMON_COUNT, &"imp", SUMMON_IMPS))  # the adds step out as the wind-up ends
 	Audio.play(&"windup")
 
 

@@ -8,7 +8,8 @@ extends Boss
 ##                      grave spikes (bone spikes burst under every hero)
 ##   phase 2 (<50%):    enraged: faster, more spikes around each hero, and it
 ##                      leaps onto the hero furthest away (bone shards burst
-##                      from the landing) and raises the dead (swarmers)
+##                      from the landing) and raises the dead (swarmers and
+##                      revenants, whose bones get back up unless smashed)
 ## Every attack is announced during its wind-up (it glows and growls), drawn
 ## above the horde: the sweep's exact wedge, a filling circle wherever spikes
 ## will burst, the landing circle of a leap, and spawn portals for the dead.
@@ -45,7 +46,10 @@ const LEAP_HEIGHT := 22.0
 const SHARD_COUNT := 12
 const SHARD_DAMAGE := 10.0
 const SHARD_SPEED := 90.0
+## The dead it raises: this many, RAISE_REVENANTS of them revenants (the rest
+## swarmers); enraging raises two more, one of them a revenant.
 const RAISE_COUNT := 6
+const RAISE_REVENANTS := 2
 const BONE_COLOR := Color(0.9, 0.86, 0.72)
 
 var phase: Phase = Phase.ONE
@@ -120,7 +124,7 @@ func _update_phase() -> void:
 	if phase == Phase.ONE and hp_ratio() < ENRAGE_AT:
 		phase = Phase.TWO
 		_announce_phase()
-		_summon(&"swarmer", RAISE_COUNT + 2)
+		_summon_mix(_crowd(RAISE_COUNT + 2, &"revenant", RAISE_REVENANTS + 1))
 
 
 func _begin_attack(p: Vector2, target: Vector2) -> void:
@@ -157,7 +161,7 @@ func wind_up(attack: Attack, p: Vector2, target: Vector2) -> void:
 			# Until it lands, not just until it jumps.
 			warn.telegraph(_leap_to, LEAP_RADIUS, danger, _action_time + LEAP_TIME)
 		Attack.RAISE:
-			_summon(&"swarmer", RAISE_COUNT)  # the dead step out as the wind-up ends
+			_summon_mix(_crowd(RAISE_COUNT, &"revenant", RAISE_REVENANTS))  # the dead step out as the wind-up ends
 	Audio.play(&"windup")
 
 

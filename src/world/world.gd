@@ -29,6 +29,16 @@ const ENEMY_TYPES: Array[String] = [
 	"res://src/enemies/data/urn.tres",
 	"res://src/enemies/data/nest.tres",
 	"res://src/enemies/data/bone_colossus.tres",
+	# Each level's own enemy (see docs/DESIGN.md, Enemies):
+	"res://src/enemies/data/bat.tres",
+	"res://src/enemies/data/drowned.tres",
+	"res://src/enemies/data/bone_archer.tres",
+	"res://src/enemies/data/revenant.tres",
+	"res://src/enemies/data/bone_pile.tres",
+	"res://src/enemies/data/sporecap.tres",
+	"res://src/enemies/data/frost_boar.tres",
+	"res://src/enemies/data/salamander.tres",
+	"res://src/enemies/data/imp.tres",
 ]
 const HORDE_ATLAS := preload("res://assets/sprites/enemies/horde_atlas.png")
 const FX_ATLAS := preload("res://assets/sprites/fx/fx_atlas.png")
@@ -40,7 +50,10 @@ const ENEMY_COLORS := {
 	&"swarmer": Color(0.42, 0.75, 0.3), &"brute": Color(0.6, 0.45, 0.68), &"spitter": Color(0.68, 0.35, 0.85),
 	&"exploder": Color(1.0, 0.55, 0.2), &"boss_demon": Color(0.9, 0.25, 0.2),
 	&"barrel": Color(0.75, 0.3, 0.2), &"urn": Color(0.69, 0.48, 0.29), &"nest": Color(0.55, 0.2, 0.35),
-	&"bone_colossus": Color(0.9, 0.86, 0.72),
+	&"bone_colossus": Color(0.9, 0.86, 0.72), &"bat": Color(0.5, 0.38, 0.6), &"drowned": Color(0.36, 0.62, 0.6),
+	&"bone_archer": Color(0.9, 0.88, 0.78), &"revenant": Color(0.82, 0.84, 0.8), &"bone_pile": Color(0.86, 0.82, 0.7),
+	&"sporecap": Color(0.92, 0.4, 0.66), &"frost_boar": Color(0.7, 0.85, 1.0), &"salamander": Color(1.0, 0.5, 0.18),
+	&"imp": Color(0.88, 0.22, 0.3),
 }
 const MAX_SPARKS_PER_FRAME := 40
 const MAX_PUFFS_PER_FRAME := 30
@@ -80,6 +93,16 @@ const URN_HEART_CHANCE := 0.15
 ## Shrine blessings last this long; Wrath hits everything on screen.
 const BLESSING_TIME := 30.0
 const WRATH_DAMAGE := 60.0
+## A revenant collapses into one of these (EnemyData.OnDeath.BONES).
+const BONE_PILE := &"bone_pile"
+## Enemy hazards on the ground: sporecaps' spore clouds, and the slag a
+## salamander's bomb leaves burning (for this long, a share of its blast a hit).
+const SPORE_COLOR := Color(1.0, 0.36, 0.72)
+const SLAG_COLOR := Color(1.0, 0.45, 0.18)
+const SLAG_TIME := 1.5
+const SLAG_DAMAGE_SHARE := 0.35
+## How high a lobbed bomb flies.
+const LOB_HEIGHT := 26.0
 
 @export var level_data: LevelData
 ## Test rooms let players join mid-game by pressing A / Enter.
@@ -153,6 +176,14 @@ var _volatile_blasts: Array[Array] = []
 ## Exploders with a lit fuse (uids) and where they were last seen in the horde.
 var _lit_fuses := PackedInt32Array()
 var _lit_hints := PackedInt32Array()
+## Enemy hazards on the ground: [position, radius, seconds left, damage a hit, colour].
+var _hazards: Array[Array] = []
+## Lobbed bombs in the air: [landing spot, seconds left, blast radius, damage].
+var _lobs: Array[Array] = []
+## Aimed shooters and chargers winding up (uids), and where they were last seen.
+var _aimers := PackedInt32Array()
+var _aimer_hints := PackedInt32Array()
+var _bone_pile_type := -1
 ## Recent enemy deaths (Raise Dead): positions and times.
 var _corpse_pos := PackedVector2Array()
 var _corpse_time := PackedFloat32Array()
@@ -207,6 +238,7 @@ func _ready() -> void:
 	flow.setup(grid)
 	horde.setup(grid, flow, enemy_types)
 	horde.projectiles = projectiles
+	_bone_pile_type = horde.type_index(BONE_PILE)
 	elements = Elements.new(self)
 	spawner.setup(horde, grid, flow, level.enemy_spawn_hints)
 	spawner.enabled = spawn_enemies
@@ -328,6 +360,7 @@ func _process(delta: float) -> void:
 	spawner.tick(dt, camera.visible_rect(), hero_positions)
 	horde.view_rect = camera.visible_rect()
 	horde.update(dt, target_positions)
+	_play_horde_events()
 	_update_spikes(dt)
 	_apply_blasts()
 	_update_warnings()
@@ -342,6 +375,8 @@ func _process(delta: float) -> void:
 	_update_zones(dt)
 	_update_barrel_blasts(dt)
 	_update_volatile_blasts(dt)
+	_update_lobs(dt)
+	_update_hazards(dt)
 	var t_projectiles := Time.get_ticks_usec()
 
 	_emit_hit_effects()
@@ -838,7 +873,11 @@ func _update_warnings() -> void:
 			_lit_hints.append(-1)
 	for p in horde.windup_pos:
 		particles.burst(p + Vector2(0, -9), 3, FxLayer.DANGER, 30.0, 0.25, 1)
+	for id in horde.aim_uids:
+		_aimers.append(id)
+		_aimer_hints.append(-1)
 	horde.clear_warning_logs()
+	_update_aim_warnings()
 	var live_pos := PackedVector2Array()
 	var live_radius := PackedFloat32Array()
 	var live_progress := PackedFloat32Array()
@@ -856,6 +895,148 @@ func _update_warnings() -> void:
 		live_progress.append(1.0 - horde.action[i] / maxf(horde.t_fuse[t], 0.001))
 		k += 1
 	warn_fx.set_live(live_pos, live_radius, live_progress)
+
+
+## Bone archers show their aim as a line, and chargers the band they're about
+## to charge down, while they wind up; both follow them and vanish if they die
+## (or get stunned out of it).
+func _update_aim_warnings() -> void:
+	var from := PackedVector2Array()
+	var to := PackedVector2Array()
+	var width := PackedFloat32Array()
+	var progress := PackedFloat32Array()
+	var k := 0
+	while k < _aimers.size():
+		var i := horde.index_of_uid(_aimers[k], _aimer_hints[k])
+		if i == -1 or horde.hp[i] <= 0.0 or horde.state[i] != 1:
+			_aimers.remove_at(k)
+			_aimer_hints.remove_at(k)
+			continue
+		_aimer_hints[k] = i
+		var t := horde.type[i]
+		var p := horde.pos[i]
+		var dir := horde.aim[i]
+		if horde.t_behavior[t] == EnemyData.Behavior.CHARGER:
+			from.append(p)
+			to.append(grid.shot_reach(p, p + dir * horde.t_charge_speed[t] * horde.t_charge_time[t]))
+			width.append((horde.t_radius[t] + Hero.RADIUS) * 2.0)
+		else:
+			var muzzle := p + HordeSim.SHOT_ORIGIN
+			from.append(muzzle + dir * 6.0)
+			to.append(grid.shot_reach(muzzle, muzzle + dir * horde.t_range[t] * 1.6))
+			width.append(1.0)
+		progress.append(1.0 - horde.action[i] / maxf(horde.t_windup[t], 0.001))
+		k += 1
+	warn_fx.set_live_bands(from, to, width, progress)
+
+
+## What the horde did this frame besides moving: bone piles getting back up,
+## bombs lobbed, blinks, charges (and the walls they ended in), arrows loosed.
+func _play_horde_events() -> void:
+	var view := camera.visible_rect().grow(24.0)
+	for k in horde.reform_pos.size():
+		var p := horde.reform_pos[k]
+		var t := horde.reform_type[k]
+		horde.spawn(t, p, spawner.effective_hp_multiplier())
+		particles.burst(p - Vector2(0, 6), 10, _enemy_color(t), 70.0, 0.4, 2, Vector2.UP, PI, 120.0)
+		if view.has_point(p):
+			Audio.play(&"rattle")
+	for k in horde.lob_from.size():
+		var land := horde.lob_to[k]
+		_lobs.append([land, HordeSim.LOB_TIME, horde.lob_radius[k], horde.lob_damage[k]])
+		fx.lob(horde.lob_from[k], land, LOB_HEIGHT, FxLayer.DANGER, HordeSim.LOB_TIME)
+		warn_fx.telegraph(land, horde.lob_radius[k] + Hero.RADIUS, FxLayer.DANGER, HordeSim.LOB_TIME)
+	if not horde.lob_from.is_empty():
+		Audio.play(&"lob")
+	for k in horde.blink_from.size():
+		warn_fx.portal(horde.blink_to[k], 7.0, FxLayer.DANGER, horde.blink_time[k])
+		particles.burst(horde.blink_from[k] - Vector2(0, 7), 6, ENEMY_COLORS[&"imp"], 40.0, 0.3, 2)
+	if not horde.blink_from.is_empty():
+		Audio.play(&"imp")
+	for p in horde.blink_arrivals:
+		particles.burst(p - Vector2(0, 7), 8, FxLayer.DANGER.lightened(0.3), 60.0, 0.3, 2)
+	for p in horde.crash_pos:
+		particles.burst(p, 10, Color(0.85, 0.9, 1.0), 80.0, 0.4, 2, Vector2.UP, PI, 100.0)
+		if view.has_point(p):
+			shake(1.5)
+			Audio.play(&"thud")
+	if horde.charges_started > 0:
+		Audio.play(&"snort")
+	if horde.arrows_fired > 0:
+		Audio.play(&"bow")
+	horde.clear_event_logs()
+
+
+## Lobbed bombs land where their telegraph said: a burst that hurts heroes it
+## reaches (walls stop it), then burning slag for a moment.
+func _update_lobs(dt: float) -> void:
+	var k := 0
+	while k < _lobs.size():
+		var lob := _lobs[k]
+		lob[1] = float(lob[1]) - dt
+		if float(lob[1]) > 0.0:
+			k += 1
+			continue
+		_lobs.remove_at(k)
+		var p: Vector2 = lob[0]
+		var r: float = lob[2]
+		var damage: float = lob[3]
+		for hero in heroes:
+			if hero.position.distance_to(p) <= r + Hero.RADIUS and grid.line_of_sight(p, hero.position):
+				hero.take_hit(damage)
+		add_hazard(p, r * 0.8, SLAG_TIME, damage * SLAG_DAMAGE_SHARE, SLAG_COLOR)
+		fx.disc(p, r, Color(1.0, 0.5, 0.2, 0.7), 0.2)
+		fx.ring(p, r * 1.1, Color(1.0, 0.85, 0.5), 0.25)
+		particles.burst(p, 12, Color(1.0, 0.55, 0.2), 110.0, 0.45, 3, Vector2.ZERO, TAU, 0.0, 2.0)
+		Audio.play(&"sizzle")
+
+
+## An enemy hazard on the ground (spores, slag): heroes standing in it take
+## `damage` a hit, spaced out by their invulnerability after each hit (walls
+## keep it in).
+func add_hazard(p: Vector2, radius: float, seconds: float, damage: float, color: Color) -> void:
+	_hazards.append([p, radius, seconds, damage, color])
+	ground_fx.zone(p, radius, color, seconds)
+
+
+func _update_hazards(dt: float) -> void:
+	var k := 0
+	while k < _hazards.size():
+		var hazard := _hazards[k]
+		hazard[2] = float(hazard[2]) - dt
+		if float(hazard[2]) <= 0.0:
+			_hazards.remove_at(k)
+			continue
+		var p: Vector2 = hazard[0]
+		var r: float = hazard[1]
+		for hero in heroes:
+			if hero.position.distance_to(p) <= r + Hero.RADIUS and grid.line_of_sight(p, hero.position):
+				hero.take_hit(hazard[3])
+		if _rng.randf() < 0.35:  # it drifts up in wisps
+			var q := p + Vector2.from_angle(_rng.randf() * TAU) * _rng.randf() * r
+			particles.burst(q, 1, hazard[4], 14.0, 0.7, 2, Vector2.UP, 0.8, -20.0)
+		k += 1
+
+
+## A sporecap burst: a cloud that hurts heroes standing in it.
+func _release_spores(p: Vector2, t: int) -> void:
+	var data := horde.types[t]
+	add_hazard(p, data.explosion_radius, data.cloud_time, data.explosion_damage * horde.damage_mult, SPORE_COLOR)
+	particles.burst(p - Vector2(0, 6), 16, SPORE_COLOR, 70.0, 0.8, 3, Vector2.UP, PI, -20.0)
+	Audio.play(&"spores")
+
+
+## A revenant falls apart into a bone pile; unless it's smashed in time, it
+## gets back up as the same enemy.
+func _collapse(p: Vector2, t: int) -> void:
+	if _bone_pile_type < 0:
+		return
+	var i := horde.spawn(_bone_pile_type, p, spawner.effective_hp_multiplier())
+	if i < 0:
+		return
+	horde.action[i] = horde.types[_bone_pile_type].reform_time
+	horde.state[i] = t
+	Audio.play(&"bones")
 
 
 func _on_portal_opened(p: Vector2, seconds: float) -> void:
@@ -1030,6 +1211,12 @@ func _process_kills() -> void:
 			var heart_chance := Elites.HEART_CHANCE if horde.t_elite[t] != 0 else HEART_DROP_CHANCE
 			if _rng.randf() < heart_chance:
 				pickups.spawn(drop + Vector2(4, 0), PickupSim.Kind.HEART, 1)
+		if not in_chasm:
+			match horde.types[t].on_death:
+				EnemyData.OnDeath.SPORES:
+					_release_spores(p, t)
+				EnemyData.OnDeath.BONES:
+					_collapse(p, t)
 		if horde.t_elite[t] != 0:
 			_elite_died(p, t)
 		Events.enemy_killed.emit(p, t, killer)

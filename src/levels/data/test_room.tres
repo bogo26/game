@@ -51,6 +51,6 @@ layout = "
         #.........................................#
         ###########################################
 "
-enemy_weights = {&"swarmer": 1.0, &"brute": 0.07, &"spitter": 0.08, &"exploder": 0.06}
+enemy_weights = {&"swarmer": 1.0, &"brute": 0.07, &"spitter": 0.08, &"exploder": 0.06, &"bat": 0.03, &"drowned": 0.03, &"bone_archer": 0.03, &"revenant": 0.03, &"sporecap": 0.03, &"frost_boar": 0.02, &"salamander": 0.03, &"imp": 0.03}
 corridor_cap_fraction = 1.0
 corridor_spawn_rate = 30.0

@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"bone_archer"
+max_hp = 14.0
+speed = 30.0
+radius = 5.0
+hurt_size = Vector2(12, 19)
+contact_damage = 4.0
+xp = 3
+knockback_taken = 1.0
+behavior = 1
+attack_range = 185.0
+attack_cooldown = 3.2
+windup_time = 0.8
+shot = 1
+projectile_damage = 11.0
+projectile_speed = 240.0
+atlas_row = 10
+anim_fps = 7.0

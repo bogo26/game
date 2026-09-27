@@ -1055,36 +1055,36 @@ def _open_spot(c, cells, near):
 
 LEVELS = [
     ("level_1", "Crypt Entrance", level1, {
-        "enemy_weights": {"swarmer": 1.0, "brute": 0.05, "spitter": 0.04, "exploder": 0.03},
+        "enemy_weights": {"swarmer": 1.0, "brute": 0.05, "spitter": 0.04, "exploder": 0.03, "bat": 0.1},
         "hp_multiplier": 1.0, "corridor_cap_fraction": 0.4, "corridor_spawn_rate": 16.0,
         "arena_quotas": [45, 60], "arena_spawn_rate": 26.0, "theme": "crypt", "tint": (1.0, 1.0, 1.0)}),
     ("level_2", "Flooded Halls", level2, {
-        "enemy_weights": {"swarmer": 1.0, "brute": 0.10, "spitter": 0.10, "exploder": 0.07},
+        "enemy_weights": {"swarmer": 1.0, "brute": 0.10, "spitter": 0.10, "exploder": 0.07, "drowned": 0.16},
         "hp_multiplier": 1.35, "corridor_cap_fraction": 0.5, "corridor_spawn_rate": 20.0,
         "arena_quotas": [80, 30], "arena_spawn_rate": 32.0, "theme": "flooded", "tint": (1.0, 1.0, 1.0)}),
     ("level_3", "Bone Pits", level3, {
-        "enemy_weights": {"swarmer": 1.0, "brute": 0.15, "spitter": 0.12, "exploder": 0.12},
+        "enemy_weights": {"swarmer": 1.0, "brute": 0.15, "spitter": 0.08, "exploder": 0.12, "bone_archer": 0.08},
         "hp_multiplier": 1.8, "corridor_cap_fraction": 0.55, "corridor_spawn_rate": 24.0,
         "arena_quotas": [100, 110, 60], "arena_spawn_rate": 38.0, "theme": "bones", "tint": (1.0, 1.0, 1.0)}),
     ("lair", "The Ossuary", lair, {
-        "enemy_weights": {"swarmer": 1.0, "brute": 0.08, "exploder": 0.06},
+        "enemy_weights": {"swarmer": 1.0, "brute": 0.08, "exploder": 0.06, "revenant": 0.22},
         "hp_multiplier": 2.0, "corridor_cap_fraction": 0.3, "corridor_spawn_rate": 12.0,
         "arena_quotas": [0], "arena_spawn_rate": 20.0, "theme": "ossuary", "tint": (1.0, 1.0, 1.0),
         "is_boss_level": True, "boss_scene": "res://src/enemies/boss/bone_colossus.tscn", "boss_room": "ossuary"}),
     ("level_4", "Fungal Caverns", level4, {
-        "enemy_weights": {"swarmer": 1.0, "brute": 0.14, "spitter": 0.16, "exploder": 0.14},
+        "enemy_weights": {"swarmer": 1.0, "brute": 0.14, "spitter": 0.14, "exploder": 0.12, "sporecap": 0.14},
         "hp_multiplier": 2.2, "corridor_cap_fraction": 0.55, "corridor_spawn_rate": 24.0,
         "arena_quotas": [90, 110, 120], "arena_spawn_rate": 40.0, "theme": "fungal", "tint": (1.0, 1.0, 1.0)}),
     ("level_5", "Frozen Vaults", level5, {
-        "enemy_weights": {"swarmer": 1.0, "brute": 0.24, "spitter": 0.12, "exploder": 0.12},
+        "enemy_weights": {"swarmer": 1.0, "brute": 0.2, "spitter": 0.12, "exploder": 0.12, "frost_boar": 0.07},
         "hp_multiplier": 2.6, "corridor_cap_fraction": 0.6, "corridor_spawn_rate": 26.0,
         "arena_quotas": [110, 100, 130], "arena_spawn_rate": 42.0, "theme": "frost", "tint": (1.0, 1.0, 1.0)}),
     ("level_6", "Molten Forge", level6, {
-        "enemy_weights": {"swarmer": 1.0, "brute": 0.22, "spitter": 0.18, "exploder": 0.22},
+        "enemy_weights": {"swarmer": 1.0, "brute": 0.22, "spitter": 0.12, "exploder": 0.2, "salamander": 0.09},
         "hp_multiplier": 3.0, "corridor_cap_fraction": 0.6, "corridor_spawn_rate": 28.0,
         "arena_quotas": [100, 120, 90, 140], "arena_spawn_rate": 44.0, "theme": "forge", "tint": (1.0, 1.0, 1.0)}),
     ("boss", "Demon's Throne", boss, {
-        "enemy_weights": {"swarmer": 1.0, "exploder": 0.1},
+        "enemy_weights": {"swarmer": 1.0, "exploder": 0.1, "imp": 0.3},
         "hp_multiplier": 3.2, "corridor_cap_fraction": 0.0, "corridor_spawn_rate": 0.0,
         "arena_quotas": [0, 0, 0, 0, 0, 0, 0, 0, 0], "arena_spawn_rate": 20.0,
         "theme": "throne", "tint": (1.0, 1.0, 1.0), "is_boss_level": True, "is_final_boss": True,

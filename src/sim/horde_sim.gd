@@ -36,10 +36,27 @@ const FLASH_TIME := 0.08
 const SLOW_FACTOR := 0.45
 const MARK_DAMAGE_MULT := 1.75
 const RANGED_BACKOFF := 0.55   # ranged enemies retreat inside this fraction of their range
-## Ranged enemies stand still and glow this long before each shot.
-const WINDUP_TIME := 0.4
 ## A ranged enemy that can't shoot yet (no sight line, off screen) looks again after this.
 const RETRY_TIME := 0.25
+## Enemy shots leave from here (above the feet) and aim at heroes' bodies.
+const SHOT_ORIGIN := Vector2(0, -8)
+const HERO_BODY := Vector2(0, -6)  # Hero.SPRITE_FEET_OFFSET
+## Weaving flyers (bats) swing from side to side at this rate (radians/s).
+const WEAVE_RATE := 6.0
+## Chargers: a charge that ends in the open leaves them catching their breath
+## this long; one that ends in a wall dazes them for longer. A charge hits
+## this many times harder than a touch.
+const CHARGE_RECOVER := 0.6
+const CRASH_STUN := 1.3
+const CHARGE_HIT_MULT := 2.0
+## Blinkers only blink toward a hero further away than this, and land about
+## BLINK_NEAR from them.
+const BLINK_MIN := 56.0
+const BLINK_NEAR := 30.0
+## A lobbed bomb flies this long before it lands.
+const LOB_TIME := 0.9
+## Bone piles rattle for this long before they get back up.
+const PILE_RATTLE := 1.0
 ## Enemies pushed harder than this (px/s) toward a chasm go over the edge.
 const FALL_PUSH := 30.0
 const FALL_TIME := 0.45
@@ -69,8 +86,9 @@ var anim := PackedFloat32Array()
 var stun := PackedFloat32Array()
 var slow := PackedFloat32Array()
 var facing := PackedFloat32Array()     # +1 right, -1 left
-var action := PackedFloat32Array()     # behaviour timer (ranged cooldown, exploder fuse)
-var state := PackedInt32Array()        # behaviour state (exploder: 1 = fuse lit)
+var action := PackedFloat32Array()     # behaviour timer (cooldowns, wind-ups, fuses, charges)
+var state := PackedInt32Array()        # behaviour state (1 = winding up / fuse lit; pile: the type it reforms as)
+var aim := PackedVector2Array()        # locked aim (aimed shots, charges) or blink target
 var mark := PackedFloat32Array()       # > 0: takes critical damage (Rogue marks)
 var fall := PackedFloat32Array()       # > 0: falling into a chasm (seconds left)
 var last_slot := PackedInt32Array()    # player slot that last hit or pushed it (-1 none)
@@ -108,7 +126,14 @@ var t_shot_speed := PackedFloat32Array()
 var t_blast_radius := PackedFloat32Array()
 var t_blast_damage := PackedFloat32Array()
 var t_fuse := PackedFloat32Array()
-## 1 for types that never walk on their own (bosses, breakable objects, nests).
+var t_windup := PackedFloat32Array()
+var t_shot := PackedInt32Array()          # EnemyData.Shot
+var t_water := PackedFloat32Array()       # speed factor in water
+var t_weave := PackedFloat32Array()
+var t_flying := PackedByteArray()
+var t_charge_speed := PackedFloat32Array()
+var t_charge_time := PackedFloat32Array()
+## 1 for types that never walk on their own (bosses, breakable objects, nests, bone piles).
 var t_static := PackedByteArray()
 var t_scale := PackedFloat32Array()      # drawn size (elites are bigger)
 var t_elite := PackedByteArray()         # Elites.Trait, 0 for ordinary enemies
@@ -132,8 +157,9 @@ var hit_pos := PackedVector2Array()
 var hit_amount := PackedFloat32Array()
 var hit_type := PackedInt32Array()
 var hit_crit := PackedByteArray()
-## Enemy shots fired since the World last checked (for sound).
+## Enemy shots fired since the World last checked (for sound): spit, aimed.
 var shots_fired := 0
+var arrows_fired := 0
 ## Ranged enemies only start a shot inside this rectangle (the camera view),
 ## so nothing fires from off screen. Empty = anywhere.
 var view_rect := Rect2()
@@ -141,10 +167,28 @@ var view_rect := Rect2()
 var flash_strength := 1.0
 ## Difficulty: multiplies every hit enemies deal (contact, shots, blasts).
 var damage_mult := 1.0
-## Exploders whose fuse lit this frame (uids), and ranged enemies that started
-## winding up a shot (positions), for the World's warnings.
+## Exploders whose fuse lit this frame (uids), ranged enemies that started
+## winding up a shot (positions), and aimed shooters and chargers that locked
+## their aim (uids), for the World's warnings.
 var fuse_uids := PackedInt32Array()
 var windup_pos := PackedVector2Array()
+var aim_uids := PackedInt32Array()
+## Since the World last read them: bombs lobbed (from, landing spot, blast
+## radius and damage), blinks started (from, to, seconds in the portal) and
+## finished (where), charges that ended in a wall, and bone piles that got
+## back up (where, and the type to put back).
+var lob_from := PackedVector2Array()
+var lob_to := PackedVector2Array()
+var lob_radius := PackedFloat32Array()
+var lob_damage := PackedFloat32Array()
+var blink_from := PackedVector2Array()
+var blink_to := PackedVector2Array()
+var blink_time := PackedFloat32Array()
+var blink_arrivals := PackedVector2Array()
+var crash_pos := PackedVector2Array()
+var charges_started := 0
+var reform_pos := PackedVector2Array()
+var reform_type := PackedInt32Array()
 ## Enemies that went over a chasm edge since the World last checked (sound).
 var falls := 0
 ## Elemental death effects since the last drain (the World plays them out):
@@ -191,6 +235,7 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	facing.resize(CAPACITY)
 	action.resize(CAPACITY)
 	state.resize(CAPACITY)
+	aim.resize(CAPACITY)
 	mark.resize(CAPACITY)
 	fall.resize(CAPACITY)
 	last_slot.resize(CAPACITY)
@@ -225,6 +270,13 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	t_blast_radius.clear()
 	t_blast_damage.clear()
 	t_fuse.clear()
+	t_windup.clear()
+	t_shot.clear()
+	t_water.clear()
+	t_weave.clear()
+	t_flying.clear()
+	t_charge_speed.clear()
+	t_charge_time.clear()
 	t_static.clear()
 	t_scale.clear()
 	t_elite.clear()
@@ -250,6 +302,13 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 		t_blast_radius.append(data.explosion_radius)
 		t_blast_damage.append(data.explosion_damage)
 		t_fuse.append(data.fuse_time)
+		t_windup.append(data.windup_time)
+		t_shot.append(data.shot)
+		t_water.append(data.water_speed())
+		t_weave.append(data.weave)
+		t_flying.append(1 if data.flying else 0)
+		t_charge_speed.append(data.charge_speed)
+		t_charge_time.append(data.charge_time)
 		t_static.append(1 if data.is_static() else 0)
 		t_scale.append(data.draw_scale)
 		t_elite.append(data.elite_trait)
@@ -299,6 +358,7 @@ func spawn(type_id: int, p: Vector2, hp_multiplier: float = 1.0) -> int:
 	facing[i] = 1.0
 	action[i] = randf() * 1.5
 	state[i] = 0
+	aim[i] = Vector2.ZERO
 	mark[i] = 0.0
 	fall[i] = 0.0
 	last_slot[i] = -1
@@ -536,10 +596,28 @@ func apply_mark(i: int, seconds: float) -> void:
 	mark[i] = maxf(mark[i], seconds)
 
 
-## Forgets this frame's fuse and wind-up logs (the World read them).
+## Forgets this frame's fuse, wind-up and aim logs (the World read them).
 func clear_warning_logs() -> void:
 	fuse_uids.clear()
 	windup_pos.clear()
+	aim_uids.clear()
+
+
+## Forgets the lobs, blinks, crashes and reforms logged (the World played them out).
+func clear_event_logs() -> void:
+	lob_from.clear()
+	lob_to.clear()
+	lob_radius.clear()
+	lob_damage.clear()
+	blink_from.clear()
+	blink_to.clear()
+	blink_time.clear()
+	blink_arrivals.clear()
+	crash_pos.clear()
+	charges_started = 0
+	arrows_fired = 0
+	reform_pos.clear()
+	reform_type.clear()
 
 
 func clear_blasts() -> void:
@@ -588,6 +666,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	var FC := facing
 	var ACT := action
 	var STATE := state
+	var AIM := aim
 	var MK := mark
 	var FALLS := fall
 	var terr := grid.terrain
@@ -605,11 +684,16 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	var behavior_t := t_behavior
 	var range_t := t_range
 	var cooldown_t := t_cooldown
-	var shot_speed_t := t_shot_speed
-	var shot_damage_t := t_shot_damage
 	var blast_radius_t := t_blast_radius
 	var blast_damage_t := t_blast_damage
 	var fuse_t := t_fuse
+	var windup_t := t_windup
+	var shot_t := t_shot
+	var water_t := t_water
+	var weave_t := t_weave
+	var flying_t := t_flying
+	var charge_speed_t := t_charge_speed
+	var charge_time_t := t_charge_time
 	var static_t := t_static
 	var head := hash.head
 	var nxt := hash.next
@@ -700,9 +784,20 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 		if mk > 0.0:
 			MK[i] = mk - dt
 		if static_t[t] != 0:
-			AN[i] += dt  # boss (moved by BossDemon), objects and nests stay put
+			AN[i] += dt  # bosses (moved by their node), objects, nests and piles stay put
+			if behavior_t[t] == EnemyData.Behavior.PILE:
+				var left := ACT[i] - dt
+				ACT[i] = left
+				if left <= 0.0:
+					# Back on its feet: the World puts what it was (STATE) in its place.
+					HP[i] = 0.0
+					_dead_pending += 1
+					reform_pos.append(p)
+					reform_type.append(STATE[i])
 			continue
 		var desired := Vector2.ZERO
+		var move_speed := speed_t[t]
+		var charging := false
 		var st := STN[i]
 		if st > 0.0:
 			STN[i] = st - dt
@@ -731,19 +826,13 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 				var dist := sqrt(best)
 				var attack_range := range_t[t]
 				if STATE[i] == 1:
-					# Winding up (pose + pink glow): stand still, then fire at the
-					# nearest hero if it's still in sight.
+					# Winding up (pose + pink glow): stand still, then shoot.
 					desired = Vector2.ZERO
 					var wind := ACT[i] - dt
 					if wind <= 0.0:
 						STATE[i] = 0
-						wind = cooldown_t[t] - WINDUP_TIME
-						if projectiles != null and grid.line_of_sight(p, tp):
-							var aim := (tp - p) / maxf(dist, 0.001)
-							projectiles.spawn(p + Vector2(0, -8), aim * shot_speed_t[t], shot_damage_t[t] * damage_mult, 3.0,
-								attack_range * 1.6 / shot_speed_t[t], ProjectileSim.Team.ENEMY, -1,
-								ProjectileSim.Look.SPIT)
-							shots_fired += 1
+						wind = maxf(RETRY_TIME, cooldown_t[t] - windup_t[t])
+						_shoot(t, p, tp, dist, AIM[i])
 					ACT[i] = wind
 				elif dist < attack_range:
 					if dist < attack_range * RANGED_BACKOFF:
@@ -754,8 +843,13 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 					if cd <= 0.0:
 						if (not check_view or view.has_point(p)) and grid.line_of_sight(p, tp):
 							STATE[i] = 1
-							cd = WINDUP_TIME
+							cd = windup_t[t]
 							windup_pos.append(p)
+							if shot_t[t] == EnemyData.Shot.AIMED:
+								# Aims now, and the World shows the line until it shoots.
+								var line := tp + HERO_BODY - p - SHOT_ORIGIN
+								AIM[i] = line.normalized() if line != Vector2.ZERO else Vector2(FC[i], 0.0)
+								aim_uids.append(uid[i])
 						else:
 							cd = RETRY_TIME
 					ACT[i] = cd
@@ -778,11 +872,68 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 						kill_slot.append(SELF_KILL)
 						_dead_pending += 1
 						continue
-			var spd := speed_t[t]
+			elif behavior == EnemyData.Behavior.CHARGER:
+				var left := ACT[i] - dt
+				var s := STATE[i]
+				if s == 1:
+					desired = Vector2.ZERO  # lining up: pink glow, the World shows the band
+					if left <= 0.0:
+						STATE[i] = 2
+						left = charge_time_t[t]
+				elif s == 2:
+					desired = AIM[i]  # charging, straight on, whatever is in the way
+					move_speed = charge_speed_t[t]
+					charging = true
+					if left <= 0.0:
+						STATE[i] = 3
+						left = CHARGE_RECOVER
+				elif s == 3:
+					desired = Vector2.ZERO  # catching its breath (dazed after a wall)
+					if left <= 0.0:
+						STATE[i] = 0
+						left = cooldown_t[t]
+				elif left <= 0.0:
+					left = RETRY_TIME
+					var dist := sqrt(best)
+					if dist < range_t[t] and (not check_view or view.has_point(p)) and grid.line_of_sight(p, tp):
+						STATE[i] = 1
+						left = windup_t[t]
+						AIM[i] = (tp - p) / maxf(dist, 0.001)
+						aim_uids.append(uid[i])
+						charges_started += 1
+				ACT[i] = left
+			elif behavior == EnemyData.Behavior.BLINKER:
+				var left := ACT[i] - dt
+				if STATE[i] == 1:
+					desired = Vector2.ZERO  # fading into its portal
+					if left <= 0.0:
+						STATE[i] = 0
+						left = cooldown_t[t]
+						p = AIM[i]
+						P[i] = p
+						V[i] = Vector2.ZERO
+						blink_arrivals.append(p)
+				elif left <= 0.0:
+					left = RETRY_TIME
+					var dist := sqrt(best)
+					if dist > BLINK_MIN and dist < range_t[t]:
+						var spot := _blink_spot(tp, p)
+						if spot.is_finite():
+							STATE[i] = 1
+							left = windup_t[t]
+							AIM[i] = spot
+							blink_from.append(p)
+							blink_to.append(spot)
+							blink_time.append(left)
+				ACT[i] = left
+			var wv := weave_t[t]
+			if wv > 0.0 and desired != Vector2.ZERO:
+				desired = (desired + desired.orthogonal() * (wv * sin(AN[i] * WEAVE_RATE))).normalized()
+			var spd := move_speed
 			if sl > 0.0:
 				spd *= SLOW_FACTOR
 			if ci >= 0 and ci < ncells and terr[ci] == LevelGrid.Terrain.WATER:
-				spd *= LevelGrid.WATER_SPEED
+				spd *= water_t[t]
 			if STT[i] > 0.0:
 				if CHL[i] > 0.0:
 					spd *= CHILL_SPEED
@@ -824,8 +975,9 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 		var kv := V[i]
 		var v := desired + S[i] * SEPARATION_STRENGTH + kv
 		V[i] = kv * decay
-		# A hard enough push carries it over a chasm's edge.
-		var knocked := kv.length_squared() > FALL_PUSH * FALL_PUSH
+		# A hard enough push (or its own charge) carries it over a chasm's edge;
+		# flyers never go over.
+		var knocked := (charging or kv.length_squared() > FALL_PUSH * FALL_PUSH) and flying_t[t] == 0
 		if v.x > 2.0:
 			FC[i] = 1.0
 		elif v.x < -2.0:
@@ -853,6 +1005,13 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 			var cy_i := ey * gw + ncx
 			if solid[cy_i] != 0 and not (knocked and terr[cy_i] == LevelGrid.Terrain.CHASM):
 				ny = p.y
+		if charging:
+			# Ran into a wall: the charge ends there, and it's dazed.
+			var a := AIM[i]
+			if (nx == p.x and absf(v.x) > 1.0 and absf(a.x) >= 0.5) or (ny == p.y and absf(v.y) > 1.0 and absf(a.y) >= 0.5):
+				STATE[i] = 3
+				ACT[i] = CRASH_STUN
+				crash_pos.append(p)
 		P[i] = Vector2(nx, ny)
 		if knocked:
 			var cc := int(ny * INV_TILE) * gw + int(nx * INV_TILE)
@@ -871,6 +1030,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	facing = FC
 	action = ACT
 	state = STATE
+	aim = AIM
 	mark = MK
 	fall = FALLS
 	status_time = STT
@@ -882,6 +1042,45 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	chill = CHL
 	frost = FRST
 	frozen = FRZ
+
+
+## A ranged enemy's wind-up is over: spit at the nearest hero (if it's still
+## in sight), loose an aimed shot along the line it showed, or lob a bomb at
+## the hero's feet (the World flies it and blows it up).
+func _shoot(t: int, p: Vector2, tp: Vector2, dist: float, aimed: Vector2) -> void:
+	var shot_speed := t_shot_speed[t]
+	var reach := t_range[t] * 1.6 / shot_speed
+	match t_shot[t]:
+		EnemyData.Shot.AIMED:
+			if projectiles != null:
+				projectiles.spawn(p + SHOT_ORIGIN, aimed * shot_speed, t_shot_damage[t] * damage_mult, 3.0, reach,
+					ProjectileSim.Team.ENEMY, -1, ProjectileSim.Look.SHARD)
+				arrows_fired += 1
+		EnemyData.Shot.LOB:
+			lob_from.append(p + SHOT_ORIGIN)
+			lob_to.append(tp)
+			lob_radius.append(t_blast_radius[t])
+			lob_damage.append(t_blast_damage[t] * damage_mult)
+		_:
+			if projectiles != null and grid.line_of_sight(p, tp):
+				var dir := (tp - p) / maxf(dist, 0.001)
+				projectiles.spawn(p + SHOT_ORIGIN, dir * shot_speed, t_shot_damage[t] * damage_mult, 3.0, reach,
+					ProjectileSim.Team.ENEMY, -1, ProjectileSim.Look.SPIT)
+				shots_fired += 1
+
+
+## Where a blinker coming from `from` lands next to the hero at `hero`: open
+## floor about BLINK_NEAR away, on its own side if it can, that the hero can
+## see (so never behind a wall). INF when there's no room.
+func _blink_spot(hero: Vector2, from: Vector2) -> Vector2:
+	var toward := (from - hero).angle()
+	for k in 5:
+		var angle := toward + randf_range(-0.8, 0.8) * (1.0 + k * 0.6)
+		var q := hero + Vector2.from_angle(angle) * randf_range(BLINK_NEAR * 0.8, BLINK_NEAR * 1.2)
+		var c := grid.cell_of(q)
+		if not grid.is_solid(c.x, c.y) and grid.line_of_sight(hero, q):
+			return q
+	return Vector2.INF
 
 
 ## Removes enemies killed since the last update (swap with the last one).
@@ -917,6 +1116,7 @@ func _remove_at(i: int) -> void:
 		facing[i] = facing[last]
 		action[i] = action[last]
 		state[i] = state[last]
+		aim[i] = aim[last]
 		mark[i] = mark[last]
 		fall[i] = fall[last]
 		last_slot[i] = last_slot[last]
@@ -982,7 +1182,8 @@ func nearest(center: Vector2, max_distance: float, include_objects: bool = true)
 	return best
 
 
-## Highest contact damage among enemies touching a body at `center`.
+## Highest contact damage among enemies touching a body at `center` (a
+## charging charger hits CHARGE_HIT_MULT times harder).
 func contact_damage_at(center: Vector2, body_radius: float) -> float:
 	_scratch.clear()
 	hash.gather(center, body_radius + max_radius, _scratch)
@@ -992,8 +1193,16 @@ func contact_damage_at(center: Vector2, body_radius: float) -> float:
 			var t := type[j]
 			var rr := body_radius + t_radius[t]
 			if center.distance_squared_to(pos[j]) <= rr * rr:
-				worst = maxf(worst, t_damage[t])
+				var d := t_damage[t]
+				if state[j] == 2 and t_behavior[t] == EnemyData.Behavior.CHARGER:
+					d *= CHARGE_HIT_MULT
+				worst = maxf(worst, d)
 	return worst * damage_mult
+
+
+## True while enemy `i` is charging (chargers).
+func is_charging(i: int) -> bool:
+	return state[i] == 2 and t_behavior[type[i]] == EnemyData.Behavior.CHARGER
 
 
 # --- rendering -------------------------------------------------------------------------
@@ -1022,9 +1231,14 @@ func render(layer: InstanceLayer) -> void:
 	var BRN := burn
 	var PSN := poison
 	var CHL := chill
+	var ACT := action
+	var STATE := state
 	var frame0 := t_frame0
 	var frames := t_frames
 	var fps := t_fps
+	var terr := grid.terrain
+	var gw := grid.width
+	var ncells := terr.size()
 	var w := 0
 	for k in n:
 		var i := keys[k] & INDEX_MASK
@@ -1039,21 +1253,42 @@ func render(layer: InstanceLayer) -> void:
 		if FALLS[i] > 0.0:
 			fade = FALLS[i] / FALL_TIME  # shrinks and fades into the chasm
 		var size := t_scale[t] * fade
+		var alpha := fade
 		buf[o] = FC[i] * size
 		buf[o + 5] = size
-		buf[o + 11] = fade
 		buf[o + 3] = roundf(p.x)
 		buf[o + 7] = roundf(p.y)
 		var frame := frame0[t]
 		var beh := t_behavior[t]
-		if beh == EnemyData.Behavior.EXPLODER and state[i] == 1:
+		var s := STATE[i]
+		var winding := false
+		if beh == EnemyData.Behavior.EXPLODER and s == 1:
 			frame += 4 + int(AN[i] * 12.0) % 2
-		elif beh == EnemyData.Behavior.NEST and action[i] > 0.0:
+		elif beh == EnemyData.Behavior.NEST and ACT[i] > 0.0:
 			frame += 4 + int(AN[i] * 10.0) % 2  # spawning (LevelDirector sets the pose timer)
-		elif beh == EnemyData.Behavior.RANGED and state[i] == 1:
+		elif beh == EnemyData.Behavior.RANGED and s == 1:
 			frame += 4  # winding up a shot
+			winding = true
+		elif beh == EnemyData.Behavior.CHARGER and s == 1:
+			frame += 4  # lining up a charge
+			winding = true
+		elif beh == EnemyData.Behavior.CHARGER and s == 2:
+			frame += 5  # charging
+		elif beh == EnemyData.Behavior.CHARGER and s == 3:
+			pass  # catching its breath: stands still
+		elif beh == EnemyData.Behavior.BLINKER and s == 1:
+			frame += 4 + int(AN[i] * 14.0) % 2  # sinking into its portal: fades out
+			alpha *= 0.3 + 0.7 * clampf(ACT[i] / maxf(t_windup[t], 0.001), 0.0, 1.0)
+		elif beh == EnemyData.Behavior.PILE:
+			if ACT[i] < PILE_RATTLE:
+				frame += 4 + int(AN[i] * 16.0) % 2  # rattling: about to get up
 		elif STN[i] <= 0.0:
-			frame += int(AN[i] * fps[t]) % frames[t]
+			var ci := int(p.y * INV_TILE) * gw + int(p.x * INV_TILE)
+			if t_water[t] > 1.0 and ci >= 0 and ci < ncells and terr[ci] == LevelGrid.Terrain.WATER:
+				frame += 4 + int(AN[i] * fps[t]) % 2  # swimming
+			else:
+				frame += int(AN[i] * fps[t]) % frames[t]
+		buf[o + 11] = alpha
 		buf[o + 8] = float(frame)
 		buf[o + 9] = flash_strength if FL[i] > 0.0 else 0.0
 		var tint := Tint.NONE
@@ -1068,7 +1303,7 @@ func render(layer: InstanceLayer) -> void:
 				tint = Tint.CHILL
 		if tint == Tint.NONE and SLW[i] > 0.0:
 			tint = Tint.CHILL
-		if beh == EnemyData.Behavior.RANGED and state[i] == 1 and STN[i] <= 0.0:
+		if winding and STN[i] <= 0.0:
 			tint = Tint.CHARGING
 		# Elites add their trait x 10: the shader draws their outline from it.
 		buf[o + 10] = float(tint + t_elite[t] * 10)

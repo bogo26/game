@@ -195,7 +195,7 @@ func test_ranged_enemies_wind_up_before_firing() -> void:
 	while h.projectiles.count == 0 and frames < 120:
 		h.update(DT, target)
 		frames += 1
-	assert_near(frames * DT, HordeSim.WINDUP_TIME, 2.0 * DT, "the shot comes after the wind-up")
+	assert_near(frames * DT, h.t_windup[0], 2.0 * DT, "the shot comes after the wind-up")
 	assert_eq(h.state[i], 0)
 	assert_eq(h.projectiles.team[0], ProjectileSim.Team.ENEMY)
 

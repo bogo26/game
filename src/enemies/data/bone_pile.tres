@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"bone_pile"
+max_hp = 20.0
+speed = 0.0
+radius = 5.0
+hurt_size = Vector2(14, 10)
+contact_damage = 0.0
+xp = 2
+knockback_taken = 0.0
+behavior = 8
+reform_time = 4.0
+atlas_row = 12
+walk_frames = 1

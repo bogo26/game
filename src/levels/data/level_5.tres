@@ -81,7 +81,7 @@ layout = "
    ###################                                                                           #.....................#
                                                                                                  #.....................#
                                                                                                  #######################"
-enemy_weights = {&"swarmer": 1.0, &"brute": 0.24, &"spitter": 0.12, &"exploder": 0.12}
+enemy_weights = {&"swarmer": 1.0, &"brute": 0.2, &"spitter": 0.12, &"exploder": 0.12, &"frost_boar": 0.07}
 hp_multiplier = 2.6
 corridor_cap_fraction = 0.6
 corridor_spawn_rate = 26.0

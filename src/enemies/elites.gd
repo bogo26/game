@@ -1,7 +1,7 @@
 class_name Elites
 extends RefCounted
-## Elite enemies: from level 2 on, about 1 in 40 enemies of the horde arrives
-## as an elite - drawn half again as big, with a glowing outline in its
+## Elite enemies: from level 2 on, about 1 in 40 walking enemies arrives as
+## an elite - drawn half again as big, with a glowing outline in its
 ## trait's colour, six times the HP, a quarter more damage, half the knockback
 ## - and one trait:
 ##   Swift      +60% speed
@@ -16,8 +16,10 @@ enum Trait { NONE, SWIFT, VOLATILE, SPLITTING }
 const NAMES: Array[String] = ["", "Swift", "Volatile", "Splitting"]
 ## Outline colours, shared with atlas_instance.gdshader.
 const COLORS: Array[Color] = [Color.WHITE, Color(0.45, 0.95, 1.0), Color(1.0, 0.55, 0.15), Color(0.6, 1.0, 0.35)]
-## Kinds that come in elite versions.
-const BASES: Array[StringName] = [&"swarmer", &"brute", &"spitter", &"exploder"]
+## Kinds that come in elite versions: every walking kind but the revenant
+## (it already comes back once).
+const BASES: Array[StringName] = [&"swarmer", &"brute", &"spitter", &"exploder", &"bat", &"drowned",
+	&"bone_archer", &"sporecap", &"frost_boar", &"salamander", &"imp"]
 
 const CHANCE := 1.0 / 40.0
 const MAX_ALIVE := 4

@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"imp"
+max_hp = 18.0
+speed = 50.0
+radius = 5.0
+hurt_size = Vector2(18, 18)
+contact_damage = 9.0
+xp = 2
+knockback_taken = 1.0
+behavior = 7
+flying = true
+attack_range = 220.0
+attack_cooldown = 3.5
+windup_time = 0.45
+atlas_row = 16
+anim_fps = 10.0
