@@ -19,7 +19,8 @@ const COLORS: Array[Color] = [Color.WHITE, Color(0.45, 0.95, 1.0), Color(1.0, 0.
 ## Kinds that come in elite versions: every walking kind but the revenant
 ## (it already comes back once).
 const BASES: Array[StringName] = [&"swarmer", &"brute", &"spitter", &"exploder", &"bat", &"drowned",
-	&"bone_archer", &"sporecap", &"frost_boar", &"salamander", &"imp"]
+	&"bone_archer", &"sporecap", &"frost_boar", &"salamander", &"imp", &"sporeling", &"eel", &"puffball",
+	&"frost_wraith"]
 
 const CHANCE := 1.0 / 40.0
 const MAX_ALIVE := 4
@@ -46,6 +47,7 @@ static func make(base: EnemyData, elite_trait: Trait) -> EnemyData:
 	e.contact_damage = base.contact_damage * DAMAGE_MULT
 	e.projectile_damage = base.projectile_damage * DAMAGE_MULT
 	e.explosion_damage = base.explosion_damage * DAMAGE_MULT
+	e.cloud_damage = base.cloud_damage * DAMAGE_MULT
 	e.knockback_taken = base.knockback_taken * KNOCKBACK_MULT
 	e.radius = base.radius * 1.3
 	e.hurt_size = base.hurt_size * SCALE

@@ -65,7 +65,7 @@ Downed state:
 
 ## Enemies
 
-Four kinds make up most of the horde throughout the run. Every level adds an enemy of its own that no other level has (`tests/test_enemies.gd` checks it), and the bosses bring their own servants.
+Four kinds make up most of the horde throughout the run. Every level adds an enemy of its own that no other level has (`tests/test_enemies.gd` checks it, the other bosses' levels included), and the bosses bring their own servants.
 
 | Enemy | Where | Role |
 |---|---|---|
@@ -81,8 +81,16 @@ Four kinds make up most of the horde throughout the run. Every level adds an ene
 | Frost boar | Frozen Vaults | A charger: lines up for 0.7 s under a band exactly as wide as what it hits, then charges 170 px in a straight line and hits twice as hard. A charge into a wall dazes it for 1.3 s; one over a crevasse edge sends it down |
 | Salamander | Molten Forge | Lobs molten slag where a hero stands: the landing spot is marked for the 0.9 s flight, then it bursts (22 px) and the slag burns for 1.5 s |
 | Imp | Demon's Throne; the Demon Lord summons them | Flies, and every 3.5 s blinks to the side of a hero 56-220 px away: a portal shows where for 0.45 s while it fades out, then it steps out next to them |
+| Sporeling | Toadstool Hollow; the Toadstool Tyrant sprouts them | A little mushroom in packs of three that gets about in hops (1.6 a second): it sits still, then leaps nearly twice its walking speed |
+| Eel | The Sunken Cistern; the Mire Serpent's brood | Slithers from side to side in pairs, and swims 2.2x as fast as it crawls: the channels belong to it |
+| Puffball | The Mycelium Deep; the Spore Mother calls them | An exploder whose burst leaves a spore cloud (26 px, 3 s) - and so does killing it first |
+| Frost wraith | The Frozen Court; the Frost Queen calls them | A flying spitter: floats over water and crevasses and shoots shards of ice |
 | Bone Colossus (mini boss) | The Ossuary | Club sweeps, grave spikes, leaps; raises swarmers and revenants; node-based |
+| Toadstool Tyrant (mini boss) | Toadstool Hollow | Bounces hop after hop onto the nearest hero, puffs rings of spore clouds; enraged, lobs spore bombs and sprouts sporelings |
+| Mire Serpent (mini boss) | The Sunken Cistern | Dives out of reach and hunts a hero as a fin, bursts up under them; spits fans of water and lunges; enraged, bursts twice and brings eels |
 | Demon Lord (final boss) | Demon's Throne | Phase-based attack patterns; summons swarmers and imps; node-based |
+| Spore Mother (final boss) | The Mycelium Deep | Rooted in place and shielded by spore pods until they burst; roots erupt along bands, spore rain and spirals; fairy rings; calls puffballs |
+| Frost Queen (final boss) | The Frozen Court | Keeps her distance: ice lances, frost novas to dash through, icicle hail, a sweeping glacial beam, blizzards; her frost chills; calls frost wraiths |
 
 **Elites** (`Elites`, from the second level on; always in the test room): about 1 in 40 spawns of the walking kinds above (every one but the revenant, which already comes back once) arrives as an elite, at most 4 alive at once (×0.5 on Casual, ×2 on Hard).
 - An elite is drawn 1.5× bigger with a pulsing outline in its trait's colour (the instance shader draws it from a code in the tint channel), with its hurtbox and footprint scaled to match, ×6 HP, ×1.25 damage and half the knockback.
@@ -159,9 +167,10 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
 ## Levels and run flow
 
 - **Map variety:** levels 1–6 each have a second layout (`level_1b` ...: same size, quotas and theme, but different room shapes, route, and chest and shrine spots). Every run picks one per level from `GameState.run_seed` and mirrors it left-right and/or upside down (boss levels only left-right): `RunConfig.layout_for()`, `LevelData.mirrored()`. That's 8 versions of each normal level. `--layout=a|b` and `--mirror=none|h|v|hv` pin them for debugging. The level tests check every layout in every mirror, and bots play every second layout mirrored.
+- **Boss pools:** each run meets one of three mini bosses and one of three final bosses, picked from the seed too (`RunConfig.boss_pool`, `RunConfig.choices()`). Every boss has a level of its own (layout, theme, own enemy), as tough as the boss level it stands in for; `--boss=<level file>` (e.g. `--boss=grove`) pins one.
 - **Authoring:**
   - Levels are ASCII layouts in `LevelData` resources; the legend is in `level_data.gd`.
-  - `tools/gen_levels.py` builds the run's layouts from shaped rooms, halls, terrain and props, and writes `src/levels/data/level_*.tres`, `lair.tres` (the mini boss) and `boss.tres` (the final boss) with each level's difficulty settings, theme and boss (see Map features).
+  - `tools/gen_levels.py` builds the run's layouts from shaped rooms, halls, terrain and props, and writes `src/levels/data/level_*.tres`, the mini bosses' `lair.tres`, `grove.tres` and `cistern.tres` and the final bosses' `boss.tres`, `mycelium.tres` and `glacier.tres`, with each level's difficulty settings, theme and boss (see Map features).
   - The sandbox `test_room.tres` is hand-written.
 - **Rendering:** `Level` turns a layout into a `TileMapLayer` for rendering and a `LevelGrid` for collision and pathfinding.
 - **Run order:** 1 → 2 → 3 → mini boss → 4 → 5 → 6 → final boss. `src/levels/run_config.tres` lists:
@@ -171,11 +180,11 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
   | 1 | LEVEL 1 | Crypt Entrance | crypt | 2 | ×1.0 | bats |
   | 2 | LEVEL 2 | Flooded Halls | flooded | 2 | ×1.35 | drowned |
   | 3 | LEVEL 3 | Bone Pits | bones | 3 | ×1.8 | bone archers |
-  | 4 | MINI BOSS | The Ossuary: the Bone Colossus | ossuary | boss room | ×2.0 | revenants |
+  | 4 | MINI BOSS | one of: The Ossuary (the Bone Colossus), Toadstool Hollow (the Toadstool Tyrant), The Sunken Cistern (the Mire Serpent) | ossuary / grove / cistern | boss room | ×2.0 | revenants / sporelings / eels |
   | 5 | LEVEL 4 | Fungal Caverns: toxic pools, spore nests | fungal | 3 | ×2.2 | sporecaps |
   | 6 | LEVEL 5 | Frozen Vaults: crevasses, slush, spike galleries | frost | 3 | ×2.6 | frost boars |
   | 7 | LEVEL 6 | Molten Forge: lava channels, powder kegs | forge | 4 | ×3.0 | salamanders |
-  | 8 | FINAL BOSS | Demon's Throne: the Demon Lord | throne | boss room | ×3.2 | imps (summoned) |
+  | 8 | FINAL BOSS | one of: Demon's Throne (the Demon Lord), The Mycelium Deep (the Spore Mother), The Frozen Court (the Frost Queen) | throne / mycelium / glacier | boss room | ×3.2 | imps / puffballs / frost wraiths (summoned) |
 
   Banners number the regular levels on their own (`RunConfig.title()`). Each level sets:
   - enemy mix: brutes, spitters and exploders grow more common level by level, next to the level's own enemy
@@ -192,8 +201,9 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
   - Clearing opens the doors, drops a heart, and returns the spawner to the corridor trickle.
   - The **exit portal** opens when every arena is cleared. The level completes after all living heroes stand in it for 1 s.
   - A **boss level's** one arena is its boss room, which spawns the level's boss instead of waves (and turns the spawner off). Picks open at once during the fight.
-    - **Mini boss** (the Ossuary): when the Bone Colossus dies its room clears like an arena (doors open, a heart, the XP vacuum), the music goes back to the dungeon track, the HUD calls out "BONE COLOSSUS SLAIN!", and the exit portal behind the hall opens (a chest waits beside it). The team walks on to level 4.
-    - **Final boss** (the Demon's Throne, no exit): the Demon Lord's death ends the run in victory.
+    - **Mini boss** (the Ossuary, Toadstool Hollow or the Sunken Cistern): when the boss dies its room clears like an arena (doors open, a heart, the XP vacuum), the music goes back to the dungeon track, the HUD calls out its name ("BONE COLOSSUS SLAIN!"), and the exit portal behind its room opens (a chest waits beside it). The team walks on to level 4.
+    - **Final boss** (the Demon's Throne, the Mycelium Deep or the Frozen Court, no exit): the boss's death ends the run in victory.
+    - During the fight the objective arrow (and the bots) follow the boss, or what it calls for: the Spore Mother points at her pods ("Burst the spore pods!  3 left"). The HUD adds the boss's state to its name ("SHIELDED", "SUBMERGED", "BLIZZARD").
 - **HUD:**
   - The objective text sits under the XP bar.
   - A yellow arrow at the screen edge points to off-screen objectives (the next arena or the exit). The next arena is the one closest **on foot** from the team (`LevelGrid.walk_distances`, a BFS where walls, closed doors and chasms block and props don't), not in a straight line.
@@ -201,7 +211,8 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
   - CORRIDOR: off-screen trickle at a fraction of the alive cap.
   - ARENA: spawns on the room's floor at least 96 px from heroes, until the quota is spent.
   - OFF.
-- **Bosses** (`Boss`, `src/enemies/boss/`): a boss's body is a `HordeSim` entry of its own enemy type, so every ability, projectile and zone hits it. The boss node moves that body, draws a 64×64 sprite sheet (walk ×2, wind-up, action) and runs the attacks; the base class holds what they share (body, sprite and wind-up glow, summons through portals, phase fanfare, the death). Bosses are immune to stun, slow and freezing; HP is base × level multiplier × player-count scaling (see Spawn director).
+- **Bosses** (`Boss`, `src/enemies/boss/`): a boss's body is a `HordeSim` entry of its own enemy type, so every ability, projectile and zone hits it. The boss node moves that body, draws a sprite sheet of square frames (walk ×2, wind-up, action; 64×64, the Spore Mother 96×96) and runs the attacks; the base class holds what they share (body, sprite and wind-up glow, summons through portals, phase fanfare, the death, hitting heroes in a circle or a band). Bosses are immune to stun, slow and freezing; HP is base × level multiplier × player-count scaling (see Spawn director).
+  - A boss body can be **out of reach** (`HordeSim.hidden`: nothing hits, finds or touches it, like the Mire Serpent under the murk) or **shielded** (`HordeSim.guard`: the share of every hit, burns and poison included, it shrugs off).
   - **Every attack is telegraphed** during its wind-up: the boss glows hot pink (a flash shader, which hit flashes can't wash out) and growls, and the warning is drawn above the horde.
 - **Mini boss (Bone Colossus, `BoneColossus`):** 1100 HP. A lumbering heap of bones with a club, fighting up close and from below.
   - Phase 1 (100–50%): walks at the nearest hero; **club sweeps** (only when someone is in reach) and **grave spikes** that burst under every hero.
@@ -213,6 +224,27 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
   - plus fire rings and summons: imps spread among swarmers (a phase change brings 9-12 adds, 3-4 of them imps; the summon attack 8, 3 of them imps)
   - enraged: faster, plus telegraphed charges
   - Telegraphs: slam: its exact circle filling up; charge: a band as wide as what it hits; fan: one aim line per fireball, with the aim locked when the wind-up starts; fire ring: a ring of turning dots around the boss; summon: the adds' spawn portals.
+- **Mini boss (Toadstool Tyrant, `ToadstoolTyrant`):** 1150 HP. A giant red-capped toadstool with an angry face that waddles after the nearest hero.
+  - Phase 1 (100–50%): **bounces** - three hops in a row, each onto the hero nearest when it squats (120 px at most), 22 damage where it lands - and **spore bursts** when heroes crowd it: a cloud under it and six in a ring 44 px out (7 a hit, 5 s).
+  - Phase 2 (below 50%): enraged (faster, 7 sporelings sprout around it), four hops a bounce, eight clouds a burst, **spore bombs** lobbed at every hero and two more around them (each leaves a cloud), and **sprouts** of 5 sporelings.
+  - Telegraphs: each hop's landing circle from its squat until it lands (it throbs pink while squatting); every cloud's circle before a burst; each bomb's landing circle; spawn portals. In the air it deals no contact damage.
+- **Mini boss (Mire Serpent, `MireSerpent`):** 1000 HP. A great serpent that hides in the murk of its cistern and never walks.
+  - Surfaced (5 s, 3.6 s enraged): **spits** a fan of 3 water shots (5 enraged) at the nearest hero and **lunges** its head down an 84 px band at anyone close.
+  - Then it **dives**: still hittable for 0.45 s while it sinks, then out of reach (the HUD says SUBMERGED) while it **hunts** the nearest hero as a fin and a wake at 62 px/s (74 enraged) - slower than a hero walks, faster than one wades - for 2.4 s (1.8 s enraged). It stops, a circle fills for 0.7 s, and it **bursts up** there (24 damage in 32 px).
+  - Phase 2 (below 50%): 5 eels come up as it enrages, every burst brings 2 more, and each dive bursts up twice (a breath of 0.6 s, then a quick 1 s hunt).
+  - Telegraphs: the burst's circle; the fan's aim lines (locked when the wind-up starts); the lunge's band, exactly as wide as what it bites; spawn portals.
+- **Final boss (Spore Mother, `SporeMother`):** 1800 HP. A towering fungus rooted in the middle of her cavern; she never moves.
+  - **Spore pods** (90 HP each, one-of-a-kind HP scaling) sprout around her as the fight starts (3) and again in phase 2 (4), tied to her by glowing threads. While any stands she is **shielded** (she shrugs off 80% of every hit; the boss bar turns grey-violet, the HUD says SHIELDED and the objective points at the pods). Her pods wither when she dies.
+  - Phase 1 (100–60%): **roots** burst along a band from her toward every hero (22 damage; step out of it) and **spore rain**: bombs on and around every hero and three more anywhere near her, each leaving a spore cloud.
+  - Phase 2 (60–25%): the pods grow back, 8 adds come (4 puffballs); adds two more random root bands, **spore spirals** (three arms of spores wheeling out of her for 2.4 s) and **calls** of 6 adds (3 puffballs).
+  - Phase 3 (below 25%): enraged (faster, another crowd, four spiral arms, three extra root bands) and **fairy rings**: seven rings 32 px wide around her; every other one erupts (24 damage), then the ones between them. Stand in a ring that waits, then step into one that has erupted.
+  - Telegraphs: every root band; each bomb's landing circle; a ring of turning dots before a spiral; each fairy ring, filling up; spawn portals.
+- **Final boss (Frost Queen, `FrostQueen`):** 1900 HP. A gaunt queen of ice gliding over her court, keeping 80–130 px from the nearest hero. Her frost **chills**: a chilled hero walks at 60% speed for a moment (tinted icy).
+  - Phase 1 (100–60%): **ice lances** (an aim line to every hero, then a fast shard down each), **frost novas** (a ring of frost rolling out to 170 px: it hits each hero once as it passes, 18 damage and a chill - dash through it or stand outside the circle) and **icicle hail** (for 2.4 s, icicles crash down on and around the heroes, each after its circle shows for 0.8 s).
+  - Phase 2 (60–25%): a crowd with 3 frost wraiths, then the **glacial beam** (a freezing beam sweeps a 115° wedge through the nearest hero in 1.6 s, 20 damage and a chill) and **calls** of 6 adds (3 frost wraiths).
+  - Phase 3 (below 25%): enraged (faster, lances in threes) and **blizzards**: for 5 s a wind pushes every hero one way (34 px/s) while shards of ice ride it in from the upwind wall.
+  - Backed into a wall with a hero on her for 0.8 s, she **steps through the ice** to a spot 150 px beyond them: she fades out for 0.5 s while a frost portal shows where she'll appear.
+  - Telegraphs: aim lines (locked when the wind-up starts); the nova's full reach, filling up; each icicle's circle; the beam's wedge and where it starts; the "BLIZZARD!" callout; spawn portals.
 - **Screens:** Main menu → Character select → Game (levels) → End screen → Play again / Change heroes / Main menu.
   - **End screen:** difficulty, levels, enemies, team level, time and Second Winds; any records set; and a table of every player's kills, damage dealt and taken, downs, revives given and biggest hit, with awards: Slayer (most kills), Medic (most revives), Tank (most damage taken), Sharpshooter (biggest hit) - only with teammates to beat - and Untouchable (never downed). **Play again** starts a new run right away with the same team, heroes and difficulty; **Change heroes** goes to character select with everyone still joined and their last hero picked.
   - **Main menu:** Start Run, Test Room (drop-in sandbox), Options, Quit. The main, pause and end menus use Godot focus navigation, so keyboard, any gamepad or mouse all work, with move/confirm sounds (`UiSounds`).
@@ -236,7 +268,7 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
   - **Test Room:** with nobody joined, Esc (or Start/B on a pad) goes back to the menu.
 - **Shared camera:** follows the middle of the group with fixed zoom, and players can't leave the screen. The leash blocks the player who is running away rather than dragging the others along.
 - **Disconnects:** if an assigned controller is unplugged, the game pauses until it is reconnected, or until another controller presses A and takes over that player.
-- **Bots** (`BotDriver`) follow the current objective with A* over the level grid and use their abilities. The test suite has four god-mode bots finish every level and second layout including both bosses, and `./tools/dev.sh run res://src/main/game.tscn -- --bots=4 --level=4` shows a bot mini boss fight (`--level=8` the final boss).
+- **Bots** (`BotDriver`) follow the current objective with A* over the level grid and use their abilities. The test suite has four god-mode bots finish every level and second layout and every boss's level, and `./tools/dev.sh run res://src/main/game.tscn -- --bots=4 --level=4` shows a bot mini boss fight (`--level=8` the final boss; add `--boss=grove` and so on for a particular one).
 
 ## Map features
 
@@ -256,7 +288,7 @@ What makes the levels play differently, beyond their shapes:
 - **Implementation.** Barrels, urns and nests are stationary `HordeSim` entries (`EnemyData` behaviours `OBJECT` / `NEST`), so every attack already hits them. They block walking on their tile (`LevelGrid.set_blocker`) until destroyed, but not shots. Objects aren't enemies: they give no kill credit, corpses or XP gems, don't count toward the spawner's cap, and bots and minions don't target them. Chests and shrines are `Interactable` nodes.
 - **Terrain.** `LevelGrid` keeps `solid` (walking: walls, closed doors, chasms, props) apart from `shot_solid` (projectiles and sight: walls and closed doors). It also stores terrain per tile and logs walkability changes, so the bots' A* only updates the cells that changed.
 - **Arena rooms.** Each arena is found by flood fill from its digit tiles, so everything inside its walls belongs to it: water, traps, chasms and props. The level test checks that shutting an arena's doors seals it.
-- **Themes.** Each level names a tile sheet (`assets/tiles/tiles_<theme>.png`: crypt, flooded, bones, ossuary, fungal, frost, forge, throne). Water (toxic pools in the fungal caverns, slush in the frozen vaults) and chasm/lava tiles are animated, and lava (`Level.LAVA_THEMES`: forge, throne) glows. The level is decorated from a per-tile hash:
+- **Themes.** Each level names a tile sheet (`assets/tiles/tiles_<theme>.png`: crypt, flooded, bones, ossuary, fungal, frost, forge, throne, and the other bosses' grove, cistern, mycelium and glacier). Water (toxic pools in the fungal caverns, slush in the frozen vaults) and chasm/lava tiles are animated, and lava (`Level.LAVA_THEMES`: forge, throne) glows. The level is decorated from a per-tile hash:
   - floor clutter per theme
   - cobwebs in room corners
   - banners, chains and cracks on walls
@@ -305,7 +337,8 @@ src/
               reusable abilities (projectile, melee arc, area burst, dash, blink, zone, channel),
               data/<hero>.tres (generated by tools/gen_hero_data.py)
   enemies/    EnemyData + data/*.tres, SpawnDirector (corridor/arena modes), Elites,
-              boss/ (Boss base, BossDemon final boss, BoneColossus mini boss)
+              boss/ (Boss base; mini bosses BoneColossus, ToadstoolTyrant, MireSerpent;
+              final bosses BossDemon, SporeMother, FrostQueen)
   upgrades/   UpgradeData, UpgradePool, data/*.tres
   levels/     Level (tiles + grid + arena rooms from LevelData), LevelDirector (arenas, exit, bosses),
               RunConfig, data/*.tres (generated by tools/gen_levels.py)
@@ -368,7 +401,8 @@ docs/         this document
   - **Chargers (frost boars, `Behavior.CHARGER`):** roam, line up (pink glow, a live band as wide as its reach), charge (`charge_speed` × `charge_time`, contact damage ×2), then catch their breath (0.6 s), or stay dazed (1.3 s) after a wall. The charge counts as a push, so it can carry the boar over a chasm's edge.
   - **Blinkers (imps, `Behavior.BLINKER`):** pick a spot about 30 px from a hero, on their own side if they can, that the hero can see; a portal opens there while they fade out.
   - **Bone piles (`Behavior.PILE`):** a revenant (`OnDeath.BONES`) leaves one that remembers what it was (`state`) and gets back up when its timer runs out. Piles count as enemies (arenas wait for them) but don't walk, block tiles or leave corpses.
-  - **Enemy hazards** (`World.add_hazard()`: spore clouds from `OnDeath.SPORES`, slag): heroes inside take a hit whenever their hit invulnerability runs out.
+  - **Enemy hazards** (`World.add_hazard()`: spore clouds from `OnDeath.SPORES` (`cloud_damage` a hit), slag): heroes inside take a hit whenever their hit invulnerability runs out. `World.lob()` flies any bomb (salamanders' slag, the mushroom bosses' spores) and leaves the right remains.
+  - **Hoppers (sporelings):** `hop` hops a second; each spends 55% of its time in the air at 1.8x speed and sits still for the rest, drawn sitting, landing, taking off and up high (`HordeSim.hop_frame()`).
 
 ### Input
 - `InputRouter` (autoload) owns four `PlayerInput` slots and polls hardware directly, not through the InputMap. That keeps any mix of keyboard and gamepads separated per player.
@@ -399,6 +433,7 @@ docs/         this document
 | 11 | Player-experience pass: run-flow fixes, readability (telegraphs, portals, outlines), game feel (feedback, hitstop, audio), pacing (waves, team lives, held picks, solo fairness), options + accessibility, onboarding (button icons, tips, controls card), replay (stats and awards, difficulty and records, map variety, elites) | done |
 | 12 | Dungeon expansion: an 8-level run (levels 1–3, a mini boss, levels 4–6, the final boss), the Bone Colossus, Fungal Caverns / Frozen Vaults / Molten Forge with second layouts, four new themes | done |
 | 13 | Level enemies: every level's own enemy (bats, drowned, bone archers, revenants, sporecaps, frost boars, salamanders, imps) with its behaviour, art, sounds and warnings; bosses raise revenants and summon imps | done |
+| 14 | More bosses: boss pools (each run meets one of three mini bosses and one of three final bosses); the Toadstool Tyrant and the Mire Serpent (mini), the Spore Mother and the Frost Queen (final), each with a level, theme and servant of its own (sporelings, eels, puffballs, frost wraiths) | done |
 
 ## Performance results
 
@@ -422,15 +457,16 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - Measured on an already heat-throttled Air: the plain baseline read 6.5 ms / 3.2 ms sim in the same state, versus 4.1 ms / 1.7 ms when cool. Summoners add about 0.1–0.3 ms over that throttled baseline.
   - After the change that writes only the instance fields that change, re-measure on a cool machine or a desktop.
 - **Milestone 13 re-check** (every level enemy in the stress room, 2026-09-27, same Air, fullscreen, back to back with the milestone 12 build): 4.95 ms average, 6.36 ms p99, 2.17 ms sim, against 4.79 / 6.32 / 2.06 ms before. The new behaviours cost about 0.1 ms of simulation.
+- **Milestone 14 re-check** (the bosses' servants added to the stress room, 2026-09-27, same Air, back to back with the milestone 13 build): 4.93 ms average, 6.36 ms p99, 2.11 ms sim, against 4.78 / 6.18 / 2.06 ms before. Hops and the out-of-reach and shield checks cost next to nothing.
 
 ## Art, effects and audio
 
 - **Art:** all sprites, tiles and the UI font are generated by `tools/gen_placeholder_art.gd` (deterministic and license-free):
   - 8 heroes (idle/run/dash/downed)
-  - 12 enemy kinds and the bone pile (walk + action frames; flyers get a shadow)
-  - two 64×64 bosses: the demon and the bone colossus
+  - 16 enemy kinds, the bone pile and the spore pod (walk + action frames; flyers get a shadow)
+  - six bosses: the demon, the bone colossus, the toadstool tyrant, the mire serpent (and its fin) and the frost queen at 64×64, the spore mother at 96×96
   - projectiles, pickups and particle blobs
-  - dungeon tiles in eight themes
+  - dungeon tiles in twelve themes
   - the Pixel5x8 font
 
   The planned swap to the CC0 0x72 "DungeonTileset II" pack only changes the PNGs and the atlas coordinates.
@@ -464,7 +500,7 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - white hit flash in the shader
   - frozen tint
   - pixel-snapped screen shake
-- **Audio:** `tools/gen_audio.gd` renders 67 SFX and 3 music loops (menu, dungeon, boss) with a small synth and sequencer into `assets/audio`.
+- **Audio:** `tools/gen_audio.gd` renders 76 SFX and 3 music loops (menu, dungeon, boss) with a small synth and sequencer into `assets/audio`.
 - **`Audio` autoload:**
   - Plays SFX through a 24-voice pool on an `SFX` bus. Six voices are reserved for cues players must not miss (down, revive, ult, level-up, heartbeat, help, boss wind-up and death, stings...), so a flood of hits can't cut them off.
   - Each sound has a minimum repeat interval (e.g. kills every 50 ms), so a horde never drowns everything out.
@@ -475,6 +511,7 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - World events cover hits, kills, explosions, pickups, hurt/down/revive and level-ups.
   - The level director plays door, clear and portal sounds; the bosses play roar, wind-up, slam, spikes and fireball.
   - The level enemies: a bow, bones falling apart and rattling back up, a spore burst, a snort and a thud into a wall, a lob and its sizzle, an imp's blink.
+  - The other bosses: the Tyrant's springy hops, the Serpent's splash, bubbles and bite, pods sprouting and roots bursting, the Queen's nova, beam and blizzard.
   - UI sounds on moves and confirms.
 - **Fullscreen:** F11 / Alt+Enter toggles it anywhere; the pause menu also has a fullscreen switch.
 

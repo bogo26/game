@@ -37,6 +37,10 @@ const FLOOR_DECOR := {
 	&"frost": [0.05, {Decor.CRACKS: 4, Decor.PUDDLE: 2, Decor.RUBBLE: 2, Decor.SKULL: 1}],
 	&"forge": [0.05, {Decor.RUBBLE: 4, Decor.CRACKS: 3, Decor.SKULL: 1, Decor.BONES: 1}],
 	&"throne": [0.04, {Decor.SKULL: 2, Decor.BONES: 1, Decor.CRACKS: 3, Decor.RUBBLE: 2}],
+	&"grove": [0.1, {Decor.MOSS: 6, Decor.PUDDLE: 2, Decor.RUBBLE: 1, Decor.BONES: 1}],
+	&"cistern": [0.07, {Decor.PUDDLE: 5, Decor.MOSS: 4, Decor.CRACKS: 2, Decor.RUBBLE: 1}],
+	&"mycelium": [0.1, {Decor.MOSS: 6, Decor.PUDDLE: 2, Decor.BONES: 2, Decor.SKULL: 1}],
+	&"glacier": [0.05, {Decor.CRACKS: 4, Decor.PUDDLE: 2, Decor.RUBBLE: 2, Decor.SKULL: 1}],
 }
 ## Themes whose chasms are lava (they light up their surroundings).
 const LAVA_THEMES: Array[StringName] = [&"forge", &"throne"]

@@ -84,6 +84,18 @@ const SFX := {
 	"lob": {"wave": "noise", "f0": 500.0, "f1": 1400.0, "dur": 0.25, "decay": 1.0, "vol": 0.18, "lp": 0.3},
 	"sizzle": {"wave": "noise", "f0": 6000.0, "f1": 2500.0, "dur": 0.45, "decay": 1.2, "vol": 0.22, "lp": 0.6},
 	"imp": {"wave": "square", "f0": 1200.0, "f1": 300.0, "dur": 0.16, "decay": 1.4, "vol": 0.12, "duty": 0.25, "vib": [0.1, 30.0]},
+	# The other bosses: the Toadstool Tyrant's springy hops, the Mire Serpent
+	# diving, bubbling up and biting, the Spore Mother's pods sprouting and
+	# roots bursting, the Frost Queen's nova, beam and blizzard.
+	"boing": {"wave": "sine", "f0": 180.0, "f1": 520.0, "dur": 0.22, "decay": 1.1, "vol": 0.3, "vib": [0.08, 22.0]},
+	"splash": {"wave": "noise", "f0": 2200.0, "f1": 400.0, "dur": 0.4, "decay": 1.3, "vol": 0.34, "lp": 0.35},
+	"bubbles": {"wave": "sine", "f0": 300.0, "f1": 700.0, "dur": 0.6, "pulses": 5, "decay": 1.6, "vol": 0.22, "vib": [0.2, 9.0]},
+	"bite": {"wave": "square", "f0": 260.0, "f1": 90.0, "dur": 0.12, "decay": 2.2, "vol": 0.26, "noise": 0.4, "duty": 0.5},
+	"sprout": {"wave": "triangle", "f0": 140.0, "f1": 380.0, "dur": 0.35, "decay": 1.0, "vol": 0.26, "noise": 0.25, "lp": 0.35},
+	"roots": {"wave": "noise", "f0": 900.0, "f1": 160.0, "dur": 0.4, "pulses": 3, "decay": 1.4, "vol": 0.34, "lp": 0.3},
+	"nova": {"wave": "sine", "f0": 1800.0, "f1": 500.0, "dur": 0.7, "decay": 1.0, "vol": 0.28, "noise": 0.3, "vib": [0.05, 30.0]},
+	"beam": {"wave": "saw", "f0": 700.0, "f1": 900.0, "dur": 1.6, "attack": 0.1, "decay": 0.6, "vol": 0.16, "lp": 0.3, "vib": [0.04, 28.0]},
+	"blizzard": {"wave": "noise", "f0": 600.0, "f1": 1800.0, "dur": 1.8, "attack": 0.4, "decay": 0.7, "vol": 0.3, "lp": 0.2, "vib": [0.3, 3.0]},
 	"victory": {"wave": "square", "f0": 523.0, "f1": 523.0, "dur": 1.3, "decay": 0.5, "vol": 0.22, "duty": 0.25, "arp": [0, 4, 7, 12, 16, 19, 24, 24], "arp_step": 0.11},
 	"defeat": {"wave": "triangle", "f0": 392.0, "f1": 262.0, "dur": 1.4, "decay": 0.6, "vol": 0.3, "arp": [0, -1, -3, -5, -7], "arp_step": 0.25, "lp": 0.4},
 }

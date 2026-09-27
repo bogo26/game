@@ -2,7 +2,8 @@ extends "res://tests/test_case.gd"
 ## Each level's own enemy: bats (Crypt Entrance), drowned (Flooded Halls),
 ## bone archers (Bone Pits), revenants (the Ossuary), sporecaps (Fungal
 ## Caverns), frost boars (Frozen Vaults), salamanders (Molten Forge) and imps
-## (Demon's Throne) - and that every level of the run has one of its own.
+## (Demon's Throne) - and that every level of the run has one of its own,
+## the other bosses' levels included (their servants are in test_new_bosses).
 
 const WORLD_SCENE := "res://src/world/world.tscn"
 const DT := 1.0 / 60.0
@@ -12,6 +13,8 @@ const OWN := {
 	"Crypt Entrance": &"bat", "Flooded Halls": &"drowned", "Bone Pits": &"bone_archer",
 	"The Ossuary": &"revenant", "Fungal Caverns": &"sporecap", "Frozen Vaults": &"frost_boar",
 	"Molten Forge": &"salamander", "Demon's Throne": &"imp",
+	"Toadstool Hollow": &"sporeling", "The Sunken Cistern": &"eel", "The Mycelium Deep": &"puffball",
+	"The Frozen Court": &"frost_wraith",
 }
 
 const ROOM := """
@@ -116,14 +119,18 @@ func test_every_level_has_an_enemy_of_its_own() -> void:
 	var known: Array[StringName] = []
 	for path in World.ENEMY_TYPES:
 		known.append((load(path) as EnemyData).id)
-	for index in run.levels.size():
-		var data := run.levels[index]
+	# Every level a run can meet: the run's levels and the other bosses' levels.
+	var levels: Array[LevelData] = []
+	levels.append_array(run.levels)
+	levels.append_array(run.boss_pool)
+	for index in levels.size():
+		var data := levels[index]
 		var own: Array[StringName] = []
 		for id: StringName in data.enemy_weights:
 			assert_true(id in known, "%s: %s is an enemy" % [data.display_name, id])
 			var elsewhere := false
-			for other in run.levels.size():
-				if other != index and run.levels[other].enemy_weights.has(id):
+			for other in levels.size():
+				if other != index and levels[other].enemy_weights.has(id):
 					elsewhere = true
 			if not elsewhere and float(data.enemy_weights[id]) > 0.0:
 				own.append(id)
@@ -132,6 +139,7 @@ func test_every_level_has_an_enemy_of_its_own() -> void:
 		if index < run.alternates.size() and run.alternates[index]:
 			assert_eq(run.alternates[index].enemy_weights, data.enemy_weights,
 				"%s: the second layout meets the same enemies" % data.display_name)
+	assert_eq(levels.size(), OWN.size(), "every level is in the table")
 
 
 func test_bosses_bring_their_own() -> void:

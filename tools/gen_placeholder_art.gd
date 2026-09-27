@@ -13,6 +13,11 @@ extends SceneTree
 ##   assets/fonts/pixel5x8.png + .fnt       proportional 5x8 pixel font (BMFont), ASCII 32-126
 ##   assets/sprites/enemies/boss_demon.png  4 frames of 64x64: walk0, walk1, windup, charge
 ##   assets/sprites/enemies/bone_colossus.png 4 frames of 64x64: walk0, walk1, windup, leap
+##   assets/sprites/enemies/toadstool_tyrant.png 4 frames of 64x64: walk0, walk1, squat, airborne
+##   assets/sprites/enemies/mire_serpent.png  4 frames of 64x64: sway0, sway1, windup, strike
+##   assets/sprites/enemies/mire_serpent_fin.png 2 frames of 32x20: its fin while it's under
+##   assets/sprites/enemies/spore_mother.png  4 frames of 96x96: idle0, idle1, windup, release
+##   assets/sprites/enemies/frost_queen.png   4 frames of 64x64: glide0, glide1, windup, cast
 ##   assets/sprites/props/chest.png         2 frames of 16x16: closed, open
 ##   assets/sprites/props/shrine.png        2 frames of 16x24: active, used (orb is white: tinted in game)
 ##   assets/sprites/fx/glow.png             64x64 soft light (torch glow)
@@ -48,9 +53,10 @@ const HEROES := {
 
 ## Row index of each enemy kind in the horde atlas (EnemyData.atlas_row).
 const ENEMY_ROWS := ["swarmer", "brute", "spitter", "exploder", "skeleton", "barrel", "urn", "nest",
-	"bat", "drowned", "bone_archer", "revenant", "bone_pile", "sporecap", "frost_boar", "salamander", "imp"]
-## Flyers get a soft shadow on the ground under them.
-const FLYERS := ["bat", "imp"]
+	"bat", "drowned", "bone_archer", "revenant", "bone_pile", "sporecap", "frost_boar", "salamander", "imp",
+	"sporeling", "eel", "spore_pod", "puffball", "frost_wraith"]
+## Flyers (and hoppers up high) get a soft shadow on the ground under them.
+const FLYERS := ["bat", "imp", "frost_wraith"]
 ## Column index of each projectile / pickup in row 0 / row 1 of the fx atlas.
 const PROJECTILES := ["arrow", "bolt", "orb", "spit", "knife", "rivet", "soul", "fire"]
 const PICKUPS := ["gem_small", "gem_medium", "gem_large", "heart"]
@@ -65,6 +71,10 @@ func _initialize() -> void:
 	_gen_font()
 	_gen_boss()
 	_gen_colossus()
+	_gen_toadstool()
+	_gen_serpent()
+	_gen_spore_mother()
+	_gen_frost_queen()
 	_gen_props()
 	_gen_icon()
 	print("placeholder art generated")
@@ -88,6 +98,45 @@ func _rect(img: Image, x: int, y: int, w: int, h: int, c: Color) -> void:
 	for yy in range(y, y + h):
 		for xx in range(x, x + w):
 			_px(img, xx, yy, c)
+
+
+## Whether anything is drawn inside `area`.
+func _has_pixels(img: Image, area: Rect2i) -> bool:
+	for y in range(area.position.y, area.end.y):
+		for x in range(area.position.x, area.end.x):
+			if img.get_pixel(x, y).a > 0.0:
+				return true
+	return false
+
+
+## Filled ellipse centred on (cx, cy) (pixel centres inside it are set).
+func _ellipse(img: Image, cx: float, cy: float, rx: float, ry: float, c: Color) -> void:
+	for y in range(floori(cy - ry), ceili(cy + ry) + 1):
+		for x in range(floori(cx - rx), ceili(cx + rx) + 1):
+			var dx := (x + 0.5 - cx) / rx
+			var dy := (y + 0.5 - cy) / ry
+			if dx * dx + dy * dy <= 1.0:
+				_px(img, x, y, c)
+
+
+## The top half of an ellipse (a mushroom cap) standing on row `base`.
+func _dome(img: Image, cx: float, base: int, half: float, height: float, c: Color) -> void:
+	for y in range(base - ceili(height), base + 1):
+		var dy := (base + 0.5 - (y + 0.5)) / height
+		if dy > 1.0:
+			continue
+		var w := half * sqrt(maxf(0.0, 1.0 - dy * dy))
+		for x in range(floori(cx - w), ceili(cx + w) + 1):
+			if absf(x + 0.5 - cx) <= w:
+				_px(img, x, y, c)
+
+
+## A 1 px line from a to b.
+func _line(img: Image, a: Vector2, b: Vector2, c: Color) -> void:
+	var n := maxi(1, int(maxf(absf(b.x - a.x), absf(b.y - a.y))))
+	for k in n + 1:
+		var q := a.lerp(b, float(k) / n)
+		_px(img, roundi(q.x), roundi(q.y), c)
 
 
 ## Adds a 1px outline around opaque pixels inside `area`.
@@ -155,6 +204,25 @@ const THEMES := {
 		"wall_top": "4c2a32", "wall_hi": "6c3e48", "wall_lo": "2a141a", "brick": "3e222a", "mortar": "1e0c10",
 		"face_hi": "643842", "water": "4a1018", "water_hi": "a0303a", "pit": "a8300c", "pit_hi": "ffc040",
 		"lava": true, "banner": "a02020", "banner_hi": "f0c040"},
+	# The other bosses' levels: a mossy grove (the Toadstool Tyrant), a sunken
+	# cistern (the Mire Serpent), a cavern of living fungus (the Spore Mother)
+	# and a court of ice (the Frost Queen).
+	"grove": {"style": "dirt", "floor": "2e3a24", "arena": "34402a", "moss": "6aae4a",
+		"wall_top": "44503a", "wall_hi": "5e7050", "wall_lo": "262e1e", "brick": "3a4630", "mortar": "1e2618",
+		"face_hi": "566a48", "water": "2a4a3a", "water_hi": "6aa88a", "pit": "050804", "pit_hi": "243020",
+		"lava": false, "banner": "a03a2a", "banner_hi": "f0d0a0"},
+	"cistern": {"style": "slab", "floor": "24302e", "arena": "2a3634", "moss": "3a6a4e",
+		"wall_top": "3a4e4a", "wall_hi": "567470", "wall_lo": "1e2c2a", "brick": "30443f", "mortar": "182422",
+		"face_hi": "4e6a64", "water": "1c3e3a", "water_hi": "4e9a86", "pit": "04100e", "pit_hi": "1a3a36",
+		"lava": false, "banner": "2a5a4a", "banner_hi": "b8d8a0"},
+	"mycelium": {"style": "dirt", "floor": "2e2034", "arena": "38243e", "moss": "c05aa8",
+		"wall_top": "4a2e52", "wall_hi": "6e4478", "wall_lo": "2a1830", "brick": "3e2646", "mortar": "1e1024",
+		"face_hi": "624070", "water": "4a2050", "water_hi": "d070c0", "pit": "06030a", "pit_hi": "3a1a40",
+		"lava": false, "banner": "8a2a7a", "banner_hi": "ffa0e0"},
+	"glacier": {"style": "slab", "floor": "3a4c64", "arena": "44587a", "moss": "c8e8ff",
+		"wall_top": "7a9cc0", "wall_hi": "b0d0f0", "wall_lo": "4a6484", "brick": "6a8cb0", "mortar": "3a5070",
+		"face_hi": "9cc0e4", "water": "4a82b0", "water_hi": "e0f4ff", "pit": "060a18", "pit_hi": "3a5a8a",
+		"lava": false, "banner": "4a5aa8", "banner_hi": "e8f8ff"},
 }
 const TILE_SHEET := "res://assets/tiles/tiles_%s.png"
 
@@ -716,8 +784,20 @@ func _gen_horde_atlas() -> void:
 					_draw_salamander(img, ox, oy, col)
 				"imp":
 					_draw_imp(img, ox, oy, col)
-			_outline(img, Rect2i(ox, oy, 32, 32))
-			if ENEMY_ROWS[row] in FLYERS and (col < 4 or ENEMY_ROWS[row] == "imp"):
+				"sporeling":
+					_draw_sporeling(img, ox, oy, col)
+				"eel":
+					_draw_eel(img, ox, oy, col)
+				"spore_pod":
+					_draw_spore_pod(img, ox, oy, col)
+				"puffball":
+					_draw_puffball(img, ox, oy, col)
+				"frost_wraith":
+					_draw_frost_wraith(img, ox, oy, col)
+			var cell := Rect2i(ox, oy, 32, 32)
+			var drawn := _has_pixels(img, cell)
+			_outline(img, cell)
+			if drawn and (ENEMY_ROWS[row] in FLYERS or (ENEMY_ROWS[row] == "sporeling" and col == 3)):
 				_rect(img, ox + 13, oy + 23, 6, 1, Color(0, 0, 0, 0.3))
 	_save(img, "res://assets/sprites/enemies/horde_atlas.png")
 
@@ -1176,6 +1256,159 @@ func _draw_imp(img: Image, ox: int, oy: int, col: int) -> void:
 	if col >= 4:
 		for sp: Array in [[10, 3], [21, 1], [11, 12], [20, 13], [16, -3]]:
 			_px(img, ox + int(sp[0]) + (col - 4), oy + y0 + int(sp[1]), Color("ff9ac4"))
+
+
+## Sporeling (Toadstool Hollow, the Toadstool Tyrant's spawn): a little
+## red-capped mushroom that gets about in hops. Frames 0-3 (see EnemyData.hop):
+## sitting, landing (squashed), taking off (stretched), up high over its shadow.
+func _draw_sporeling(img: Image, ox: int, oy: int, col: int) -> void:
+	if col > 3:
+		return
+	var cap := Color("e2583a")
+	var cap_dark := Color("a8342a")
+	var spot := Color("ffe6cc")
+	var stalk := Color("efe2c8")
+	var stalk_dark := Color("c0ad8c")
+	# [cap half-width, cap top, cap bottom, stalk half-width, stalk top, stalk bottom]
+	var shape: Array = [[6, 12, 17, 3, 18, 23], [7, 13, 18, 4, 19, 23], [5, 11, 16, 2, 17, 22],
+		[6, 10, 15, 3, 16, 21]][col]
+	var ch: int = shape[0]
+	var cap_top: int = shape[1]
+	var cap_bottom: int = shape[2]
+	var s: int = shape[3]
+	var stalk_top: int = shape[4]
+	var stalk_bottom: int = shape[5]
+	_rect(img, ox + 16 - s, oy + stalk_top, s * 2, stalk_bottom - stalk_top + 1, stalk)
+	_rect(img, ox + 16 - s, oy + stalk_bottom, s * 2, 1, stalk_dark)
+	if col <= 1:
+		_px(img, ox + 15 - s, oy + stalk_bottom, stalk_dark)  # little feet
+		_px(img, ox + 16 + s, oy + stalk_bottom, stalk_dark)
+	_px(img, ox + 15, oy + stalk_top + 2, EYE)
+	_px(img, ox + 17, oy + stalk_top + 2, EYE)
+	_dome(img, ox + 16.0, oy + cap_bottom, ch + 0.5, cap_bottom - cap_top + 0.5, cap)
+	_rect(img, ox + 16 - ch, oy + cap_bottom, ch * 2, 1, cap_dark)
+	_px(img, ox + 18 - ch, oy + cap_top + 2, spot)
+	_px(img, ox + 17, oy + cap_top + 1, spot)
+	_px(img, ox + 14 + ch, oy + cap_top + 3, spot)
+
+
+## Eel (the Sunken Cistern, the Mire Serpent's brood): a long green eel
+## slithering low along the ground, head to the right. Frames 0-3 slither
+## (the wave runs down its body); 4-5 swim (head up, humps and foam).
+func _draw_eel(img: Image, ox: int, oy: int, col: int) -> void:
+	var body := Color("4e7a3e")
+	var belly := Color("b0c878")
+	var dark := Color("2c4824")
+	var foam := Color("c8ecf4")
+	var swim := col >= 4
+	var phase := col * PI * 0.5
+	for x in range(5, 24):
+		var wave := sin(x * 0.55 - phase)
+		var y := 19 + roundi(wave * 1.5)
+		if swim:
+			if wave < 0.1:
+				continue  # under the water between humps
+			y = 20 - roundi(wave * 1.5)
+		_rect(img, ox + x, oy + y, 1, 3, body)
+		_px(img, ox + x, oy + y + 2, belly)
+		if x % 2 == 0:
+			_px(img, ox + x, oy + y - 1, dark)  # the fin along its back
+	var hy := 17 if not swim else 16
+	_rect(img, ox + 23, oy + hy, 5, 4, body)
+	_rect(img, ox + 24, oy + hy + 3, 4, 1, belly)
+	_px(img, ox + 28, oy + hy + 1, body)
+	_px(img, ox + 25, oy + hy + 1, Color("ffe040"))
+	_px(img, ox + 27, oy + hy + 2, dark)
+	if swim:
+		_rect(img, ox + 6, oy + 22, 20, 1, foam)
+		_px(img, ox + 4 + (col - 4) * 3, oy + 21, foam)
+		_px(img, ox + 21 - (col - 4) * 3, oy + 21, foam)
+		_rect(img, ox + 22, oy + 21, 7, 1, Color("9ad4e4"))
+
+
+## Spore pod (the Spore Mother's shield): a glowing violet sac on a knot of
+## roots. Frames 0-3 pulse; 4-5 throb (swollen, bright).
+func _draw_spore_pod(img: Image, ox: int, oy: int, col: int) -> void:
+	if col > 5:
+		return
+	var sac := Color("b04c9c")
+	var sac_dark := Color("6e2a64")
+	var glow := Color("ff9ae0")
+	var root := Color("4a2a3a")
+	var swell: int = 1 if col >= 4 else [0, 0, 1, 0][col]
+	var bright := [0.2, 0.5, 0.8, 0.5, 1.0, 0.9][col] as float
+	for r: Array in [[6, 22, 12, 23], [9, 23, 23, 23], [20, 22, 25, 22]]:
+		_line(img, Vector2(ox + int(r[0]), oy + int(r[1])), Vector2(ox + int(r[2]), oy + int(r[3])), root)
+	_ellipse(img, ox + 16.0, oy + 15.5, 6.5 + swell, 8.0 + swell * 0.5, sac)
+	_ellipse(img, ox + 14.5, oy + 18.0, 4.0, 4.5, sac_dark)
+	_ellipse(img, ox + 16.5, oy + 14.0, 4.0 + swell, 5.0, sac)
+	var c := sac.lerp(glow, bright)
+	for sp: Array in [[13, 11], [18, 13], [15, 16], [19, 18], [12, 15]]:
+		_rect(img, ox + int(sp[0]), oy + int(sp[1]), 2, 2, c)
+	_px(img, ox + 18, oy + 13, Color.WHITE if bright > 0.7 else c.lightened(0.3))
+	_rect(img, ox + 15, oy + 7 - swell, 3, 2, Color("f0c0e8"))  # the bud on top
+
+
+## Puffball (the Mycelium Deep, the Spore Mother's spawn): a round pale
+## puffball on stubby feet with a spore hole on top. Frames 0-3 waddle; 4-5
+## swell up before it bursts (the fuse), spores puffing out of the top.
+func _draw_puffball(img: Image, ox: int, oy: int, col: int) -> void:
+	var skin := Color("ece2cc")
+	var shade := Color("c2b294")
+	var dark := Color("8a7a60")
+	var w := _walk(col)
+	var fuse := col >= 4
+	var b := w.x if not fuse else 0
+	var r := 7.0 if not fuse else 8.0
+	if not fuse:
+		_rect(img, ox + 13, oy + 22, 2, 2 - maxi(w.y, 0), dark)
+		_rect(img, ox + 17, oy + 22, 2, 2 - maxi(-w.y, 0), dark)
+	else:
+		skin = skin.lerp(Color("ffb0d0"), 0.35 if col == 4 else 0.55)
+	_ellipse(img, ox + 16.0, oy + 22.5 - r + b, r, r, skin)
+	_ellipse(img, ox + 14.0, oy + 24.0 - r + b + 2.0, r * 0.55, r * 0.5, shade)
+	_ellipse(img, ox + 17.0, oy + 21.0 - r + b, r * 0.7, r * 0.55, skin)
+	for d: Array in [[12, 15], [19, 13], [18, 18], [13, 11]]:
+		_px(img, ox + int(d[0]), oy + int(d[1]) + b + (0 if not fuse else -1), shade)
+	var top := roundi(23.0 - 2.0 * r) + b
+	_rect(img, ox + 15, oy + top, 3, 1, dark)  # the spore hole
+	_px(img, ox + 14, oy + 17 + b, EYE)
+	_px(img, ox + 18, oy + 17 + b, EYE)
+	if fuse:
+		for sp: Array in [[15, -2], [17, -3], [14, -4], [18, -1]]:
+			_px(img, ox + int(sp[0]) + col - 4, oy + top + int(sp[1]), Color("ff7ac0"))
+
+
+## Frost wraith (the Frozen Court, the Frost Queen's servant): a hooded ghost
+## of ice with a wisp for legs, floating over its shadow. Frames 0-3 hover;
+## 4 winds up a shot (arms up round a glinting shard of ice).
+func _draw_frost_wraith(img: Image, ox: int, oy: int, col: int) -> void:
+	if col > 4:
+		return
+	var body := Color("cfe6ff")
+	var shade := Color("8fb6e0")
+	var dark := Color("4e6e96")
+	var eyes := Color("6af0ff")
+	var y0: int = [0, 1, 1, 0, 0][col]
+	var sway: int = [0, 1, 0, -1, 0][col]
+	# The wisp: a tail that narrows and sways under the body.
+	for k in 6:
+		var half := 4 - k * 2 / 3
+		_rect(img, ox + 16 - half + sway * (k / 3), oy + 14 + y0 + k, half * 2, 1, body if k < 4 else shade)
+	_rect(img, ox + 11, oy + 9 + y0, 10, 6, body)
+	_rect(img, ox + 11, oy + 13 + y0, 3, 2, shade)
+	_ellipse(img, ox + 16.0, oy + 8.5 + y0, 4.5, 4.0, body)  # the hood
+	_rect(img, ox + 13, oy + 7 + y0, 6, 4, dark)  # the dark inside of the hood
+	_px(img, ox + 14, oy + 9 + y0, eyes)
+	_px(img, ox + 17, oy + 9 + y0, eyes)
+	if col == 4:
+		_rect(img, ox + 9, oy + 5, 2, 5, body)
+		_rect(img, ox + 21, oy + 5, 2, 5, body)
+		_rect(img, ox + 15, oy + 1, 2, 3, Color("e8fbff"))
+		_px(img, ox + 16, oy + 2, Color.WHITE)
+	else:
+		_rect(img, ox + 9, oy + 11 + y0, 2, 4, shade)
+		_rect(img, ox + 21, oy + 11 + y0, 2, 4, shade)
 
 
 # --- props (chests, shrines: node sprites) ---------------------------------------------
@@ -1647,6 +1880,351 @@ func _draw_colossus(img: Image, ox: int, frame: int) -> void:
 	for x in [27, 32, 37]:
 		_rect(img, ox + x, 4 + bob, 1, 3, bone)
 		_px(img, ox + x, 3 + bob, hi)
+
+
+# --- the other bosses (square frames; feet 6 px above the bottom, see Boss) --------------
+
+func _gen_toadstool() -> void:
+	var img := _img(256, 64)
+	for f in 4:
+		_draw_toadstool(img, f * 64, f)
+		_outline(img, Rect2i(f * 64, 0, 64, 64))
+	_save(img, "res://assets/sprites/enemies/toadstool_tyrant.png")
+
+
+## The Toadstool Tyrant: a huge red cap with white spots on a thick pale
+## stalk with an angry face, stubby arms and feet. Frame 2 squats (squashed,
+## about to bounce or puff), frame 3 is in the air (stretched, feet tucked).
+func _draw_toadstool(img: Image, ox: int, frame: int) -> void:
+	var cap := Color("d8322a")
+	var cap_hi := Color("f06a50")
+	var cap_dark := Color("98201c")
+	var spot := Color("fff4e8")
+	var gill := Color("c8b08a")
+	var stalk := Color("f0e4cc")
+	var stalk_shade := Color("cdbb98")
+	var stalk_hi := Color("fff8ea")
+	var dark := Color("3a2626")
+	var bob := 1 if frame == 1 else 0
+	# Squash (+) and stretch (-): the cap sits lower and wider, the stalk shorter.
+	var squash: int = [0, 0, 3, -2][frame]
+	var cx := ox + 32.0
+	var feet_y := 58 if frame != 3 else 54
+	# Feet: stepping in turn, tucked up in the air.
+	var lift_l := 2 if frame == 1 else 0
+	var lift_r := 2 if frame == 0 else 0
+	_ellipse(img, cx - 8.0, feet_y - 2.5 - lift_l, 5.5, 2.5, stalk_shade)
+	_ellipse(img, cx + 8.0, feet_y - 2.5 - lift_r, 5.5, 2.5, stalk_shade)
+	# The stalk: a barrel, widest low down.
+	var top := 30 + squash + bob
+	var bottom := feet_y - 3
+	for y in range(top, bottom + 1):
+		var t := float(y - top) / maxf(1.0, bottom - top)
+		var half := 11.0 + 2.5 * sin(t * PI * 0.8) + (1.0 if squash > 0 else 0.0) - (1.0 if squash < 0 else 0.0)
+		_rect(img, roundi(cx - half), y, roundi(half * 2.0), 1, stalk)
+		_rect(img, roundi(cx - half), y, 3, 1, stalk_shade)
+		_px(img, roundi(cx + half) - 3, y, stalk_hi)
+	# Arms: stubby, down at its sides; up beside the cap in the air.
+	var ay := 42 + squash + bob
+	if frame == 3:
+		_rect(img, ox + 13, 25, 5, 9, stalk)
+		_rect(img, ox + 46, 25, 5, 9, stalk)
+		_rect(img, ox + 12, 23, 7, 4, stalk_shade)
+		_rect(img, ox + 45, 23, 7, 4, stalk_shade)
+	else:
+		_rect(img, ox + 15, ay, 6, 8, stalk)
+		_rect(img, ox + 43, ay, 6, 8, stalk)
+		_rect(img, ox + 14, ay + 7, 7, 4, stalk_shade)
+		_rect(img, ox + 43, ay + 7, 7, 4, stalk_shade)
+	# The face: angry brows, glaring eyes (squinting when it squats), a frown.
+	var fy := top + 8
+	var eye_h := 1 if frame == 2 else 3
+	_rect(img, ox + 23, fy + 3 - eye_h, 6, eye_h, Color.WHITE)
+	_rect(img, ox + 35, fy + 3 - eye_h, 6, eye_h, Color.WHITE)
+	_rect(img, ox + 26, fy + 3 - eye_h, 2, eye_h, dark)
+	_rect(img, ox + 36, fy + 3 - eye_h, 2, eye_h, dark)
+	for k in 6:
+		_px(img, ox + 22 + k, fy - 2 + k / 2, dark)
+		_px(img, ox + 41 - k, fy - 2 + k / 2, dark)
+	var my := fy + 9
+	_rect(img, ox + 27, my, 10, 1, dark)
+	_px(img, ox + 26, my + 1, dark)
+	_px(img, ox + 37, my + 1, dark)
+	_px(img, ox + 29, my + 1, Color.WHITE)
+	_px(img, ox + 34, my + 1, Color.WHITE)
+	# Gills under the rim, then the cap.
+	var base := 31 + squash + bob
+	var half_w := 26.0 + squash * 0.7
+	_rect(img, roundi(cx - half_w + 4.0), base - 1, roundi(half_w * 2.0 - 8.0), 3, gill)
+	for x in range(roundi(cx - half_w + 6.0), roundi(cx + half_w - 5.0), 3):
+		_px(img, x, base, gill.darkened(0.3))
+	_dome(img, cx, base - 2, half_w, 21.0 - squash, cap)
+	_dome(img, cx - 5.0, base - 12, half_w * 0.45, 8.0 - squash * 0.5, cap_hi)
+	_rect(img, roundi(cx - half_w), base - 2, roundi(half_w * 2.0), 2, cap_dark)
+	var spots: Array = [[-15, -9, 3.0], [-2, -16, 3.5], [11, -11, 3.0], [19, -4, 2.0], [-21, -3, 2.0],
+		[4, -6, 2.5], [-9, -17, 1.8]]
+	for sp: Array in spots:
+		_ellipse(img, cx + float(sp[0]), base - 2 + float(sp[1]) + (0.0 if squash >= 0 else -squash * 0.5),
+			float(sp[2]), float(sp[2]) * 0.8, spot)
+
+
+func _gen_serpent() -> void:
+	var img := _img(256, 64)
+	for f in 4:
+		_draw_serpent(img, f * 64, f)
+		_outline(img, Rect2i(f * 64, 0, 64, 64))
+	_save(img, "res://assets/sprites/enemies/mire_serpent.png")
+	var fin := _img(64, 20)
+	for f in 2:
+		_draw_fin(fin, f * 32, f)
+		_outline(fin, Rect2i(f * 32, 0, 32, 20))
+		# Its bulk under the surface: a dark shadow round the fin (not outlined).
+		for y in range(13, 19):
+			for x in 32:
+				var d := Vector2((x + 0.5 - 16.0) / 14.0, (y + 0.5 - 16.0) / 3.2)
+				if d.length_squared() <= 1.0 and fin.get_pixel(f * 32 + x, y).a == 0.0:
+					fin.set_pixel(f * 32 + x, y, Color(0.02, 0.08, 0.06, 0.45))
+	_save(fin, "res://assets/sprites/enemies/mire_serpent_fin.png")
+
+
+## The Mire Serpent rising out of a murky pool: a coil breaking the surface,
+## a scaly neck curving up to a finned head with a yellow eye. Frames 0-1
+## sway, 2 rears back (mouth open), 3 strikes forward (jaws wide).
+func _draw_serpent(img: Image, ox: int, frame: int) -> void:
+	var skin := Color("3e7a4a")
+	var dark := Color("24502e")
+	var belly := Color("b8c878")
+	var fin := Color("c04a3a")
+	var murk := Color("2a4a42")
+	var ripple := Color("7ab0a0")
+	var sway: int = [0, 2, -2, 3][frame]
+	# The pool it rises from, and a coil of its body breaking the surface.
+	_ellipse(img, ox + 32.0, 55.0, 18.0, 3.2, murk)
+	_rect(img, ox + 17, 54, 5, 1, ripple)
+	_rect(img, ox + 42, 56, 6, 1, ripple)
+	for k in 13:
+		var a := PI * k / 12.0
+		var q := Vector2(ox + 22.0 - cos(a) * 6.0, 54.0 - sin(a) * 7.0)
+		_ellipse(img, q.x, q.y, 3.2, 3.2, skin)
+	_px(img, ox + 17, 49, dark)
+	_px(img, ox + 21, 46, dark)
+	_px(img, ox + 26, 49, dark)
+	# The neck: an S-curve up from the water, thinning towards the head.
+	var head := Vector2(ox + 36.0 + sway, 17.0)
+	if frame == 2:
+		head = Vector2(ox + 30.0, 14.0)
+	elif frame == 3:
+		head = Vector2(ox + 42.0, 18.0)
+	var root := Vector2(ox + 35.0, 54.0)
+	var n := 22
+	for k in n + 1:
+		var t := float(k) / n
+		var q := root.lerp(head + Vector2(-4, 5), t) + Vector2(sin(t * PI * 1.6) * 6.0 * (1.0 - t * 0.3), 0)
+		var r := lerpf(5.2, 3.6, t)
+		_ellipse(img, q.x, q.y, r, r, skin)
+		_px(img, roundi(q.x + r * 0.5), roundi(q.y), belly)
+		_px(img, roundi(q.x + r * 0.5) - 1, roundi(q.y), belly)
+		if k % 3 == 0:
+			_px(img, roundi(q.x - r * 0.4), roundi(q.y), dark)
+	# The crest: red fins behind the head, flared when it rears back.
+	var flare := 2 if frame == 2 else 0
+	for k in 4:
+		var bx := roundi(head.x) - 9 + k * 2
+		var h := 4 + k + flare
+		_rect(img, bx, roundi(head.y) - h + 1, 2, h, fin)
+	# The head: a wedge facing right with a yellow slit eye.
+	var hx := roundi(head.x)
+	var hy := roundi(head.y)
+	_ellipse(img, head.x, head.y, 7.5, 5.5, skin)
+	_rect(img, hx + 3, hy - 3, 8, 6, skin)
+	_rect(img, hx - 2, hy + 3, 12, 2, belly)
+	_rect(img, hx + 1, hy - 3, 3, 3, Color("ffe040"))
+	_px(img, hx + 2, hy - 3, EYE)
+	_px(img, hx + 2, hy - 2, EYE)
+	_px(img, hx + 9, hy - 2, dark)
+	if frame >= 2:
+		# Jaws open: a dark gap and fangs.
+		var gap := 2 if frame == 2 else 4
+		_rect(img, hx + 3, hy + 1, 9, gap, Color("4a1a1e"))
+		_rect(img, hx + 3, hy + 1 + gap, 9, 2, belly)
+		_px(img, hx + 5, hy + 1, Color.WHITE)
+		_px(img, hx + 9, hy + 1, Color.WHITE)
+		_px(img, hx + 6, hy + gap, Color.WHITE)
+	else:
+		_rect(img, hx + 4, hy + 1, 7, 1, dark)
+
+
+## Its fin cutting through the murk: a big dark dorsal fin with a red edge,
+## foam curling off it (the shadow of its bulk is added under it).
+func _draw_fin(img: Image, ox: int, frame: int) -> void:
+	var fin := Color("24502e")
+	var edge := Color("c04a3a")
+	var foam := Color("c8ecf4")
+	for y in range(2, 15):
+		var w := (y - 2) * 0.9
+		var x0 := 15 - roundi(w * 0.35)
+		_rect(img, ox + x0, y, maxi(1, roundi(w)), 1, fin)
+		_px(img, ox + x0, y, edge)
+	var drift := frame * 2
+	_rect(img, ox + 5 + drift, 14, 6, 1, foam)
+	_rect(img, ox + 21 - drift, 14, 6, 1, foam)
+	_rect(img, ox + 10, 15, 12, 1, Color("9ad4e4"))
+	_px(img, ox + 3 + drift, 13, foam)
+	_px(img, ox + 28 - drift, 13, foam)
+
+
+func _gen_spore_mother() -> void:
+	var img := _img(384, 96)
+	for f in 4:
+		_draw_spore_mother(img, f * 96, f)
+		_outline(img, Rect2i(f * 96, 0, 96, 96))
+	_save(img, "res://assets/sprites/enemies/spore_mother.png")
+
+
+## The Spore Mother: a towering mushroom with a vast violet cap covered in
+## glowing spots, a frilled collar, a pale stalk with glowing eyes and a
+## gaping mouth, rooted in a spread of roots and little mushrooms. Frames 0-1
+## breathe, 2 swells (about to release), 3 releases (spores off the rim).
+func _draw_spore_mother(img: Image, ox: int, frame: int) -> void:
+	var cap := Color("8a3a9a")
+	var cap_hi := Color("b462c4")
+	var cap_dark := Color("5a2066")
+	var glow := Color("ff8ad8")
+	var gill := Color("e0b0d8")
+	var stalk := Color("dccce4")
+	var stalk_shade := Color("a898b8")
+	var stalk_hi := Color("f4ecf8")
+	var root := Color("5a3a52")
+	var dark := Color("3a1e3a")
+	var cx := ox + 48.0
+	var breathe := 1 if frame == 1 else 0
+	var swell := 2 if frame == 2 else 0
+	var lift := -1 if frame == 3 else 0
+	# Roots spreading over the ground, and little mushrooms among them.
+	for r: Array in [[-30, 89, -6, 86], [-24, 90, -4, 88], [30, 89, 6, 86], [22, 90, 4, 88], [-38, 88, -26, 89],
+			[38, 88, 26, 89]]:
+		_line(img, Vector2(cx + float(r[0]), float(r[1])), Vector2(cx + float(r[2]), float(r[3])), root)
+	for m: Array in [[-30, 85, 4.0, "d8582a"], [33, 86, 3.5, "e27ab8"], [-20, 88, 3.0, "b86ad0"]]:
+		_rect(img, roundi(cx + float(m[0])) - 1, int(m[1]), 2, 4, stalk)
+		_dome(img, cx + float(m[0]), int(m[1]), float(m[2]), float(m[2]) * 0.8, Color(m[3]))
+	# The stalk, flaring at the foot.
+	for y in range(40, 89):
+		var t := float(y - 40) / 48.0
+		var half := 14.0 + 5.0 * t * t
+		_rect(img, roundi(cx - half), y, roundi(half * 2.0), 1, stalk)
+		_rect(img, roundi(cx - half), y, 4, 1, stalk_shade)
+		_rect(img, roundi(cx + half) - 4, y, 2, 1, stalk_hi)
+	# Its face: two big glowing eyes and a gaping mouth hung with strands.
+	var eye := Color("ffe0f8") if frame != 2 else Color.WHITE
+	for ex in [-8.0, 8.0]:
+		_ellipse(img, cx + ex, 58.0, 4.0 + swell * 0.5, 3.0 + swell * 0.5, glow)
+		_ellipse(img, cx + ex, 58.0, 2.2, 1.6, eye)
+	var mouth := 4 if frame == 3 else 2
+	_ellipse(img, cx, 70.0, 7.0, mouth, dark)
+	for sx in [-4, -1, 3]:
+		_rect(img, roundi(cx) + sx, 70, 1, mouth + 2, stalk_hi)
+	# The frilled collar under the cap.
+	for x in range(roundi(cx - 19.0), roundi(cx + 19.0)):
+		var drop := 3 + (x % 3)
+		_rect(img, x, 46, 1, drop, gill.darkened(0.1))
+	# Gills, then the cap: vast, violet, spotted with glowing discs.
+	var base := 42 + breathe + lift
+	var half_w := 44.0 + swell
+	_rect(img, roundi(cx - half_w + 6.0), base - 1, roundi(half_w * 2.0 - 12.0), 4, gill)
+	for x in range(roundi(cx - half_w + 8.0), roundi(cx + half_w - 7.0), 3):
+		_rect(img, x, base, 1, 2, gill.darkened(0.35))
+	_dome(img, cx, base - 2, half_w, 32.0 + swell, cap)
+	_dome(img, cx - 9.0, base - 16, half_w * 0.42, 12.0 + swell, cap_hi)
+	_rect(img, roundi(cx - half_w), base - 3, roundi(half_w * 2.0), 2, cap_dark)
+	var lit := [0.35, 0.6, 1.0, 0.8][frame] as float
+	var spots: Array = [[-28, -8, 4.0], [-14, -20, 4.5], [4, -26, 4.0], [20, -16, 4.5], [34, -7, 3.5],
+		[-36, -3, 2.5], [-3, -12, 3.0], [12, -5, 3.0], [-22, -2, 2.5], [27, -25, 2.5]]
+	for sp: Array in spots:
+		var q := Vector2(cx + float(sp[0]) * half_w / 44.0, base - 2 + float(sp[1]))
+		_ellipse(img, q.x, q.y, float(sp[2]), float(sp[2]) * 0.85, glow.darkened(0.45 * (1.0 - lit)))
+		_ellipse(img, q.x - 0.5, q.y - 0.5, float(sp[2]) * 0.45, float(sp[2]) * 0.4, Color("ffd8f4") if lit > 0.5 else glow)
+	if frame == 3:
+		# Spores puffing off the rim.
+		for k in 14:
+			var a := PI * (0.05 + 0.9 * k / 13.0)
+			var q := Vector2(cx - cos(a) * (half_w + 3.0), base - 3 - sin(a) * 5.0 - (k % 3) * 3)
+			_rect(img, roundi(q.x), roundi(q.y), 2, 2, glow)
+
+
+func _gen_frost_queen() -> void:
+	var img := _img(256, 64)
+	for f in 4:
+		_draw_frost_queen(img, f * 64, f)
+		_outline(img, Rect2i(f * 64, 0, 64, 64))
+	_save(img, "res://assets/sprites/enemies/frost_queen.png")
+
+
+## The Frost Queen: a tall, gaunt queen of ice in a flaring gown with an
+## icicle hem, a jagged crown, long white hair, glowing eyes and a staff
+## tipped with a crystal, floating over the floor. Frames 0-1 glide, 2 raises
+## the staff (the crystal blazing), 3 casts (staff thrust forward).
+func _draw_frost_queen(img: Image, ox: int, frame: int) -> void:
+	var gown := Color("d8ecff")
+	var gown_shade := Color("9cc0e0")
+	var fold := Color("b8d4f0")
+	var skin := Color("d4ecfa")
+	var hair := Color("f4faff")
+	var ice := Color("b8f0ff")
+	var eyes := Color("5ae8ff")
+	var staff := Color("7aa8cc")
+	var crystal := Color("e0ffff")
+	var bob := 1 if frame == 1 else 0
+	var cx := ox + 32
+	# The gown: flaring from the waist to an icicle hem, floating over the floor.
+	for y in range(30, 55):
+		var t := float(y - 30) / 24.0
+		var half := roundi(5.0 + 8.5 * t)
+		_rect(img, cx - half, y + bob, half * 2, 1, gown)
+		_rect(img, cx - half, y + bob, 2, 1, gown_shade)
+		if y % 5 == 2:
+			_px(img, cx - half / 2, y + bob, fold)
+			_px(img, cx + half / 2, y + bob, fold)
+	for k in 7:
+		var x := cx - 12 + k * 4
+		_rect(img, x, 55 + bob, 2, 2 + (k % 2), ice)
+	# Bodice, arms and the hair falling over her shoulders.
+	_rect(img, cx - 5, 20 + bob, 10, 11, Color("a8d0f0"))
+	_rect(img, cx - 1, 23 + bob, 2, 2, Color("6af0ff"))
+	_rect(img, cx - 9, 11 + bob, 3, 19, hair)
+	_rect(img, cx + 6, 11 + bob, 3, 19, hair)
+	_rect(img, cx - 8, 21 + bob, 2, 13, skin)  # the left arm, down
+	# The face: pale, with glowing eyes.
+	_ellipse(img, cx, 15.5 + bob, 4.5, 5.0, skin)
+	_px(img, cx - 2, 15 + bob, eyes)
+	_px(img, cx + 1, 15 + bob, eyes)
+	_rect(img, cx - 1, 18 + bob, 2, 1, Color("8ab0d0") if frame != 2 else Color("3a5a7a"))
+	# The crown: jagged spikes of ice.
+	var spikes: Array = [[-6, 4], [-3, 6], [0, 8], [3, 6], [6, 4]]
+	for s: Array in spikes:
+		var sx: int = cx + int(s[0])
+		var h: int = s[1]
+		_rect(img, sx - 1, 11 - h + bob, 2, h, ice)
+		_px(img, sx - 1, 11 - h + bob, Color.WHITE)
+	_rect(img, cx - 7, 10 + bob, 14, 2, ice)
+	# The staff in her right hand and its crystal.
+	var glow := Color.WHITE if frame >= 2 else crystal
+	if frame == 3:
+		_line(img, Vector2(cx + 4, 50), Vector2(cx + 14, 16), staff)
+		_line(img, Vector2(cx + 5, 50), Vector2(cx + 15, 16), staff)
+		_rect(img, cx + 5, 22, 3, 8, skin)
+		_ellipse(img, cx + 15.0, 13.0, 3.5, 4.5, glow)
+		_rect(img, cx + 18, 12, 3, 1, Color.WHITE)
+	else:
+		var top := 12 if frame != 2 else 4
+		_rect(img, cx + 11, top + 4 + bob, 2, 50 - top - 4, staff)
+		_rect(img, cx + 8, 21 + bob if frame != 2 else 14, 3, 8, skin)
+		_ellipse(img, cx + 12.0, top + 2.0 + bob, 3.0, 4.0, glow)
+		_px(img, cx + 12, top + bob, Color.WHITE)
+	# Shards of ice floating round her.
+	var shards: Array = [[-15, 30], [15, 42], [-13, 46]] if frame != 2 else [[-11, 26], [13, 36], [-10, 40]]
+	for s: Array in shards:
+		_rect(img, cx + int(s[0]), int(s[1]) + bob, 2, 3, ice)
+		_px(img, cx + int(s[0]), int(s[1]) + bob, Color.WHITE)
 
 
 # --- app icon (drawn at 32x32, scaled x8 with nearest filtering) ----------------------

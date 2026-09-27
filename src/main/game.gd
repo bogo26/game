@@ -70,22 +70,39 @@ func _load_level() -> void:
 	_show_banner(run.title(GameState.level_index), data.display_name)
 
 
-## This run's layout for a level (see RunConfig.layout_for); --layout=a|b and
-## --mirror=none|h|v|hv pin it (debugging, screenshots).
+## This run's layout for a level (see RunConfig.layout_for); --layout=a|b,
+## --mirror=none|h|v|hv and --boss=<level file, e.g. grove> pin it (debugging,
+## screenshots).
 func _layout(index: int) -> LevelData:
 	var pinned_layout := ""
 	var pinned_mirror := ""
+	var pinned_boss := ""
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--layout="):
 			pinned_layout = arg.get_slice("=", 1)
 		elif arg.begins_with("--mirror="):
 			pinned_mirror = arg.get_slice("=", 1)
-	if pinned_layout == "" and pinned_mirror == "":
+		elif arg.begins_with("--boss="):
+			pinned_boss = arg.get_slice("=", 1)
+	var boss := _pinned_boss(index, pinned_boss)
+	if pinned_layout == "" and pinned_mirror == "" and boss == null:
 		return run.layout_for(index, GameState.run_seed)
 	var data := run.levels[index]
-	if pinned_layout == "b" and index < run.alternates.size() and run.alternates[index]:
+	if boss:
+		data = boss
+	elif pinned_layout == "b" and index < run.alternates.size() and run.alternates[index]:
 		data = run.alternates[index]
 	return data.mirrored(pinned_mirror.contains("h"), pinned_mirror.contains("v") and not data.is_boss_level)
+
+
+## The boss level named `file_id` (its file name) if it can be level `index`.
+func _pinned_boss(index: int, file_id: String) -> LevelData:
+	if file_id == "":
+		return null
+	for data in run.choices(index):
+		if data.resource_path.get_file().get_basename() == file_id:
+			return data
+	return null
 
 
 func _show_banner(title: String, subtitle: String) -> void:

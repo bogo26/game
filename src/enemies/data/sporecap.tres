@@ -17,5 +17,6 @@ on_death = 3
 explosion_radius = 30.0
 explosion_damage = 6.0
 cloud_time = 4.0
+cloud_damage = 6.0
 atlas_row = 13
 anim_fps = 5.0

@@ -31,7 +31,8 @@ extends Resource
 
 @export_group("Look")
 ## Tile sheet: assets/tiles/tiles_<theme>.png (crypt, flooded, bones, ossuary,
-## fungal, frost, forge, throne).
+## fungal, frost, forge, throne; the other bosses' grove, cistern, mycelium
+## and glacier).
 @export var theme: StringName = &"crypt"
 @export var tint := Color.WHITE
 

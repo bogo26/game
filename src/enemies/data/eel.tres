@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="EnemyData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/enemies/enemy_data.gd" id="1_enemy"]
+
+[resource]
+script = ExtResource("1_enemy")
+id = &"eel"
+max_hp = 14.0
+speed = 34.0
+radius = 5.0
+hurt_size = Vector2(26, 10)
+contact_damage = 8.0
+xp = 1
+knockback_taken = 1.1
+behavior = 0
+swim_speed = 2.2
+weave = 0.7
+pack = 2
+atlas_row = 18
+anim_fps = 9.0

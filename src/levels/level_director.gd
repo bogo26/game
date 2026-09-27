@@ -257,6 +257,8 @@ func _tick_active_room(dt: float) -> void:
 	if data.is_boss_level:
 		if boss == null or not is_instance_valid(boss):
 			_clear(room)
+		else:
+			_follow_boss()
 		return
 	room.wave_time += dt
 	if room.breather > 0.0:
@@ -442,7 +444,9 @@ func _update_objective() -> void:
 	if active_room:
 		var room_nests := nest_positions(active_room.id)
 		if data.is_boss_level:
-			objective = "Defeat the %s!" % boss_name
+			objective = _boss_objective()
+			if boss and is_instance_valid(boss):
+				objective_target = boss.objective_point()
 		elif not room_nests.is_empty():
 			objective = "Destroy the nests!  %d left" % room_nests.size()
 			objective_target = _nearest(room_nests)
@@ -464,6 +468,22 @@ func _update_objective() -> void:
 		if next:
 			objective_target = next.center
 	objective_changed.emit(objective)
+
+
+## During the fight: the boss's own call ("Burst the spore pods!") or "Defeat the <boss>!".
+func _boss_objective() -> String:
+	var hint := boss.objective_hint() if boss and is_instance_valid(boss) else ""
+	return hint if hint != "" else "Defeat the %s!" % boss_name
+
+
+## The arrow (and the bots) follow the fight as the boss moves; the text
+## changes when the boss calls for something else.
+func _follow_boss() -> void:
+	objective_target = boss.objective_point()
+	var text := _boss_objective()
+	if text != objective:
+		objective = text
+		objective_changed.emit(objective)
 
 
 func _nearest(points: Array[Vector2]) -> Vector2:
