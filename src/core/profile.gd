@@ -1,8 +1,10 @@
 class_name Profile
 extends RefCounted
 ## Records kept between runs (user://profile.cfg): runs played, wins and best
-## time per difficulty, and the hardest difficulty each hero has won on (the
-## stars in character select). Hard unlocks with a win on Normal.
+## time per difficulty, the hardest difficulty each hero has won on (the
+## stars in character select), and the furthest wave reached in Endless Waves
+## per difficulty. Hard unlocks with a win on Normal, or by reaching wave
+## HARD_UNLOCK_WAVE on Normal.
 
 const DEFAULT_PATH := "user://profile.cfg"
 ## Bumped when runs change length, so best times stay comparable: version 2
@@ -10,6 +12,8 @@ const DEFAULT_PATH := "user://profile.cfg"
 ## final boss). Loading an older profile drops its best times but keeps wins,
 ## Hard unlocked and the hero stars.
 const RUN_VERSION := 2
+## Endless Waves: reaching this wave on Normal unlocks Hard too.
+const HARD_UNLOCK_WAVE := 20
 ## Where the profile is saved (tests point this elsewhere).
 static var path := DEFAULT_PATH
 
@@ -19,6 +23,8 @@ var wins := PackedInt32Array([0, 0, 0])
 var best_time := PackedFloat32Array([0.0, 0.0, 0.0])
 ## Hero id -> the hardest difficulty won with it.
 var hero_best: Dictionary = {}
+## Per difficulty: the furthest wave reached in Endless Waves (0 = none).
+var best_wave := PackedInt32Array([0, 0, 0])
 
 
 static func load_profile() -> Profile:
@@ -31,6 +37,7 @@ static func load_profile() -> Profile:
 	if int(cfg.get_value("runs", "version", 1)) >= RUN_VERSION:
 		p.best_time = PackedFloat32Array(cfg.get_value("runs", "best_time", [0.0, 0.0, 0.0]))
 	p.hero_best = cfg.get_value("heroes", "best", {})
+	p.best_wave = PackedInt32Array(cfg.get_value("waves", "best", [0, 0, 0]))
 	return p
 
 
@@ -41,11 +48,12 @@ func save() -> void:
 	cfg.set_value("runs", "wins", Array(wins))
 	cfg.set_value("runs", "best_time", Array(best_time))
 	cfg.set_value("heroes", "best", hero_best)
+	cfg.set_value("waves", "best", Array(best_wave))
 	cfg.save(path)
 
 
 func hard_unlocked() -> bool:
-	return wins[1] > 0 or wins[2] > 0
+	return wins[1] > 0 or wins[2] > 0 or best_wave[1] >= HARD_UNLOCK_WAVE
 
 
 ## The hardest difficulty won with a hero, or -1.
@@ -68,5 +76,18 @@ func record_run(victory: bool, difficulty: int, seconds: float, hero_ids: Array)
 		for id: StringName in hero_ids:
 			if difficulty > hero_rank(id):
 				hero_best[String(id)] = difficulty
+	save()
+	return news
+
+
+## Records an Endless Waves game (the furthest wave the team reached) and
+## saves. Returns what's new, for the end screen:
+## {"best_wave": bool, "hard_unlocked": bool}.
+func record_waves(difficulty: int, wave: int) -> Dictionary:
+	var was_unlocked := hard_unlocked()
+	var news := {"best_wave": wave > best_wave[difficulty], "hard_unlocked": false}
+	if news["best_wave"]:
+		best_wave[difficulty] = wave
+	news["hard_unlocked"] = hard_unlocked() and not was_unlocked
 	save()
 	return news

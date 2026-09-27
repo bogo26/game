@@ -4,8 +4,10 @@ extends Control
 ## un-readies or leaves. Once every joined player is ready, any of them starts
 ## the run with A / Enter (or Start on a gamepad) - there is no timer.
 ## With nobody joined, B / Esc returns to the main menu. Any joined player
-## picks the difficulty with LB / RB (Q / E); Hard unlocks with a Normal win.
-## A star by a hero's name shows the hardest difficulty won with them.
+## picks the difficulty with LB / RB (Q / E); Hard unlocks with a Normal win
+## (or wave 20 of Endless Waves on Normal). A star by a hero's name shows the
+## hardest difficulty won with them. For Endless Waves the title says so, and
+## the top left shows the best wave on the chosen difficulty.
 
 const ROSTER: Array[StringName] = [
 	&"knight", &"ranger", &"mage", &"cleric", &"berserker", &"rogue", &"engineer", &"necromancer",
@@ -57,6 +59,8 @@ var went_back := false
 var _title: Label
 var _footer: Label
 var _difficulty_label: Label
+## Endless Waves: the best wave on the chosen difficulty.
+var _record_label: Label
 var _back_prev: Dictionary = {}
 var _hero_cache: Dictionary = {}
 var _time := 0.0
@@ -82,9 +86,13 @@ func _ready() -> void:
 	bg.color = Color(0.04, 0.035, 0.07)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	add_child(bg)
-	_title = _label("CHOOSE YOUR HEROES", 16, Color("ffe07a"))
+	var waves := GameState.mode == GameState.Mode.WAVES
+	_title = _label("ENDLESS WAVES" if waves else "CHOOSE YOUR HEROES", 16, Color("ffe07a"))
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_title)
+	_record_label = _label("", 8, Color("ffe07a"))
+	_record_label.visible = waves
+	add_child(_record_label)
 	_footer = _label("", 8, Color(0.8, 0.8, 0.85))
 	_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	add_child(_footer)
@@ -139,8 +147,13 @@ func _update_difficulty_label() -> void:
 			next = p.glyph(PlayerInput.Action.UI_NEXT_TAB)
 			break
 	var text := "%s  %s  %s" % [prev, GameState.DIFFICULTY_NAMES[GameState.difficulty].to_upper(), next]
+	var waves := GameState.mode == GameState.Mode.WAVES
 	if not GameState.profile.hard_unlocked():
-		text = "(Hard: win on Normal)   " + text
+		text = ("(Hard: wave %d on Normal)   " % Profile.HARD_UNLOCK_WAVE if waves
+			else "(Hard: win on Normal)   ") + text
+	if waves:
+		var best := GameState.profile.best_wave[GameState.difficulty]
+		_record_label.text = "Best: wave %d" % best if best > 0 else "Survive as many waves as you can"
 	_difficulty_label.text = text
 	_difficulty_label.label_settings.font_color = [Color(0.45, 0.95, 0.5), Color.WHITE, Color(1.0, 0.45, 0.4)][GameState.difficulty]
 
@@ -334,6 +347,8 @@ func _layout() -> void:
 	_title.size = Vector2(view.x, 18)
 	_difficulty_label.position = Vector2(view.x * 0.5, 6)
 	_difficulty_label.size = Vector2(view.x * 0.5 - MARGIN, 10)
+	_record_label.position = Vector2(MARGIN, 6)
+	_record_label.size = Vector2(view.x * 0.3, 10)
 	_footer.position = Vector2(0, view.y - 12)
 	_footer.size = Vector2(view.x, 10)
 	var top := TITLE_HEIGHT

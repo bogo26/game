@@ -2,7 +2,8 @@
 """Builds the run's level layouts and writes src/levels/data/*.tres (levels
 1-6 and their second layouts, and a level for each boss: the mini bosses'
 ossuary, grove and cistern, the final bosses' throne, mycelium and glacier;
-src/levels/run_config.tres lists the run's order and the boss pools).
+src/levels/run_config.tres lists the run's order and the boss pools), and
+the Endless Waves arena, waves.tres (not part of the run).
 
 Levels are designed here on a character canvas (legend in
 src/levels/level_data.gd) from shapes: rectangles, octagons, discs, caves,
@@ -1166,6 +1167,34 @@ def glacier():
     return c
 
 
+# --- Endless Waves --------------------------------------------------------------------------
+
+def waves():
+    """The Pit (Endless Waves): one sealed arena and nothing else. Pillars to
+    duck behind, a pool on either side, spike beds at the top and bottom,
+    powder kegs by the walls and a few urns. The team starts in the middle;
+    a boss comes in at whichever B is furthest from them. No chasms: flyers
+    could hover over one out of reach."""
+    c = Canvas(64, 44, seed=29)
+    pit = c.octagon_cells(2, 2, 61, 41, 9)
+    c.arena(1, pit)
+    for (x, y) in ((20, 13), (42, 13), (20, 29), (42, 29)):
+        c.pillar(x, y)
+    c.fill(c.disc_cells(9, 21, 3), "~")
+    c.fill(c.disc_cells(54, 23, 2), "~")
+    c.fill(c.rect_cells(27, 5, 36, 6), "^")
+    c.fill(c.rect_cells(27, 37, 36, 38), "^")
+    c.put(31, 21, "P")
+    for (x, y) in ((31, 10), (31, 33), (15, 21), (48, 21)):
+        c.put(x, y, "B")
+    c.cluster(12, 9)
+    c.cluster(50, 9, pattern=((0, 0), (1, 0), (1, 1)))
+    c.cluster(12, 33, pattern=((0, 0), (0, 1), (1, 1)))
+    c.cluster(50, 33, pattern=((1, 0), (0, 1), (1, 1)))
+    c.scatter(pit, "u", 5)
+    return c
+
+
 def _open_spot(c, cells, near):
     """The cell of `cells` nearest to `near` with room around it."""
     best, best_d = None, 1 << 30
@@ -1242,6 +1271,12 @@ LEVELS = [
     ("level_4b", "Fungal Caverns", level4b, None),
     ("level_5b", "Frozen Vaults", level5b, None),
     ("level_6b", "Molten Forge", level6b, None),
+    # Endless Waves' arena: the WaveDirector sets each wave's mix, HP and
+    # pace, and picks the theme per game.
+    ("waves", "The Pit", waves, {
+        "enemy_weights": {"swarmer": 1.0},
+        "hp_multiplier": 1.0, "corridor_cap_fraction": 0.0, "corridor_spawn_rate": 0.0,
+        "arena_quotas": [0], "arena_spawn_rate": 24.0, "theme": "crypt", "tint": (1.0, 1.0, 1.0)}),
 ]
 
 

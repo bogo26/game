@@ -1,7 +1,7 @@
 extends Node2D
 ## Title screen: slow pan over a dungeon, the game title and a button list
-## (Start Run / Test Room / Options / Quit). Any keyboard, gamepad or mouse can
-## navigate.
+## (Start Run / Endless Waves / Test Room / Options / Quit). Any keyboard,
+## gamepad or mouse can navigate.
 
 const BACKGROUND_LEVEL := preload("res://src/levels/data/test_room.tres")
 const CHARACTER_SELECT := "res://src/ui/character_select.tscn"
@@ -24,7 +24,8 @@ func _ready() -> void:
 	level.build(BACKGROUND_LEVEL)
 	_pan_origin = level.player_spawns[0]
 	camera.position = _pan_origin
-	%StartButton.pressed.connect(_on_start)
+	%StartButton.pressed.connect(_on_start.bind(GameState.Mode.RUN))
+	%WavesButton.pressed.connect(_on_start.bind(GameState.Mode.WAVES))
 	%TestRoomButton.pressed.connect(_on_test_room)
 	%QuitButton.pressed.connect(func() -> void: get_tree().quit())
 	var options := OptionsMenu.new()
@@ -44,7 +45,9 @@ func _process(delta: float) -> void:
 	camera.position = (_pan_origin + Vector2(sin(_time * 0.11) * 220.0, cos(_time * 0.07) * 90.0)).round()
 
 
-func _on_start() -> void:
+## Start Run or Endless Waves: character select, then that mode.
+func _on_start(mode: GameState.Mode) -> void:
+	GameState.mode = mode
 	get_tree().change_scene_to_file(CHARACTER_SELECT)
 
 

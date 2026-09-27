@@ -1,8 +1,9 @@
 class_name EndScreen
 extends Control
-## Run results: victory or defeat, the team's numbers, any records set, a
-## table of every player's numbers with awards, and
-##   Play again     - same team and heroes, straight into a new run
+## Run results: victory or defeat (GAME OVER and the wave reached, after
+## Endless Waves), the team's numbers, any records set, a table of every
+## player's numbers with awards, and
+##   Play again     - same team, heroes and mode, straight into a new game
 ##   Change heroes  - character select with everyone still joined
 ##   Main menu
 
@@ -28,25 +29,16 @@ func _ready() -> void:
 	get_tree().paused = false
 	Audio.play_music(&"menu")
 	var victory := GameState.last_run_victory
-	%Title.text = "VICTORY!" if victory else "DEFEAT"
+	var waves := GameState.mode == GameState.Mode.WAVES
+	%Title.text = "GAME OVER" if waves else ("VICTORY!" if victory else "DEFEAT")
 	%Title.add_theme_color_override("font_color", Color("ffe07a") if victory else Color("e8504a"))
-	var total := RunConfig.load_default().levels.size()
-	var minutes := int(GameState.run_time) / 60
-	var seconds := int(GameState.run_time) % 60
-	var parts := PackedStringArray([
-		GameState.DIFFICULTY_NAMES[GameState.difficulty],
-		"Levels %d/%d" % [GameState.levels_cleared, total],
-		"Enemies %d" % GameState.run_kills,
-		"Team level %d" % GameState.team_level,
-		"Time %d:%02d" % [minutes, seconds],
-	])
-	if GameState.lives_used > 0:
-		parts.append("Second Winds %d" % GameState.lives_used)
-	%Stats.text = "   ".join(parts)
+	%Stats.text = stats_line()
 	var news := GameState.last_run_news
 	var records := PackedStringArray()
 	if news.get("best_time", false):
 		records.append("NEW BEST TIME!")
+	if news.get("best_wave", false):
+		records.append("NEW BEST WAVE!")
 	if news.get("hard_unlocked", false):
 		records.append("HARD UNLOCKED!")
 	%Records.text = "   ".join(records)
@@ -69,6 +61,28 @@ func _ready() -> void:
 
 func _buttons() -> Array[Button]:
 	return [%AgainButton, %ChangeButton, %MenuButton]
+
+
+## The team's numbers: the difficulty, how far it got (levels, or the wave in
+## Endless Waves), enemies, team level, time and Second Winds.
+static func stats_line() -> String:
+	var difficulty := GameState.DIFFICULTY_NAMES[GameState.difficulty]
+	var parts := PackedStringArray()
+	if GameState.mode == GameState.Mode.WAVES:
+		parts.append_array(["Endless Waves", difficulty, "Wave %d" % GameState.wave])
+	else:
+		parts.append_array([difficulty,
+			"Levels %d/%d" % [GameState.levels_cleared, RunConfig.load_default().levels.size()]])
+	var minutes := int(GameState.run_time) / 60
+	var seconds := int(GameState.run_time) % 60
+	parts.append_array([
+		"Enemies %d" % GameState.run_kills,
+		"Team level %d" % GameState.team_level,
+		"Time %d:%02d" % [minutes, seconds],
+	])
+	if GameState.lives_used > 0:
+		parts.append("Second Winds %d" % GameState.lives_used)
+	return "   ".join(parts)
 
 
 func _process(delta: float) -> void:
