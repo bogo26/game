@@ -54,6 +54,29 @@ func test_line_of_sight() -> void:
 	assert_false(g.line_of_sight(Vector2(2.5 * T, 4.5 * T), Vector2(7.5 * T, 4.5 * T)), "blocked by wall")
 
 
+func test_a_clear_walk_is_stopped_by_whatever_stops_walkers() -> void:
+	var g := LevelGrid.new(20, 5)
+	var a := LevelGrid.cell_center(Vector2i(1, 2))
+	var b := LevelGrid.cell_center(Vector2i(18, 3))
+	assert_true(g.walk_line_clear(a, b), "open floor")
+	g.set_terrain(9, 2, LevelGrid.Terrain.WATER)
+	g.set_terrain(9, 3, LevelGrid.Terrain.WATER)
+	assert_true(g.walk_line_clear(a, b), "water slows walkers but doesn't stop them")
+	g.set_chasm(10, 2)
+	g.set_chasm(10, 3)
+	assert_false(g.walk_line_clear(a, b), "a chasm does")
+	assert_true(g.line_of_sight(a, b), "though sight crosses it")
+	g = LevelGrid.new(20, 5)
+	g.set_blocker(12, 3, true)
+	assert_false(g.walk_line_clear(a, b), "so does a barrel")
+	assert_true(g.line_of_sight(a, b), "which shots fly past")
+	g.set_blocker(12, 3, false)
+	g.set_solid(15, 3, true)
+	assert_false(g.walk_line_clear(a, b), "and a wall")
+	assert_false(g.line_of_sight(a, b))
+	assert_false(g.walk_line_clear(Vector2(-8, 40), b), "and the edge of the grid")
+
+
 func test_sweep_until_blocked_stops_before_wall() -> void:
 	var g := _room()
 	var end := g.sweep_until_blocked(Vector2(2.5 * T, 4.5 * T), Vector2(8.5 * T, 4.5 * T), 4.0)

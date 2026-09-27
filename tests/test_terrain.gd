@@ -138,6 +138,9 @@ func test_water_slows_enemies() -> void:
 	var h := _horde(level)
 	var wet := h.spawn(0, LevelGrid.cell_center(Vector2i(2, 2)))
 	var dry := h.spawn(0, LevelGrid.cell_center(Vector2i(2, 3)))
+	for i: int in [wet, dry]:
+		h.pace[i] = 1.0
+		h.bend[i] = 0.0
 	h.update(0.0, PackedVector2Array())
 	var start_wet := h.pos[wet].x
 	var start_dry := h.pos[dry].x

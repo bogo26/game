@@ -1,6 +1,7 @@
 extends "res://tests/test_case.gd"
 
 const T := LevelGrid.TILE
+const DT := 1.0 / 60.0
 
 
 func _open_grid(w: int, h: int) -> LevelGrid:
@@ -327,3 +328,283 @@ func test_killing_exploder_during_fuse_prevents_blast() -> void:
 	for frame in 60:
 		h.update(1.0 / 60.0, target)
 	assert_eq(h.blast_pos.size(), 0)
+
+
+# --- how enemies move -------------------------------------------------------------------------
+
+## Spawns one that walks at exactly its kind's speed and never arcs in.
+func _steady(h: HordeSim, p: Vector2, type_id: int = 0) -> int:
+	var i := h.spawn(type_id, p)
+	h.pace[i] = 1.0
+	h.bend[i] = 0.0
+	return i
+
+
+## The atlas column the only enemy on screen is drawn with.
+func _drawn_column(h: HordeSim) -> int:
+	var layer := InstanceLayer.new()
+	layer.setup(PlaceholderTexture2D.new(), HordeSim.SPRITE_CELL, HordeSim.SPRITE_FEET, HordeSim.CAPACITY)
+	h.render(layer)
+	var column := int(layer.buffer[8]) - h.t_frame0[h.type[0]]
+	layer.free()
+	return column
+
+
+func test_enemies_get_up_to_speed_and_turn_round_smoothly() -> void:
+	var g := _open_grid(40, 20)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var h := _horde(g, flow)
+	var i := _steady(h, Vector2(320, 160))
+	var right := PackedVector2Array([Vector2(600, 160)])
+	var full := h.t_speed[0]
+	h.update(DT, right)
+	assert_true(h.walk[i].length() < full * 0.3, "not at full speed at once (%.1f px/s)" % h.walk[i].length())
+	for f in 36:
+		h.update(DT, right)
+	assert_true(h.walk[i].length() > full * 0.9, "up to speed in 0.6 s (%.1f px/s)" % h.walk[i].length())
+	var left := PackedVector2Array([Vector2(40, 160)])  # the hero is suddenly behind it
+	var frames := 0
+	while h.walk[i].x > 0.0 and frames < 60:
+		h.update(DT, left)
+		frames += 1
+	assert_true(frames >= 4, "turning round takes a moment (%d frames)" % frames)
+	assert_true(h.walk[i].x < 0.0, "but it does turn round")
+
+
+func test_enemies_walk_straight_at_a_hero_in_the_open() -> void:
+	var g := _open_grid(30, 16)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var start := LevelGrid.cell_center(Vector2i(4, 4))
+	var target := PackedVector2Array([LevelGrid.cell_center(Vector2i(14, 7))])  # 10 tiles right, 3 down
+	flow.compute_now(target)
+	var h := _horde(g, flow)
+	var i := _steady(h, start)
+	var line := (target[0] - start).normalized()
+	var worst := 0.0
+	for f in 360:
+		h.update(DT, target)
+		worst = maxf(worst, absf((h.pos[i] - start).cross(line)))
+	assert_true(h.pos[i].distance_to(target[0]) < T, "got there")
+	# The flow field alone goes diagonally first, then straight: 30 px off the line.
+	assert_true(worst < 6.0, "along the straight line (at most %.1f px off it)" % worst)
+
+
+func test_enemies_go_round_a_pillar_to_reach_the_hero() -> void:
+	var g := _open_grid(30, 16)
+	for y in range(5, 11):
+		for x in range(12, 15):
+			g.set_solid(x, y, true)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var target := PackedVector2Array([LevelGrid.cell_center(Vector2i(22, 8))])
+	flow.compute_now(target)
+	var h := _horde(g, flow)
+	var i := _steady(h, LevelGrid.cell_center(Vector2i(5, 8)))
+	var in_wall := false
+	var frames := 0
+	while h.pos[i].distance_to(target[0]) > T and frames < 900:
+		h.update(DT, target)
+		in_wall = in_wall or g.is_solid_at(h.pos[i])
+		frames += 1
+	assert_false(in_wall, "never inside the pillar")
+	assert_true(h.pos[i].distance_to(target[0]) <= T, "and got round it (%.1f s)" % (frames * DT))
+
+
+func test_chasers_stop_at_the_hero_instead_of_piling_on() -> void:
+	var g := _open_grid(20, 20)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var hero := Vector2(160, 160)
+	var target := PackedVector2Array([hero])
+	flow.compute_now(target)
+	var h := _horde(g, flow)
+	var i := _steady(h, hero + Vector2(60, 0))
+	for f in 180:
+		h.update(DT, target)
+	var d := h.pos[i].distance_to(hero)
+	assert_true(d > 2.0, "not on top of the hero (%.1f px)" % d)
+	assert_true(d < HordeSim.HERO_RADIUS + h.t_radius[0], "but touching (%.1f px)" % d)
+	assert_true(h.contact_damage_at(hero, HordeSim.HERO_RADIUS) > 0.0, "so it still hurts")
+	assert_true(h.walk[i].length() < 1.0, "and it stands its ground")
+
+
+func test_a_crowd_round_a_hero_does_not_flicker() -> void:
+	var g := _open_grid(24, 24)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var hero := Vector2(192, 192)
+	var target := PackedVector2Array([hero])
+	flow.compute_now(target)
+	var h := _horde(g, flow)
+	for k in 12:
+		h.spawn(0, hero + Vector2.from_angle(TAU * k / 12.0) * 48.0)
+	for f in 120:  # gather round
+		h.update(DT, target)
+	var flips := PackedInt32Array()
+	flips.resize(h.count)
+	var before := h.facing.duplicate()
+	for f in 120:
+		h.update(DT, target)
+		for k in h.count:
+			if h.facing[k] != before[k]:
+				flips[k] += 1
+		before = h.facing.duplicate()
+	var most := 0
+	for k in h.count:
+		most = maxi(most, flips[k])
+	assert_true(most <= 2, "each faces one way (at most %d flips in 2 s)" % most)
+
+
+func test_the_walk_cycle_follows_the_feet() -> void:
+	var g := _open_grid(40, 10)
+	for x in range(1, 39):
+		g.set_terrain(x, 3, LevelGrid.Terrain.WATER)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var h := _horde(g, flow)
+	var dry := _steady(h, LevelGrid.cell_center(Vector2i(2, 2)))
+	var wet := _steady(h, LevelGrid.cell_center(Vector2i(2, 3)))
+	var targets := PackedVector2Array([Vector2(1000, 2.5 * T), Vector2(1000, 3.5 * T)])
+	for f in 60:  # up to speed
+		h.update(DT, targets)
+	var dry_from := h.stride[dry]
+	var wet_from := h.stride[wet]
+	for f in 60:
+		h.update(DT, targets)
+	var fps := h.types[0].anim_fps
+	assert_near(h.stride[dry] - dry_from, fps, fps * 0.05, "a walk cycle at full speed on the floor")
+	assert_near(h.stride[wet] - wet_from, fps * LevelGrid.WATER_SPEED, fps * 0.05, "slower wading")
+
+
+func test_walkers_stand_still_but_flyers_keep_flapping() -> void:
+	var g := _open_grid(20, 20)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var bat := _swarmer()
+	bat.flying = true
+	for kind: EnemyData in [_swarmer(), bat]:
+		var types: Array[EnemyData] = [kind]
+		var h := HordeSim.new()
+		h.setup(g, flow, types)
+		_steady(h, Vector2(160, 160))
+		var columns := {}
+		for f in 60:  # nobody to go after
+			h.update(DT, PackedVector2Array())
+			columns[_drawn_column(h)] = true
+		if kind.flying:
+			assert_true(columns.size() > 1, "a hovering flyer keeps flapping")
+		else:
+			assert_eq(columns.keys(), [0], "a walker stands in its neutral pose")
+
+
+func test_every_enemy_has_its_own_pace_and_angle() -> void:
+	var g := _open_grid(30, 10)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var h := _horde(g, flow)
+	for k in 20:
+		h.spawn(0, Vector2(24 + k * 20, 80))
+	var paces := {}
+	var bends := {}
+	for k in h.count:
+		paces[snappedf(h.pace[k], 0.001)] = true
+		bends[snappedf(h.bend[k], 0.001)] = true
+		assert_true(absf(h.pace[k] - 1.0) <= HordeSim.PACE_SPREAD + 0.0001, "pace %.3f" % h.pace[k])
+		assert_true(absf(h.bend[k]) <= HordeSim.ARC_BEND + 0.0001, "bend %.3f" % h.bend[k])
+	assert_true(paces.size() > 1 and bends.size() > 1, "no two alike")
+
+
+func test_ranged_enemies_stand_still_to_shoot() -> void:
+	var g := _open_grid(30, 10)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var target := PackedVector2Array([LevelGrid.cell_center(Vector2i(20, 5))])
+	flow.compute_now(target)
+	var types: Array[EnemyData] = [_typed(EnemyData.Behavior.RANGED)]
+	var h := HordeSim.new()
+	h.setup(g, flow, types)
+	h.projectiles = ProjectileSim.new()
+	var i := _steady(h, LevelGrid.cell_center(Vector2i(15, 5)))
+	h.walk[i] = Vector2(0, 20)  # circling when its shot is ready
+	h.action[i] = 0.0
+	h.update(DT, target)
+	assert_eq(h.state[i], 1, "winding up")
+	var at := h.pos[i]
+	while h.state[i] == 1:
+		h.update(DT, target)
+	assert_true(h.projectiles.count > 0, "shot")
+	assert_true(h.pos[i].distance_to(at) < 0.01, "without taking a step")
+
+
+func test_ranged_enemies_circle_while_they_wait_to_shoot() -> void:
+	var g := _open_grid(30, 16)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var hero := LevelGrid.cell_center(Vector2i(15, 8))
+	var target := PackedVector2Array([hero])
+	flow.compute_now(target)
+	var types: Array[EnemyData] = [_typed(EnemyData.Behavior.RANGED)]
+	var h := HordeSim.new()
+	h.setup(g, flow, types)
+	h.projectiles = ProjectileSim.new()
+	var i := _steady(h, hero + Vector2(-80, 0))
+	h.action[i] = 5.0  # no shot for a while
+	h.anim[i] = 0.0  # and no change of sides
+	var start := (h.pos[i] - hero).angle()
+	var nearest := INF
+	var furthest := 0.0
+	for f in 90:
+		h.update(DT, target)
+		var d := h.pos[i].distance_to(hero)
+		nearest = minf(nearest, d)
+		furthest = maxf(furthest, d)
+	var turned := absf(angle_difference(start, (h.pos[i] - hero).angle()))
+	assert_true(turned > deg_to_rad(10.0), "it circles the hero (%.0f degrees)" % rad_to_deg(turned))
+	var attack_range := h.t_range[0]
+	assert_true(nearest > attack_range * HordeSim.RANGED_BACKOFF and furthest < attack_range,
+		"within its range all along (%.0f to %.0f px)" % [nearest, furthest])
+
+
+func test_melee_enemies_arc_in_from_their_own_sides() -> void:
+	var g := _open_grid(30, 30)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var hero := Vector2(240, 240)
+	var target := PackedVector2Array([hero])
+	flow.compute_now(target)
+	var h := _horde(g, flow)
+	var a := _steady(h, hero + Vector2(-110, -6))
+	var b := _steady(h, hero + Vector2(-110, 6))
+	h.bend[a] = HordeSim.ARC_BEND
+	h.bend[b] = -HordeSim.ARC_BEND
+	for f in 360:
+		h.update(DT, target)
+	var spread := absf(angle_difference((h.pos[a] - hero).angle(), (h.pos[b] - hero).angle()))
+	assert_true(spread > deg_to_rad(60.0), "they close in from different sides (%.0f degrees apart)" % rad_to_deg(spread))
+	for i: int in [a, b]:
+		assert_true(h.pos[i].distance_to(hero) < HordeSim.HERO_RADIUS + h.t_radius[0], "and both reach the hero")
+
+
+func test_a_shove_breaks_an_enemys_stride() -> void:
+	var g := _open_grid(40, 10)
+	var flow := FlowField.new()
+	flow.setup(g)
+	var types: Array[EnemyData] = [_swarmer(), load("res://src/enemies/data/brute.tres") as EnemyData]
+	var h := HordeSim.new()
+	h.setup(g, flow, types)
+	var target := PackedVector2Array([Vector2(600, 80)])
+	var light := _steady(h, Vector2(40, 48))
+	var heavy := _steady(h, Vector2(40, 112), 1)
+	for f in 60:  # up to speed
+		h.update(DT, target)
+	var light_speed := h.walk[light].length()
+	var heavy_speed := h.walk[heavy].length()
+	h.push(light, Vector2(-150, 0), 0)
+	h.push(heavy, Vector2(-150, 0), 0)
+	assert_true(h.walk[light].length() < light_speed * 0.4, "a swarmer loses its stride")
+	assert_true(h.walk[heavy].length() > heavy_speed * 0.6, "a brute barely notices")
+	for f in 30:
+		h.update(DT, target)
+	assert_true(h.walk[light].length() > light_speed * 0.9, "then it gets going again")

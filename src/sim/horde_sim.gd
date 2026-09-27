@@ -41,6 +41,51 @@ const RETRY_TIME := 0.25
 ## Enemy shots leave from here (above the feet) and aim at heroes' bodies.
 const SHOT_ORIGIN := Vector2(0, -8)
 const HERO_BODY := Vector2(0, -6)  # Hero.SPRITE_FEET_OFFSET
+const HERO_RADIUS := 5.0  # Hero.RADIUS
+## How enemies walk (on top of their kind's speed and `agility`):
+## every CLEAR_CHECK_TIME seconds (staggered) each checks whether it can walk
+## straight to its target, if that's within CLEAR_CHECK_RANGE; while it can,
+## it heads straight there instead of following the flow field.
+const CLEAR_CHECK_TIME := 0.25
+const CLEAR_CHECK_RANGE := 352.0
+## Each walks at its own pace: its kind's speed, give or take this share.
+const PACE_SPREAD := 0.1
+## Closing in, it eases off over ARRIVE_EASE px and stops at ARRIVE_SHARE of
+## touching distance: close enough to hurt, without piling onto the hero.
+## Inside that, the hero counts as a body in the crowd (separation), so the
+## enemies behind can't squeeze it onto the hero's feet.
+const ARRIVE_SHARE := 0.6
+const ARRIVE_EASE := 12.0
+## Pressed from the front (px of overlap against its way), it slows down by
+## QUEUE_GAIN per px, to QUEUE_MIN of its speed at most, and waits its turn.
+const QUEUE_GAIN := 0.25
+const QUEUE_MIN := 0.15
+## It turns to face left or right only once its way is this far off vertical
+## (normalised x). Within FACE_NEAR px of its target it faces the target.
+const FACE_TURN := 0.2
+const FACE_NEAR := 32.0
+## Walking slower than this share of its speed, it counts as standing (and faces its target).
+const FACE_STAND := 0.25
+## Walkers slower than IDLE_SHARE of their speed stand in their neutral pose;
+## ones that have reached a hero tread at TREAD_SHARE of the full rate at least.
+const IDLE_SHARE := 0.1
+const TREAD_SHARE := 0.4
+## Ranged enemies in range circle their target at STRAFE_KEEP of their range,
+## at STRAFE_SHARE of their speed, and change sides every STRAFE_FLIP seconds.
+const STRAFE_SHARE := 0.5
+const STRAFE_KEEP := 0.8
+const STRAFE_FLIP := 2.4
+## Melee enemies arc in: nearer than ARC_FAR px they bend their way sideways
+## by their own `bend` (fully from ARC_RAMP px nearer), and straighten out
+## over the last ARC_FADE px before they stop.
+const ARC_BEND := 0.8
+const ARC_FAR := 112.0
+const ARC_RAMP := 32.0
+const ARC_FADE := 24.0
+## A shove of STAGGER_FULL px/s (after its kind's knockback_taken) breaks up
+## to STAGGER_MAX of an enemy's stride; it gets going again at its agility.
+const STAGGER_FULL := 160.0
+const STAGGER_MAX := 0.85
 ## Weaving flyers (bats) swing from side to side at this rate (radians/s).
 const WEAVE_RATE := 6.0
 ## Hoppers (sporelings) spend this share of each hop in the air, going this
@@ -82,6 +127,11 @@ var count := 0
 var pos := PackedVector2Array()
 var vel := PackedVector2Array()        # knockback / impulses, decays
 var sep := PackedVector2Array()        # last separation push (updated every other frame)
+var walk := PackedVector2Array()       # its own walking velocity: eases toward where it wants to go (momentum)
+var clear := PackedByteArray()         # 1: it can walk straight to its target (checked every 16th frame)
+var pace := PackedFloat32Array()       # its own share of its kind's speed (PACE_SPREAD)
+var bend := PackedFloat32Array()       # how far it arcs in when closing on a hero (-ARC_BEND..ARC_BEND)
+var stride := PackedFloat32Array()     # walk-cycle phase in frames: walkers step as far as they walk
 var hp := PackedFloat32Array()
 var type := PackedInt32Array()
 var uid := PackedInt32Array()
@@ -118,6 +168,8 @@ var guard := PackedFloat32Array()
 # Per-type tables (index = type id).
 var types: Array[EnemyData] = []
 var t_speed := PackedFloat32Array()
+var t_agility := PackedFloat32Array()
+var t_stride := PackedFloat32Array()      # walk-cycle frames per px walked (anim_fps at full speed)
 var t_radius := PackedFloat32Array()
 var t_hurt_half_width := PackedFloat32Array()
 var t_hurt_height := PackedFloat32Array()
@@ -240,6 +292,7 @@ var _next_uid := 1
 var _frame := 0
 var _sort_keys := PackedInt32Array()
 var _scratch := PackedInt32Array()
+var _blend := PackedFloat32Array()  # per type, this frame: how far `walk` eases toward its goal
 
 
 func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> void:
@@ -249,6 +302,11 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	pos.resize(CAPACITY)
 	vel.resize(CAPACITY)
 	sep.resize(CAPACITY)
+	walk.resize(CAPACITY)
+	clear.resize(CAPACITY)
+	pace.resize(CAPACITY)
+	bend.resize(CAPACITY)
+	stride.resize(CAPACITY)
 	hp.resize(CAPACITY)
 	type.resize(CAPACITY)
 	uid.resize(CAPACITY)
@@ -279,6 +337,8 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	guard.resize(CAPACITY)
 	count = 0
 	t_speed.clear()
+	t_agility.clear()
+	t_stride.clear()
 	t_radius.clear()
 	t_hurt_half_width.clear()
 	t_hurt_height.clear()
@@ -312,6 +372,8 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	max_radius = 0.0
 	for data in types:
 		t_speed.append(data.speed)
+		t_agility.append(data.agility)
+		t_stride.append(data.anim_fps / maxf(data.speed, 1.0))
 		t_radius.append(data.radius)
 		t_hurt_half_width.append(data.hurt_size.x * 0.5)
 		t_hurt_height.append(data.hurt_size.y)
@@ -347,6 +409,7 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 		t_base.append(base if base >= 0 else t)
 	_type_count.resize(types.size())
 	_type_count.fill(0)
+	_blend.resize(types.size())
 	_refresh_hurt_reach()
 	hash.setup(grid.size_px(), HASH_CELL, CAPACITY)
 
@@ -376,6 +439,11 @@ func spawn(type_id: int, p: Vector2, hp_multiplier: float = 1.0) -> int:
 	pos[i] = p
 	vel[i] = Vector2.ZERO
 	sep[i] = Vector2.ZERO
+	walk[i] = Vector2.ZERO
+	clear[i] = 0
+	pace[i] = randf_range(1.0 - PACE_SPREAD, 1.0 + PACE_SPREAD)
+	bend[i] = randf_range(-ARC_BEND, ARC_BEND)
+	stride[i] = randf() * 4.0
 	hp[i] = t_hp[type_id] * hp_multiplier
 	type[i] = type_id
 	uid[i] = _next_uid
@@ -473,7 +541,9 @@ func damage(i: int, amount: float, knockback: Vector2, source_slot: int, crit: b
 		hit_type.append(type[i])
 		hit_crit.append(1 if crit else 0)
 	if knockback != Vector2.ZERO:
-		vel[i] += knockback * t_knockback[type[i]]
+		var kick := knockback * t_knockback[type[i]]
+		vel[i] += kick
+		_stagger(i, kick)
 	if source_slot >= 0 and source_slot < damage_by_slot.size():
 		var dealt := minf(amount, h)
 		damage_by_slot[source_slot] += dealt
@@ -610,9 +680,17 @@ func apply_slow(i: int, seconds: float) -> void:
 
 ## Knockback without damage; the pusher gets the kill if it goes into a chasm.
 func push(i: int, impulse: Vector2, source_slot: int) -> void:
-	vel[i] += impulse * t_knockback[type[i]]
+	var kick := impulse * t_knockback[type[i]]
+	vel[i] += kick
+	_stagger(i, kick)
 	if source_slot >= 0:
 		last_slot[i] = source_slot
+
+
+## A shove breaks its stride: it's carried further, then gets going again at
+## its agility. Heavy kinds (which take less knockback) barely notice.
+func _stagger(i: int, kick: Vector2) -> void:
+	walk[i] *= 1.0 - minf(kick.length() / STAGGER_FULL, STAGGER_MAX)
 
 
 func is_falling(i: int) -> bool:
@@ -671,6 +749,8 @@ func clear_blasts() -> void:
 func relocate(i: int, p: Vector2) -> void:
 	pos[i] = p
 	vel[i] = Vector2.ZERO
+	walk[i] = Vector2.ZERO
+	clear[i] = 0
 
 
 func clear_hit_log() -> void:
@@ -700,6 +780,12 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	var P := pos
 	var V := vel
 	var S := sep
+	var WK := walk
+	var CLR := clear
+	var PC := pace
+	var BND := bend
+	var ST := stride
+	var UID := uid
 	var HP := hp
 	var T := type
 	var FL := flash
@@ -739,6 +825,10 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	var charge_time_t := t_charge_time
 	var hop_t := t_hop
 	var static_t := t_static
+	var stride_t := t_stride
+	var blend := _blend
+	for k in blend.size():
+		blend[k] = 1.0 - exp(-t_agility[k] * dt)
 	var head := hash.head
 	var nxt := hash.next
 	var hcols := hash.cols
@@ -754,8 +844,13 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	var ntargets := targets.size()
 	var decay := exp(-KNOCKBACK_DECAY * dt)
 	var parity := _frame & 1
+	var frame := _frame
+	var check_every := maxi(1, roundi(CLEAR_CHECK_TIME / maxf(dt, 0.001)))
 	var check_view := view_rect.has_area()
 	var view := view_rect.grow(-4.0)
+	var clear_range2 := CLEAR_CHECK_RANGE * CLEAR_CHECK_RANGE
+	var face_near2 := FACE_NEAR * FACE_NEAR
+	var face_turn2 := FACE_TURN * FACE_TURN
 
 	for i in n:
 		if HP[i] <= 0.0:
@@ -849,35 +944,58 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 		var desired := Vector2.ZERO
 		var move_speed := speed_t[t]
 		var charging := false
+		# `walk` eases toward `desired` (momentum), but stops dead while it's
+		# planted for an action (so warnings and aim lines never slide) or
+		# stunned, and follows charges and hops as they are.
+		var planted := false
+		var hopping := false
+		var treading := false  # it has reached its hero
+		var face_dir := Vector2.ZERO  # which way to face, if not the way it walks
+		var best := INF
+		var tp := p
+		var W := WK[i]
 		var st := STN[i]
 		if st > 0.0:
 			STN[i] = st - dt
+			planted = true
 		else:
 			var behavior := behavior_t[t]
 			var ci := int(p.y * INV_TILE) * gw + int(p.x * INV_TILE)
 			var direct := true
+			var flow_way := Vector2.ZERO
 			if ci >= 0 and ci < ncells:
 				var fd := fdir[ci]
 				if fd != 0 and fdist[ci] > DIRECT_CHASE_TILES:
-					desired = dirs[fd]
+					flow_way = dirs[fd]
 					direct = false
-			# Nearest hero (cheap: at most 4). Chasers only need it up close.
-			var best := INF
-			var tp := p
-			if (direct or behavior != EnemyData.Behavior.CHASER) and ntargets > 0:
+			# Nearest hero (cheap: at most 4). Chasers only need it up close,
+			# while they can walk straight to it, and to check whether they can
+			# (not needed up close, where they go straight anyway).
+			var way_clear := CLR[i] != 0
+			var check := not direct and (UID[i] + frame) % check_every == 0
+			if (direct or way_clear or check or behavior != EnemyData.Behavior.CHASER) and ntargets > 0:
 				for k in ntargets:
 					var q := targets[k]
 					var d2 := p.distance_squared_to(q)
 					if d2 < best:
 						best = d2
 						tp = q
-				if direct and best > 1.0:
-					desired = (tp - p) / sqrt(best)
+			if check:
+				way_clear = best < clear_range2 and grid.walk_line_clear(p, tp)
+				CLR[i] = 1 if way_clear else 0
+			var dist := sqrt(best)
+			# Straight at the hero when it's close or the way is clear, else
+			# along the flow field.
+			var straight := (direct or way_clear) and best < INF
+			if not straight:
+				desired = flow_way
+			elif best > 1.0:
+				desired = (tp - p) / dist
 			if behavior == EnemyData.Behavior.RANGED and best < INF:
-				var dist := sqrt(best)
 				var attack_range := range_t[t]
 				if STATE[i] == 1:
 					# Winding up (pose + pink glow): stand still, then shoot.
+					planted = true
 					desired = Vector2.ZERO
 					var wind := ACT[i] - dt
 					if wind <= 0.0:
@@ -886,14 +1004,21 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 						_shoot(t, p, tp, dist, AIM[i])
 					ACT[i] = wind
 				elif dist < attack_range:
+					var toward := (tp - p) / maxf(dist, 0.001)
 					if dist < attack_range * RANGED_BACKOFF:
-						desired = (p - tp) / maxf(dist, 0.001)
+						desired = -toward
 					else:
-						desired = Vector2.ZERO
+						# Circles its target at about STRAFE_KEEP of its range,
+						# changing sides now and then.
+						var side := STRAFE_SHARE if ((int(AN[i] / STRAFE_FLIP) + UID[i]) & 1) == 0 else -STRAFE_SHARE
+						var keep := clampf((dist - attack_range * STRAFE_KEEP) / (attack_range * 0.2), -1.0, 1.0)
+						desired = toward.orthogonal() * side + toward * (keep * 0.5)
 					var cd := ACT[i] - dt
 					if cd <= 0.0:
 						if (not check_view or view.has_point(p)) and grid.line_of_sight(p, tp):
 							STATE[i] = 1
+							planted = true
+							desired = Vector2.ZERO
 							cd = windup_t[t]
 							windup_pos.append(p)
 							if shot_t[t] == EnemyData.Shot.AIMED:
@@ -904,12 +1029,19 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 						else:
 							cd = RETRY_TIME
 					ACT[i] = cd
+				# In range it keeps its eyes on the hero (backing off too), or on
+				# the line it shows while it draws an aimed shot.
+				if STATE[i] == 1 and shot_t[t] == EnemyData.Shot.AIMED:
+					face_dir = AIM[i]
+				elif dist < attack_range:
+					face_dir = tp - p
 			elif behavior == EnemyData.Behavior.EXPLODER and best < INF:
 				if STATE[i] == 0 and best < blast_radius_t[t] * blast_radius_t[t] * 0.4:
 					STATE[i] = 1
 					ACT[i] = fuse_t[t]
 					fuse_uids.append(uid[i])
 				if STATE[i] == 1:
+					planted = true
 					desired = Vector2.ZERO
 					var fuse := ACT[i] - dt
 					ACT[i] = fuse
@@ -928,7 +1060,9 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 				var left := ACT[i] - dt
 				var s := STATE[i]
 				if s == 1:
+					planted = true
 					desired = Vector2.ZERO  # lining up: pink glow, the World shows the band
+					face_dir = AIM[i]
 					if left <= 0.0:
 						STATE[i] = 2
 						left = charge_time_t[t]
@@ -936,27 +1070,32 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 					desired = AIM[i]  # charging, straight on, whatever is in the way
 					move_speed = charge_speed_t[t]
 					charging = true
+					face_dir = AIM[i]
 					if left <= 0.0:
 						STATE[i] = 3
 						left = CHARGE_RECOVER
 				elif s == 3:
+					planted = true
 					desired = Vector2.ZERO  # catching its breath (dazed after a wall)
 					if left <= 0.0:
 						STATE[i] = 0
 						left = cooldown_t[t]
 				elif left <= 0.0:
 					left = RETRY_TIME
-					var dist := sqrt(best)
 					if dist < range_t[t] and (not check_view or view.has_point(p)) and grid.line_of_sight(p, tp):
 						STATE[i] = 1
+						planted = true
+						desired = Vector2.ZERO
 						left = windup_t[t]
 						AIM[i] = (tp - p) / maxf(dist, 0.001)
+						face_dir = AIM[i]
 						aim_uids.append(uid[i])
 						charges_started += 1
 				ACT[i] = left
 			elif behavior == EnemyData.Behavior.BLINKER:
 				var left := ACT[i] - dt
 				if STATE[i] == 1:
+					planted = true
 					desired = Vector2.ZERO  # fading into its portal
 					if left <= 0.0:
 						STATE[i] = 0
@@ -964,27 +1103,50 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 						p = AIM[i]
 						P[i] = p
 						V[i] = Vector2.ZERO
+						CLR[i] = 0
 						blink_arrivals.append(p)
 				elif left <= 0.0:
 					left = RETRY_TIME
-					var dist := sqrt(best)
 					if dist > BLINK_MIN and dist < range_t[t]:
 						var spot := _blink_spot(tp, p)
 						if spot.is_finite():
 							STATE[i] = 1
+							planted = true
+							desired = Vector2.ZERO
 							left = windup_t[t]
 							AIM[i] = spot
 							blink_from.append(p)
 							blink_to.append(spot)
 							blink_time.append(left)
 				ACT[i] = left
+			if straight and not planted and not charging and behavior != EnemyData.Behavior.RANGED:
+				# Closing in: it arcs in on its own angle, then eases off just
+				# inside touching distance instead of piling onto the hero.
+				var stop := (HERO_RADIUS + r) * ARRIVE_SHARE
+				if dist < ARC_FAR:
+					var arc := BND[i] * minf((ARC_FAR - dist) / ARC_RAMP, 1.0) \
+						* clampf((dist - stop) / ARC_FADE, 0.0, 1.0)
+					desired = (desired + desired.orthogonal() * arc).normalized()
+				if dist < stop + ARRIVE_EASE:
+					desired *= maxf(0.0, (dist - stop) / ARRIVE_EASE)
+					treading = true
 			var wv := weave_t[t]
 			if wv > 0.0 and desired != Vector2.ZERO:
-				desired = (desired + desired.orthogonal() * (wv * sin(AN[i] * WEAVE_RATE))).normalized()
+				# Only its heading sways: strafing or arriving, it keeps its pace.
+				desired = (desired + desired.orthogonal() * (wv * sin(AN[i] * WEAVE_RATE))).normalized() \
+					* desired.length()
+			if not charging and desired != Vector2.ZERO:
+				# Pressed against where it's going (someone's in the way): it waits its turn.
+				var along := S[i].dot(desired)
+				if along < 0.0:
+					desired *= maxf(QUEUE_MIN, 1.0 + along * QUEUE_GAIN)
 			var spd := move_speed
+			if not charging:
+				spd *= PC[i]  # its own pace (a charge keeps the length its band shows)
 			var hop := hop_t[t]
 			if hop > 0.0:
 				# Hoppers leap (faster than they'd walk), then sit a moment.
+				hopping = true
 				spd *= HOP_BOOST if fmod(AN[i] * hop, 1.0) < HOP_AIR else 0.0
 			if sl > 0.0:
 				spd *= SLOW_FACTOR
@@ -996,6 +1158,13 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 				if PSTK[i] > 0.0:
 					spd *= maxf(POISON_MIN_SPEED, 1.0 - POISON_SLOW_PER_STACK * PSTK[i])
 			desired *= spd
+		if planted:
+			W = Vector2.ZERO
+		elif charging or hopping:
+			W = desired
+		else:
+			W = W.lerp(desired, blend[t])
+		WK[i] = W
 
 		# Separation: half of the enemies refresh their push each frame.
 		if (i & 1) == parity:
@@ -1026,18 +1195,43 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 							else:
 								push += Vector2(1.0 if i > j else -1.0, 0.5)
 					j = nxt[j]
+			var hold := (HERO_RADIUS + r) * ARRIVE_SHARE
+			if best < hold * hold and best > 0.0001 and not charging:
+				var d := sqrt(best)
+				push += (p - tp) * ((hold - d) / d)
 			S[i] = push
 
 		var kv := V[i]
-		var v := desired + S[i] * SEPARATION_STRENGTH + kv
+		var own := W + S[i] * SEPARATION_STRENGTH  # under its own steam: walking, and the crowd's push
+		var v := own + kv
 		V[i] = kv * decay
 		# A hard enough push (or its own charge) carries it over a chasm's edge;
 		# flyers never go over.
 		var knocked := (charging or kv.length_squared() > FALL_PUSH * FALL_PUSH) and flying_t[t] == 0
-		if v.x > 2.0:
-			FC[i] = 1.0
-		elif v.x < -2.0:
-			FC[i] = -1.0
+		if st <= 0.0 and (i & 1) == parity:
+			# It faces its aim while it has one, its target when it's near it or
+			# standing, else the way it walks (never the crowd's jostle or a
+			# knockback). Going nearly straight up or down, it keeps its side.
+			# (Half of the enemies look again each frame.)
+			var fw := face_dir
+			if fw == Vector2.ZERO:
+				fw = W
+				var stand := speed_t[t] * FACE_STAND
+				if best < INF and (best < face_near2 or W.length_squared() < stand * stand):
+					fw = tp - p
+			if fw.x * fw.x > face_turn2 * fw.length_squared():
+				FC[i] = 1.0 if fw.x > 0.0 else -1.0
+		if flying_t[t] == 0:
+			# Walkers step as far as they go under their own steam (slower wading
+			# or queueing, treading once they've reached a hero) and stand in
+			# their neutral pose when still. Flyers flap on the clock.
+			var gait := own.length()
+			if treading:
+				gait = maxf(gait, speed_t[t] * TREAD_SHARE)
+			if gait > speed_t[t] * IDLE_SHARE:
+				ST[i] += gait * dt * stride_t[t]
+			else:
+				ST[i] -= floorf(ST[i])
 		AN[i] += dt
 
 		# Tile collision, per axis, probing the leading edge.
@@ -1078,6 +1272,9 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	pos = P
 	vel = V
 	sep = S
+	walk = WK
+	clear = CLR
+	stride = ST
 	hp = HP
 	flash = FL
 	anim = AN
@@ -1162,6 +1359,11 @@ func _remove_at(i: int) -> void:
 		pos[i] = pos[last]
 		vel[i] = vel[last]
 		sep[i] = sep[last]
+		walk[i] = walk[last]
+		clear[i] = clear[last]
+		pace[i] = pace[last]
+		bend[i] = bend[last]
+		stride[i] = stride[last]
 		hp[i] = hp[last]
 		type[i] = type[last]
 		uid[i] = uid[last]
@@ -1320,6 +1522,7 @@ func render(layer: InstanceLayer) -> void:
 	var T := type
 	var FC := facing
 	var AN := anim
+	var ST := stride
 	var FL := flash
 	var SLW := slow
 	var STN := stun
@@ -1382,12 +1585,14 @@ func render(layer: InstanceLayer) -> void:
 				frame += 4 + int(AN[i] * 16.0) % 2  # rattling: about to get up
 		elif STN[i] <= 0.0:
 			var ci := int(p.y * INV_TILE) * gw + int(p.x * INV_TILE)
+			# Walkers step as they go (`stride`); flyers flap on the clock.
+			var cycle := int(AN[i] * fps[t]) if t_flying[t] != 0 else int(ST[i])
 			if t_hop[t] > 0.0:
 				frame += hop_frame(fmod(AN[i] * t_hop[t], 1.0))
 			elif t_water[t] > 1.0 and ci >= 0 and ci < ncells and terr[ci] == LevelGrid.Terrain.WATER:
-				frame += 4 + int(AN[i] * fps[t]) % 2  # swimming
+				frame += 4 + cycle % 2  # swimming
 			else:
-				frame += int(AN[i] * fps[t]) % frames[t]
+				frame += cycle % frames[t]
 		buf[o + 11] = alpha
 		buf[o + 8] = float(frame)
 		buf[o + 9] = flash_strength if FL[i] > 0.0 else 0.0

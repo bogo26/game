@@ -236,13 +236,15 @@ func test_decoy_draws_the_horde_then_bursts_into_caltrops() -> void:
 	var decoy: Minion = decoys[0]
 	assert_true(decoy.lure and decoy.position.distance_to(spot) < 2.0)
 	var walker := _enemy(world, spot + Vector2(40, 0))
+	world.horde.pace[_at(world, walker)] = 1.0
+	world.horde.bend[_at(world, walker)] = 0.0
 	world._process(DT)
 	assert_true(world.target_positions.has(decoy.position), "the horde goes after it like a hero")
 	var before := _pos(world, walker).distance_to(decoy.position)
-	_frames(world, 0.5)
+	_frames(world, 1.0)  # a brute takes a moment to get going
 	assert_true(_pos(world, walker).distance_to(decoy.position) < before - 8.0, "an enemy walked up to it")
 	var at := decoy.position
-	_frames(world, 3.0)
+	_frames(world, 2.5)
 	assert_false(decoy in world.minions, "it's gone")
 	var caltrops := world.zones.filter(func(z: EffectZone) -> bool: return z.slow_time > 0.0)
 	assert_eq(caltrops.size(), 1, "it burst into caltrops")

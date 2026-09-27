@@ -188,8 +188,10 @@ func test_bats_weave_and_fly_over_water() -> void:
 	assert_near(h.t_water[0], 1.0, 0.001, "water doesn't slow a flyer")
 	var dry := h.spawn(0, LevelGrid.cell_center(Vector2i(2, 1)))
 	var wet := h.spawn(0, LevelGrid.cell_center(Vector2i(2, 2)))
-	h.anim[dry] = 0.0
-	h.anim[wet] = 0.0
+	for i: int in [dry, wet]:
+		h.anim[i] = 0.0
+		h.pace[i] = 1.0
+		h.bend[i] = 0.0
 	h.update(0.0, PackedVector2Array())
 	var start := h.pos[wet]
 	var dry_start := h.pos[dry]
@@ -226,6 +228,9 @@ func test_drowned_swim_fast_through_water() -> void:
 	var h := _horde(level, [&"drowned"])
 	var dry := h.spawn(0, LevelGrid.cell_center(Vector2i(2, 1)))
 	var wet := h.spawn(0, LevelGrid.cell_center(Vector2i(2, 2)))
+	for i: int in [dry, wet]:
+		h.pace[i] = 1.0
+		h.bend[i] = 0.0
 	h.update(0.0, PackedVector2Array())
 	var dry_start := h.pos[dry].x
 	var wet_start := h.pos[wet].x

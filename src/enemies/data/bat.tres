@@ -13,6 +13,7 @@ contact_damage = 4.0
 xp = 1
 knockback_taken = 1.4
 behavior = 0
+agility = 14.0
 flying = true
 weave = 0.8
 pack = 3

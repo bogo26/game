@@ -13,6 +13,7 @@ contact_damage = 9.0
 xp = 2
 knockback_taken = 1.0
 behavior = 7
+agility = 12.0
 flying = true
 attack_range = 220.0
 attack_cooldown = 3.5

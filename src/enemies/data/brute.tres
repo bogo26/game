@@ -13,5 +13,6 @@ contact_damage = 14.0
 xp = 5
 knockback_taken = 0.3
 behavior = 0
+agility = 4.0
 atlas_row = 1
 anim_fps = 5.0

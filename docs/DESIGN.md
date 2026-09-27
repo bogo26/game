@@ -398,7 +398,7 @@ Nodes are too expensive for 300+ enemies at 120 fps, so hordes are **plain data*
 - **Rendering:** one `MultiMeshInstance2D` draws every enemy from a single atlas. Per-instance custom data carries animation frame, hit-flash and tint, read by a small canvas shader. The buffer is uploaded with a single `multimesh.buffer = …` per frame.
 - **Y-sorting:** native `PackedInt32Array.sort()` on packed `(y << 10) | index` keys.
 - **Spatial hash** (linked lists in packed arrays, 16 px cells), rebuilt every frame. It serves separation, contact damage, attack hit queries and projectile hits.
-- **Flow field:** multi-source BFS from all living players over the tile grid. It runs on a `WorkerThreadPool` thread with double buffering and refreshes about every 0.2 s. Every enemy follows the field toward the nearest player.
+- **Flow field:** multi-source BFS from all living players over the tile grid. It runs on a `WorkerThreadPool` thread with double buffering and refreshes about every 0.2 s. Enemies follow the field toward the nearest player, except when they can walk straight there (see Enemy movement).
 - **Wall collision:** per-axis solid-tile lookups, with no physics engine.
 - **Two shapes per enemy.** An enemy's position is its feet. A small **footprint circle** there (`radius`) handles walls, crowding, contact damage and ground-level attacks (slashes, slams, zones). A **hurtbox** (`hurt_size`, a box standing on the feet and as big as the drawn body) is what projectiles hit, so a shot that visibly crosses the head connects and one passing under the feet doesn't. `tests/test_hurtboxes.gd` checks every hurtbox against its sprite. Projectiles search the hash down to the tallest body alive (a boss only widens the search while it lives).
 - Enemy shots hit a circle around the **middle of a hero's body**, not the feet; the boss aims its fireball fans at it.
@@ -475,11 +475,39 @@ docs/         this document
   - Holy Dash adds 1.5 s of revive progress, and Divine Light revives everyone.
   - In test rooms, a wiped team gets back up after 3 s. In a run, a wipe ends the run (milestone 6).
 
+### Enemy movement
+Every walking enemy moves in `HordeSim._move()`:
+- **Momentum:** each enemy has its own walking velocity (`HordeSim.walk`). It eases toward where the enemy wants to go at its kind's `agility` per second: bats 14, swarmers 8, brutes 4, frost boars 3. Heroes use the same easing.
+  - Charges and hops keep their own speed profile.
+  - Stuns and freezes stop an enemy dead, and so does every action that plants its feet: wind-ups, fuses, lining up a charge, catching its breath, a blink. So warnings never slide.
+  - Separation and knockback stay outside it.
+- **Straight when the way is clear:**
+  - Every 0.25 s (staggered by uid), an enemy more than 2 tiles from its nearest hero and within 22 tiles of them checks whether it can walk straight there. `LevelGrid.walk_line_clear()` is blocked by walls, closed doors, chasms and props, but not by water.
+  - While the way is clear, it heads straight at the hero at the true angle. Otherwise it follows the flow field, and momentum turns the hand-off into a curve.
+  - That's at most 1,200 short rays a second at 300 enemies. The DDA behind both `walk_line_clear()` and `line_of_sight()` runs on plain ints, about 40% faster than before.
+- **Pace and approach:** each enemy has two traits of its own.
+  - `pace`: it walks at its kind's speed ±10%. Charges keep their full length.
+  - `bend`: closer than 7 tiles, melee enemies arc in sideways by it (up to 0.8), so the horde fans out and closes in from several sides. They straighten out for the last stretch.
+- **Arrival and crowds:**
+  - Closing in, an enemy eases off over 12 px and stops at 60% of touching distance. It still hurts, but it doesn't pile onto the hero.
+  - Inside that distance, the hero counts as a body in the separation push, so the crowd behind can't squeeze anyone onto the hero's feet.
+  - Pressed from the front (separation pushing against its way), an enemy slows down, to as little as 15% of its speed, and waits its turn instead of shoving.
+- **Facing:** an enemy faces the first of these that applies:
+  - its aim, while lining up a charge or drawing an aimed shot
+  - its target, when within 2 tiles, in range (ranged enemies) or standing still
+  - the way it walks, never the crowd's jostle or a knockback
+
+  It only turns once that way is more than about 12° off vertical, so crowds don't flicker.
+- **Walk cycle:** walkers step as far as they actually walk (`HordeSim.stride`, at `anim_fps` at full speed).
+  - They step slower wading, chilled or queueing, and tread once they've reached a hero.
+  - They stand in their neutral pose (frame 0) when still.
+  - Flyers flap on the clock.
+
 ### Enemy behaviours
-- **Chaser:** flow field; direct steering within 2 tiles of a hero.
-- **Ranged (spitter):** holds position inside its range, backs off when heroes get closer than 55% of it. When its cooldown is up and it has line of sight, it stands still and glows hot pink for 0.4 s (its shot pose), then fires at the nearest hero. It only starts a shot while it's inside the camera view, so nothing fires from off screen.
+- **Chaser:** goes for the nearest hero, straight when the way is clear or within 2 tiles, else along the flow field (see Enemy movement).
+- **Ranged (spitter):** inside its range, it circles its target at about 80% of that range at half speed, changing sides every 2.4 s, and backs off when heroes get closer than 55% of it. When its cooldown is up and it has line of sight, it stops dead and glows hot pink for 0.4 s (its shot pose), then fires at the nearest hero. It only starts a shot while it's inside the camera view, so nothing fires from off screen.
 - **Exploder:** lights its fuse when close, then blasts heroes in its radius that it has line of sight to (walls stop it, like the boss slam). Killing it during the fuse cancels the blast, and self-destructs drop no XP.
-- **Knockback:** damage pushes enemies away from the hit source, scaled per type (brutes resist). Stun freezes, slow halves speed, and marks make enemies take ×1.75 damage.
+- **Knockback:** damage pushes enemies away from the hit source, scaled per type (brutes resist). A shove also breaks an enemy's stride: its walking speed drops by the shove over 160 px/s (after its resistance), by 85% at most, then it gets going again at its agility. Stun freezes, slow halves speed, and marks make enemies take ×1.75 damage.
 - **Each level's own enemy** is data (`EnemyData`) plus a few behaviour switches in the horde's loop, so it costs about 0.1 ms per frame with every kind in the stress room:
   - **Flocks and flyers (bats):** `pack` spawns that many together; `weave` adds a sideways swing to their steering (a sine per enemy); `flying` enemies ignore water and are never carried over a chasm's edge.
   - **Swimmers (drowned):** `swim_speed` replaces the wading slow in water, where they're drawn with their swim frames.
@@ -548,6 +576,11 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
 - **Milestone 13 re-check** (every level enemy in the stress room, 2026-09-27, same Air, fullscreen, back to back with the milestone 12 build): 4.95 ms average, 6.36 ms p99, 2.17 ms sim, against 4.79 / 6.32 / 2.06 ms before. The new behaviours cost about 0.1 ms of simulation.
 - **Milestone 14 re-check** (the bosses' servants added to the stress room, 2026-09-27, same Air, back to back with the milestone 13 build): 4.93 ms average, 6.36 ms p99, 2.11 ms sim, against 4.78 / 6.18 / 2.06 ms before. Hops and the out-of-reach and shield checks cost next to nothing.
 - **Milestone 15 check** (legendaries, 2026-09-27): not on the Air, but headless in a Linux container, so only simulation time counts (headless frame pacing isn't a measurement). 20 s with `--ult-spam`, each hero given all three of its legendaries at once (more than a run allows) against the same heroes without: Rogue, Engineer, Necromancer and Cleric 2.59 → 2.75 ms sim (flames, forks and ricochets add ~0.17 ms of projectiles); Knight, Ranger, Mage and Berserker 2.51 → 2.51 ms. Re-measure on the Air.
+- **Enemy movement check** (2026-09-27): on the Air, but headless, so only simulation time counts. Headless runs read higher than windowed ones, before and after alike. Three 20 s stress runs alternated with the build before:
+  - The horde went from 1.04 to 1.29 ms, and the whole simulation from 3.13 to 3.25 ms.
+  - On its own, the horde step (300 mixed enemies round four heroes, 120 fps) went from 0.77 to 1.01 ms. The clear-path rays and the nearest-hero search they need cost 0.08 ms of that, arc-in and arrival 0.04 ms, and facing 0.035 ms.
+  - The shared DDA got about 40% faster, which speeds up every `line_of_sight()` check too.
+  - Re-measure windowed with `--fullscreen --max-fps=120 --seconds=60`.
 
 ## Art, effects and audio
 

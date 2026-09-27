@@ -13,6 +13,7 @@ contact_damage = 0.0
 xp = 2
 knockback_taken = 1.2
 behavior = 2
+agility = 10.0
 explosion_radius = 30.0
 explosion_damage = 22.0
 fuse_time = 0.7
