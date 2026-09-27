@@ -157,7 +157,7 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
 
 ### Legendary upgrades (the mini boss's reward)
 
-Beating the mini boss opens a **LEGENDARY** round ("LEGENDARY!  TRANSFORM AN ABILITY", `GameState.LEGENDARY_ROUND`, queued first by `World._on_mini_boss_defeated()` and opening 1.6 s later, after the death's slow motion). Each player is offered their own hero's three legendaries (`UpgradePool.legendary_offers()`), and **each turns a different ability into a new form**: a new name, look and behaviour for the rest of the run. So the pick is which ability to transform for levels 4–6 and the final boss. The final boss gives none; the chest by the mini boss's exit still gives its ordinary treasure round.
+Beating the mini boss opens a **LEGENDARY** round ("LEGENDARY!  TRANSFORM AN ABILITY", `GameState.LEGENDARY_ROUND`, queued first by `World._on_mini_boss_defeated()` and opening 1.6 s later, after the death's slow motion). Each player is offered their own hero's three legendaries (`UpgradePool.legendary_offers()`), and **each turns a different ability into a new form**: a new name, look and behaviour for the rest of the run. So the pick is which ability to transform for levels 4–6 and the final boss. The final boss gives none; the chest by the mini boss's exit still gives its ordinary treasure round. In Endless Waves every boss wave gives one, until a hero has taken all three (see [Endless Waves](#endless-waves)).
 
 | Hero | Legendary | Transforms | What changes |
 |---|---|---|---|
@@ -334,7 +334,7 @@ The second mode (main menu → Endless Waves): no dungeon, just waves that keep 
 - **Boss waves:** every 5th wave. Waves 5, 15, 25… bring a mini boss and waves 10, 20, 30… a final boss. Each game shuffles the three of each kind, so all three come before any repeats. The pools are read from `RunConfig` (its levels and boss pools), so a boss added to the run joins Endless Waves too.
   - The boss comes through a portal (1 s) at the `B` furthest from the team, with "BOSS WAVE" and the boss music. Its HP scales with its wave, like the horde's, on the bosses' player curve.
   - The spawner stays off, as in the run's boss rooms: the boss brings its own servants.
-  - Beating it says "<NAME> SLAIN!", refills the team's lives and gives everyone a treasure round (a bonus pick). It never ends the game.
+  - Beating it says "<NAME> SLAIN!" and opens a **legendary round** (see Legendary upgrades). Here every boss counts, not only mini bosses, until each hero has taken all three of its legendaries. After that no legendary round is queued at all (`World.legendaries_left()`), rather than an empty one. A treasure round (a bonus pick) comes after it, and the team's lives are refilled. It never ends the game.
 - **Team lives:** the difficulty's lives per level at the start, refilled after every boss wave, so five waves play the part of a run's level. A wipe with no life left ends the game: "GAME OVER / You reached wave n", then the end screen.
 - **Records:** `Profile.record_waves()` keeps the furthest wave per difficulty, shown in character select ("Best: wave 12") and announced on the end screen ("NEW BEST WAVE!"). Reaching wave 20 on Normal also unlocks Hard (`Profile.HARD_UNLOCK_WAVE`).
 - **Code:**

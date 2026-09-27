@@ -1369,12 +1369,22 @@ func _on_arena_cleared(_room_id: int) -> void:
 		tip(&"exit", "The exit is open: everyone into the portal!")
 
 
-## A mini boss fell: its room opens, and so does the exit behind it, and
-## every player picks a legendary.
+## A mini boss fell (in Endless Waves, any boss): its room opens, and so does
+## the exit behind it, and every player picks a legendary - while any hero
+## still has one to take (with none left the round would open empty).
 func _on_mini_boss_defeated(boss_name: String) -> void:
 	hud.callout("%s SLAIN!" % boss_name.to_upper(), Color(1, 0.9, 0.5))
-	GameState.add_legendary_pick()
+	if legendaries_left():
+		GameState.add_legendary_pick()
 	level_up_delay = maxf(level_up_delay, LEGENDARY_DELAY)
+
+
+## Whether any hero still has a legendary to take (UpgradePool.legendary_offers).
+func legendaries_left() -> bool:
+	for hero in heroes:
+		if not upgrade_pool.legendary_offers(hero.hero_id, hero.upgrade_stacks).is_empty():
+			return true
+	return false
 
 
 func _on_wave_started(wave: int, waves: int) -> void:

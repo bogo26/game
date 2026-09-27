@@ -347,22 +347,53 @@ func test_boss_waves() -> void:
 		assert_true(world.boss.position.distance_to(furthest) < 24.0, "at the B furthest from the team")
 		assert_near(world.spawner.level_hp_multiplier, director.wave.hp, 0.0001, "as tough as its wave")
 		_step(world, 2.0)
-		var t := 0.0
-		while slain.is_empty() and t < 10.0:  # (the Mire Serpent can't be hit while it's under)
-			if world.boss:
-				world.horde.damage(world.horde.index_of_uid(world.boss.uid), 1e9, Vector2.ZERO, 0)
-			_step(world, 0.5)
-			t += 0.5
-		_step(world, 2.0)
+		_kill_boss(world, slain)
 		assert_eq(slain.size(), 1, "wave %d: the boss is slain" % start)
 		assert_false(won[0], "and the game goes on")
 		assert_eq(director.phase, WaveDirector.Phase.BREAK)
-		assert_eq(GameState.pending_treasures, treasures + 1, "a bonus pick for everyone")
+		assert_eq(GameState.next_round(), GameState.LEGENDARY_ROUND, "wave %d: a legendary round first" % start)
+		assert_eq(GameState.pending_rounds[1], GameState.TREASURE_ROUND, "then a bonus pick for everyone")
+		assert_eq(GameState.pending_treasures, treasures + 1)
 		assert_eq(GameState.team_lives, GameState.lives_per_level(), "the team's lives are back")
 		_step(world, WaveDirector.BREAK_TIME)
 		assert_eq(GameState.wave, start + 1)
 		assert_false(director.wave.is_boss())
 		_teardown(world)
+
+
+func test_legendary_rounds_stop_once_every_legendary_is_taken() -> void:
+	var world := _wave_world(5)
+	var hero := world.heroes[0]
+	var offers := world.upgrade_pool.legendary_offers(hero.hero_id, hero.upgrade_stacks)
+	assert_eq(offers.size(), 3, "a hero has three legendaries")
+	hero.apply_upgrade(offers[0], false)
+	hero.apply_upgrade(offers[1], false)
+	assert_true(world.legendaries_left(), "one left")
+	GameState.pending_rounds.clear()
+	world._on_mini_boss_defeated("Test Boss")
+	assert_eq(GameState.next_round(), GameState.LEGENDARY_ROUND, "so a boss still brings a round")
+	hero.apply_upgrade(offers[2], false)
+	assert_false(world.legendaries_left(), "all three taken")
+	GameState.pending_rounds.clear()
+	var slain: Array[String] = []
+	world.director.mini_boss_defeated.connect(func(boss_name: String) -> void: slain.append(boss_name))
+	_step(world, WaveDirector.FIRST_BREAK + WaveDirector.BOSS_PORTAL_TIME + 0.2)
+	_kill_boss(world, slain)
+	assert_eq(slain.size(), 1, "the boss is slain")
+	assert_false(GameState.pending_rounds.has(GameState.LEGENDARY_ROUND), "no empty legendary round")
+	assert_eq(GameState.next_round(), GameState.TREASURE_ROUND, "just the bonus pick")
+	_teardown(world)
+
+
+## Kills the boss (once it can be hit) and lets its death play out.
+func _kill_boss(world: World, slain: Array[String]) -> void:
+	var t := 0.0
+	while slain.is_empty() and t < 10.0:  # (the Mire Serpent can't be hit while it's under)
+		if world.boss:
+			world.horde.damage(world.horde.index_of_uid(world.boss.uid), 1e9, Vector2.ZERO, 0)
+		_step(world, 0.5)
+		t += 0.5
+	_step(world, 2.0)
 
 
 # --- records and screens ----------------------------------------------------------------------

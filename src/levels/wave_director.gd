@@ -7,8 +7,10 @@ extends LevelDirector
 ## while: they stay in the fight). A short break follows, where pick rounds
 ## earned during the wave open, and then the next wave comes. Every 5th wave
 ## is a boss: a mini boss on waves 5, 15, 25..., a final boss on 10, 20, 30...
-## Beating one refills the team's lives and gives everyone a bonus pick.
-## settings() holds the numbers behind each wave.
+## Beating one opens a legendary round (every boss counts here, until each
+## hero has taken all three of its legendaries), refills the team's lives
+## and gives everyone a bonus pick. settings() holds the numbers behind each
+## wave.
 
 const ARENA_PATH := "res://src/levels/data/waves.tres"
 ## The tile sheets the arena may wear (one per game).
@@ -298,8 +300,10 @@ func _on_boss_defeated() -> void:
 	boss = null
 	world.boss = null
 	Audio.play_music(&"dungeon")
-	mini_boss_defeated.emit(boss_name)  # the World calls out "<NAME> SLAIN!"
 	_clear_wave()
+	# Any boss, mini or final: the World calls out "<NAME> SLAIN!" and queues
+	# a legendary round ahead of the treasure round _clear_wave() queued.
+	mini_boss_defeated.emit(boss_name)
 
 
 ## The wave is over: a heart for the team, the XP vacuum (the World's
