@@ -34,6 +34,12 @@ func blocks_other_abilities() -> bool:
 	return is_active()
 
 
+## The spin round the hero: enemies keep out of it.
+func add_dangers(horde: HordeSim) -> void:
+	if is_active() and damage > 0.0:
+		horde.add_danger(hero.position, radius * area_scale(), duration + mod(&"duration") - _time_left)
+
+
 func damage_taken_factor() -> float:
 	return damage_taken_multiplier if is_active() else 1.0
 

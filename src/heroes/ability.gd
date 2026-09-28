@@ -149,6 +149,13 @@ func on_kill(_at: Vector2) -> void:
 	pass
 
 
+## Where it's about to hurt enemies, or is hurting them round the hero right
+## now (a Meteor's mark, a Whirlwind): adds those circles to the horde's
+## dangers, which enemies steer clear of. Zones it placed are the World's.
+func add_dangers(_horde: HordeSim) -> void:
+	pass
+
+
 ## Radius multiplier from upgrades (area_pct) and active buffs.
 func area_scale() -> float:
 	return (1.0 + mod(&"area_pct")) * hero.buff_product(&"area_factor")

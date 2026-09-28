@@ -54,6 +54,15 @@ func is_active() -> bool:
 	return not _pending_time.is_empty()
 
 
+## Blasts on their way down (Meteor): enemies try to get out from under them.
+func add_dangers(horde: HordeSim) -> void:
+	if damage <= 0.0 and stun_time <= 0.0 and slow_time <= 0.0:
+		return  # only heals
+	var r := _radius()
+	for k in _pending_time.size():
+		horde.add_danger(_pending_pos[k], r, delay - _pending_time[k])
+
+
 func cancel() -> void:
 	# Already-cast meteors still land; nothing to cancel.
 	pass
