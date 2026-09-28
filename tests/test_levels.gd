@@ -42,6 +42,8 @@ func test_run_config_lists_the_run() -> void:
 			assert_eq(data.is_final_boss, index == last, "%s: in the right pool" % data.display_name)
 			assert_eq(data.hp_multiplier, run.levels[index].hp_multiplier, "%s: as tough as %s"
 				% [data.display_name, run.levels[index].display_name])
+			assert_eq(data.boss_hp_multiplier, run.levels[index].boss_hp_multiplier, "%s: its boss too"
+				% data.display_name)
 			scenes[index].append(data.boss_scene.get_file().get_basename())
 	assert_eq(scenes[3], ["bone_colossus", "toadstool_tyrant", "mire_serpent"], "the mini bosses")
 	assert_eq(scenes[last], ["boss_demon", "spore_mother", "frost_queen"], "the final bosses")
@@ -291,6 +293,25 @@ func test_the_mini_boss_opens_the_way_on() -> void:
 		hero.position = world.level.exit_center()
 	_step(world, 150)  # the boss's death froze time for a moment; then a second in the portal
 	assert_true(completed[0], "the portal takes the team on to level 4")
+	_teardown(world)
+
+
+func test_a_boss_is_tougher_than_its_level() -> void:
+	# The boss level's boss_hp_multiplier goes to its boss alone: the servants
+	# it calls get the level's HP like every other enemy there.
+	var data: LevelData = RunConfig.load_default().levels[3]
+	assert_true(data.boss_hp_multiplier > 1.0, "the boss is the level's big fight")
+	var world := _run_world(data, [&"knight", &"ranger"])
+	var room: LevelDirector.Room = world.director.rooms[0]
+	for hero in world.heroes:
+		hero.position = world.grid.nearest_open(room.center + Vector2(0, 60))
+	_step(world, 2)
+	var spawner := world.spawner
+	var base := world.horde.types[world.horde.type_index(world.boss.body_type)].max_hp
+	assert_near(world.boss.max_hp, base * spawner.unique_hp_multiplier() * data.boss_hp_multiplier, 0.01,
+		"its own HP, the level's, the team's and the boss multiplier")
+	assert_near(world.boss._add_hp_multiplier, spawner.effective_hp_multiplier(), 0.0001,
+		"its servants only get the level's")
 	_teardown(world)
 
 

@@ -81,3 +81,4 @@ is_boss_level = true
 is_final_boss = true
 boss_scene = "res://src/enemies/boss/boss_demon.tscn"
 boss_room = "throne room"
+boss_hp_multiplier = 1.5

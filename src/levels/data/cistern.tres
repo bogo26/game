@@ -88,3 +88,4 @@ tint = Color(1.0, 1.0, 1.0, 1.0)
 is_boss_level = true
 boss_scene = "res://src/enemies/boss/mire_serpent.tscn"
 boss_room = "cistern"
+boss_hp_multiplier = 1.5

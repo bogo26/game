@@ -346,6 +346,9 @@ func test_boss_waves() -> void:
 				furthest = p
 		assert_true(world.boss.position.distance_to(furthest) < 24.0, "at the B furthest from the team")
 		assert_near(world.spawner.level_hp_multiplier, director.wave.hp, 0.0001, "as tough as its wave")
+		var base := world.horde.types[world.horde.type_index(world.boss.body_type)].max_hp
+		assert_near(world.boss.max_hp, base * world.spawner.unique_hp_multiplier(), 0.01,
+			"the boss too (the run's boss levels toughen theirs on top; waves don't)")
 		_step(world, 2.0)
 		_kill_boss(world, slain)
 		assert_eq(slain.size(), 1, "wave %d: the boss is slain" % start)

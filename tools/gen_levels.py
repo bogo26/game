@@ -1206,6 +1206,11 @@ def _open_spot(c, cells, near):
     return best
 
 
+# The run's bosses take half again the HP their level's hp_multiplier gives them
+# (their servants don't), so each boss is a real fight. Endless Waves' bosses
+# scale with their wave instead.
+BOSS_HP = 1.5
+
 LEVELS = [
     ("level_1", "Crypt Entrance", level1, {
         "enemy_weights": {"swarmer": 1.0, "brute": 0.05, "spitter": 0.04, "exploder": 0.03, "bat": 0.1},
@@ -1223,7 +1228,8 @@ LEVELS = [
         "enemy_weights": {"swarmer": 1.0, "brute": 0.08, "exploder": 0.06, "revenant": 0.22},
         "hp_multiplier": 2.0, "corridor_cap_fraction": 0.3, "corridor_spawn_rate": 12.0,
         "arena_quotas": [0], "arena_spawn_rate": 20.0, "theme": "ossuary", "tint": (1.0, 1.0, 1.0),
-        "is_boss_level": True, "boss_scene": "res://src/enemies/boss/bone_colossus.tscn", "boss_room": "ossuary"}),
+        "is_boss_level": True, "boss_scene": "res://src/enemies/boss/bone_colossus.tscn", "boss_room": "ossuary",
+        "boss_hp_multiplier": BOSS_HP}),
     ("level_4", "Fungal Caverns", level4, {
         "enemy_weights": {"swarmer": 1.0, "brute": 0.14, "spitter": 0.14, "exploder": 0.12, "sporecap": 0.14},
         "hp_multiplier": 2.2, "corridor_cap_fraction": 0.55, "corridor_spawn_rate": 24.0,
@@ -1241,30 +1247,35 @@ LEVELS = [
         "hp_multiplier": 3.2, "corridor_cap_fraction": 0.0, "corridor_spawn_rate": 0.0,
         "arena_quotas": [0, 0, 0, 0, 0, 0, 0, 0, 0], "arena_spawn_rate": 20.0,
         "theme": "throne", "tint": (1.0, 1.0, 1.0), "is_boss_level": True, "is_final_boss": True,
-        "boss_scene": "res://src/enemies/boss/boss_demon.tscn", "boss_room": "throne room"}),
+        "boss_scene": "res://src/enemies/boss/boss_demon.tscn", "boss_room": "throne room",
+        "boss_hp_multiplier": BOSS_HP}),
     # The other bosses: each can take its kind's place in a run (run_config.tres boss_pool).
     ("grove", "Toadstool Hollow", grove, {
         "enemy_weights": {"swarmer": 1.0, "brute": 0.08, "exploder": 0.06, "sporeling": 0.24},
         "hp_multiplier": 2.0, "corridor_cap_fraction": 0.3, "corridor_spawn_rate": 12.0,
         "arena_quotas": [0], "arena_spawn_rate": 20.0, "theme": "grove", "tint": (1.0, 1.0, 1.0),
-        "is_boss_level": True, "boss_scene": "res://src/enemies/boss/toadstool_tyrant.tscn", "boss_room": "hollow"}),
+        "is_boss_level": True, "boss_scene": "res://src/enemies/boss/toadstool_tyrant.tscn", "boss_room": "hollow",
+        "boss_hp_multiplier": BOSS_HP}),
     ("cistern", "The Sunken Cistern", cistern, {
         "enemy_weights": {"swarmer": 1.0, "brute": 0.08, "exploder": 0.06, "eel": 0.24},
         "hp_multiplier": 2.0, "corridor_cap_fraction": 0.3, "corridor_spawn_rate": 12.0,
         "arena_quotas": [0], "arena_spawn_rate": 20.0, "theme": "cistern", "tint": (1.0, 1.0, 1.0),
-        "is_boss_level": True, "boss_scene": "res://src/enemies/boss/mire_serpent.tscn", "boss_room": "cistern"}),
+        "is_boss_level": True, "boss_scene": "res://src/enemies/boss/mire_serpent.tscn", "boss_room": "cistern",
+        "boss_hp_multiplier": BOSS_HP}),
     ("mycelium", "The Mycelium Deep", mycelium, {
         "enemy_weights": {"swarmer": 1.0, "exploder": 0.1, "puffball": 0.3},
         "hp_multiplier": 3.2, "corridor_cap_fraction": 0.0, "corridor_spawn_rate": 0.0,
         "arena_quotas": [0], "arena_spawn_rate": 20.0,
         "theme": "mycelium", "tint": (1.0, 1.0, 1.0), "is_boss_level": True, "is_final_boss": True,
-        "boss_scene": "res://src/enemies/boss/spore_mother.tscn", "boss_room": "deep"}),
+        "boss_scene": "res://src/enemies/boss/spore_mother.tscn", "boss_room": "deep",
+        "boss_hp_multiplier": BOSS_HP}),
     ("glacier", "The Frozen Court", glacier, {
         "enemy_weights": {"swarmer": 1.0, "exploder": 0.1, "frost_wraith": 0.3},
         "hp_multiplier": 3.2, "corridor_cap_fraction": 0.0, "corridor_spawn_rate": 0.0,
         "arena_quotas": [0], "arena_spawn_rate": 20.0,
         "theme": "glacier", "tint": (1.0, 1.0, 1.0), "is_boss_level": True, "is_final_boss": True,
-        "boss_scene": "res://src/enemies/boss/frost_queen.tscn", "boss_room": "court"}),
+        "boss_scene": "res://src/enemies/boss/frost_queen.tscn", "boss_room": "court",
+        "boss_hp_multiplier": BOSS_HP}),
     ("level_1b", "Crypt Entrance", level1b, None),
     ("level_2b", "Flooded Halls", level2b, None),
     ("level_3b", "Bone Pits", level3b, None),

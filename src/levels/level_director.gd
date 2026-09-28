@@ -124,7 +124,7 @@ func setup(p_world: World) -> void:
 	spawner.corridor_cap_fraction = data.corridor_cap_fraction
 	spawner.spawn_rate = _rate(data.corridor_spawn_rate)
 	spawner.mode = SpawnDirector.Mode.CORRIDOR if data.corridor_spawn_rate > 0.0 else SpawnDirector.Mode.OFF
-	boss_hp_multiplier = spawner.unique_hp_multiplier()
+	boss_hp_multiplier = spawner.unique_hp_multiplier() * data.boss_hp_multiplier
 	_update_objective()
 
 

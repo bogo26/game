@@ -46,6 +46,10 @@ extends Resource
 @export_file("*.tscn") var boss_scene := "res://src/enemies/boss/boss_demon.tscn"
 ## What the objective calls the boss room before the fight: "Enter the <boss_room>".
 @export var boss_room := "throne room"
+## Multiplies the boss's HP on top of hp_multiplier (its servants and the
+## level's other enemies only get hp_multiplier). Endless Waves' bosses scale
+## with their wave instead.
+@export var boss_hp_multiplier := 1.0
 
 
 ## A copy with the layout flipped left-right and/or upside down (runs vary

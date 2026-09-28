@@ -86,3 +86,4 @@ tint = Color(1.0, 1.0, 1.0, 1.0)
 is_boss_level = true
 boss_scene = "res://src/enemies/boss/bone_colossus.tscn"
 boss_room = "ossuary"
+boss_hp_multiplier = 1.5

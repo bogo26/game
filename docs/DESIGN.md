@@ -199,7 +199,7 @@ Beating the mini boss opens a **LEGENDARY** round ("LEGENDARY!  TRANSFORM AN ABI
   - With 3–4 players each panel sits in its player's HUD corner; with 2 the lower slot is on the left.
   - Rounds wait until the level banner has gone. Rounds earned after the exit is reached, or once the run is won or lost, carry over to the next level instead of opening then.
 - Upgrades last for the whole run and reset on game over.
-- XP needed per level: `6·L^1.35 + 4·L`, scaled by `1 + 0.35 × (players − 1)` (see `src/core/xp_curve.gd`).
+- XP needed per level: `24·L^1.35 + 16·L`, scaled by `1 + 0.35 × (players − 1)` (see `src/core/xp_curve.gd`). Every level-up stops the game for everyone, so the curve paces them at about two per regular level: a dozen in a run, a pick screen every minute or so.
 
 ## Levels and run flow
 
@@ -229,7 +229,7 @@ Beating the mini boss opens a **LEGENDARY** round ("LEGENDARY!  TRANSFORM AN ABI
   - corridor pressure
   - arena quotas
   - a theme (tile sheet and decorations) and an optional tint
-  - for boss levels: the boss (`boss_scene`), what the objective calls its room (`boss_room`) and whether it is the final boss
+  - for boss levels: the boss (`boss_scene`), what the objective calls its room (`boss_room`), whether it is the final boss, and how much tougher the boss is than the level (`boss_hp_multiplier`: 1.5 for every boss, `BOSS_HP` in `gen_levels.py`; its servants only get the level's HP)
 - **`LevelDirector` runs the objectives:**
   - An **arena room** (digit tiles) activates when a living hero is 36+ px inside it. Stragglers are pulled in with the leader, every door touching the room turns solid, and the spawner switches to arena mode.
   - The quota comes in **waves**: 2 (45% / 55%) up to 60 enemies, 3 (30% / 33% / 37%) above. The next wave comes once 25% or less of the current one is left (or after 12 s), after a 2 s breather, with a "WAVE 2/3" callout and a horn.
@@ -248,7 +248,7 @@ Beating the mini boss opens a **LEGENDARY** round ("LEGENDARY!  TRANSFORM AN ABI
   - CORRIDOR: off-screen trickle at a fraction of the alive cap.
   - ARENA: spawns on the room's floor at least 96 px from heroes, until the quota is spent.
   - OFF.
-- **Bosses** (`Boss`, `src/enemies/boss/`): a boss's body is a `HordeSim` entry of its own enemy type, so every ability, projectile and zone hits it. The boss node moves that body, draws a sprite sheet of square frames (walk ×2, wind-up, action; 64×64, the Spore Mother 96×96) and runs the attacks; the base class holds what they share (body, sprite and wind-up glow, summons through portals, phase fanfare, the death, hitting heroes in a circle or a band). Bosses are immune to stun, slow and freezing; HP is base × level multiplier × player-count scaling (see Spawn director).
+- **Bosses** (`Boss`, `src/enemies/boss/`): a boss's body is a `HordeSim` entry of its own enemy type, so every ability, projectile and zone hits it. The boss node moves that body, draws a sprite sheet of square frames (walk ×2, wind-up, action; 64×64, the Spore Mother 96×96) and runs the attacks; the base class holds what they share (body, sprite and wind-up glow, summons through portals, phase fanfare, the death, hitting heroes in a circle or a band). Bosses are immune to stun, slow and freezing; HP is base × level multiplier × the level's boss multiplier (1.5) × player-count scaling (see Spawn director). The boss multiplier makes each boss a real fight: without it most bosses fell in about half a minute.
   - A boss body can be **out of reach** (`HordeSim.hidden`: nothing hits, finds or touches it, like the Mire Serpent under the murk) or **shielded** (`HordeSim.guard`: the share of every hit, burns and poison included, it shrugs off).
   - **Every attack is telegraphed** during its wind-up: the boss glows hot pink (a flash shader, which hit flashes can't wash out) and growls, and the warning is drawn above the horde.
 - **Mini boss (Bone Colossus, `BoneColossus`):** 1100 HP. A lumbering heap of bones with a club, fighting up close and from below.
@@ -332,7 +332,7 @@ The second mode (main menu → Endless Waves): no dungeon, just waves that keep 
   - From wave 2, each regular wave features one of the 12 level enemies (bats, drowned, bone archers, revenants, sporecaps, frost boars, salamanders, imps, sporelings, eels, puffballs, frost wraiths) at weight 0.15, in an order shuffled per game. From wave 12 the one before it stays on, and from wave 24 the two before.
   - At most as many enemies are alive at once as in the run (the alive cap by player count), so bigger waves last longer rather than crowding more.
 - **Boss waves:** every 5th wave. Waves 5, 15, 25… bring a mini boss and waves 10, 20, 30… a final boss. Each game shuffles the three of each kind, so all three come before any repeats. The pools are read from `RunConfig` (its levels and boss pools), so a boss added to the run joins Endless Waves too.
-  - The boss comes through a portal (1 s) at the `B` furthest from the team, with "BOSS WAVE" and the boss music. Its HP scales with its wave, like the horde's, on the bosses' player curve.
+  - The boss comes through a portal (1 s) at the `B` furthest from the team, with "BOSS WAVE" and the boss music. Its HP scales with its wave, like the horde's, on the bosses' player curve (without the run's boss multiplier: the first boss wave comes after only four waves' worth of picks).
   - The spawner stays off, as in the run's boss rooms: the boss brings its own servants.
   - Beating it says "<NAME> SLAIN!" and opens a **legendary round** (see Legendary upgrades). Here every boss counts, not only mini bosses, until each hero has taken all three of its legendaries. After that no legendary round is queued at all (`World.legendaries_left()`), rather than an empty one. A treasure round (a bonus pick) comes after it, and the team's lives are refilled. It never ends the game.
 - **Team lives:** the difficulty's lives per level at the start, refilled after every boss wave, so five waves play the part of a run's level. A wipe with no life left ends the game: "GAME OVER / You reached wave n", then the end screen.
