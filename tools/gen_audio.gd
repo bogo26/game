@@ -22,7 +22,7 @@ const SFX := {
 	"shoot_soul": {"wave": "triangle", "f0": 300.0, "f1": 700.0, "dur": 0.16, "decay": 1.2, "vol": 0.3, "vib": [0.12, 18.0]},
 	"slash": {"wave": "noise", "f0": 6000.0, "f1": 1500.0, "dur": 0.11, "decay": 1.6, "vol": 0.22, "lp": 0.35},
 	"hit": {"wave": "noise", "f0": 3000.0, "f1": 800.0, "dur": 0.045, "decay": 3.0, "vol": 0.2, "lp": 0.6},
-	"crit": {"wave": "square", "f0": 1760.0, "f1": 2640.0, "dur": 0.09, "decay": 1.6, "vol": 0.17, "duty": 0.25, "noise": 0.15},
+	"crit": {"wave": "noise", "f0": 4500.0, "f1": 150.0, "dur": 0.15, "decay": 2.5, "vol": 0.3, "lp": 0.4},
 	"kill": {"wave": "square", "f0": 420.0, "f1": 120.0, "dur": 0.09, "decay": 2.0, "vol": 0.16, "duty": 0.5, "noise": 0.25},
 	"explosion": {"wave": "noise", "f0": 1400.0, "f1": 90.0, "dur": 0.55, "decay": 1.6, "vol": 0.45, "lp": 0.25},
 	"slam": {"wave": "sine", "f0": 140.0, "f1": 38.0, "dur": 0.32, "decay": 1.5, "vol": 0.55, "noise": 0.35, "lp": 0.3},

@@ -47,6 +47,18 @@ static func _extend_ui_actions() -> void:
 		stick.axis_value = extra[action][2]
 		InputMap.action_add_event(action, stick)
 
+	if InputMap.has_action(&"ui_accept"):
+		var btn_a := InputEventJoypadButton.new()
+		btn_a.device = -1
+		btn_a.button_index = JOY_BUTTON_A
+		InputMap.action_add_event(&"ui_accept", btn_a)
+	
+	if InputMap.has_action(&"ui_cancel"):
+		var btn_b := InputEventJoypadButton.new()
+		btn_b.device = -1
+		btn_b.button_index = JOY_BUTTON_B
+		InputMap.action_add_event(&"ui_cancel", btn_b)
+
 
 func _process(delta: float) -> void:
 	PlayerInput.update_enter_latch()
