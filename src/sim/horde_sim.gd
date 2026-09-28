@@ -260,6 +260,9 @@ var view_rect := Rect2()
 var flash_strength := 1.0
 ## Difficulty: multiplies every hit enemies deal (contact, shots, blasts).
 var damage_mult := 1.0
+## Multiplies how fast enemies walk (a restless horde's: see
+## LevelDirector.RESTLESS_SPEED); charges keep the speed their band shows.
+var speed_mult := 1.0
 ## Exploders whose fuse lit this frame (uids), ranged enemies that started
 ## winding up a shot (positions), and aimed shooters and chargers that locked
 ## their aim (uids), for the World's warnings.
@@ -921,6 +924,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	var FRST := frost
 	var FRZ := frozen
 	var speed_t := t_speed
+	var speed_scale := speed_mult
 	var radius_t := t_radius
 	var behavior_t := t_behavior
 	var range_t := t_range
@@ -1068,7 +1072,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 					reform_type.append(STATE[i])
 			continue
 		var desired := Vector2.ZERO
-		var move_speed := speed_t[t]
+		var move_speed := speed_t[t] * speed_scale
 		var charging := false
 		# `walk` eases toward `desired` (momentum), but stops dead while it's
 		# planted for an action (so warnings and aim lines never slide) or

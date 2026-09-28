@@ -112,6 +112,7 @@ func setup(p_world: World) -> void:
 	super.setup(p_world)
 	room = rooms[0]
 	world.spawner.mode = SpawnDirector.Mode.OFF
+	has_clock = false  # the waves keep the pressure on themselves
 	_seed = GameState.run_seed
 	_minis = boss_scenes(false)
 	_finals = boss_scenes(true)

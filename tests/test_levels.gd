@@ -339,10 +339,17 @@ func test_bots_can_finish_every_level() -> void:
 		var done := [false]
 		world.level_completed.connect(func() -> void: done[0] = true)
 		world.boss_defeated.connect(func() -> void: done[0] = true)
+		# Walking straight from objective to objective, they never let the
+		# keep-moving clock run out (LevelDirector.RESTLESS_AFTER).
+		var restless := [0]
+		world.director.restless_changed.connect(func(stage: int) -> void: restless[0] = maxi(restless[0], stage))
+		var longest_walk := 0.0
 		var seconds := 0
 		while seconds < 600 and not done[0]:
 			_step(world, 60)
 			seconds += 1
+			if world.director.clock_running():
+				longest_walk = maxf(longest_walk, world.director.clock_length - world.director.restless_in)
 			if OS.get_cmdline_user_args().has("--verbose") and seconds % 30 == 0:
 				var d := world.director
 				var states := []
@@ -353,5 +360,8 @@ func test_bots_can_finish_every_level() -> void:
 					world.boss.hp_ratio() if world.boss else -1.0])
 		assert_true(done[0], "%s finished by bots (%d s, arenas %d/%d)" % [
 			data.display_name, seconds, world.director.arenas_cleared(), world.director.rooms.size()])
-		print("  %s: bots finished in %d s of game time" % [data.display_name, seconds])
+		assert_eq(restless[0], 0, "%s: bots reach every objective in time (longest walk %d s)" % [
+			data.display_name, roundi(longest_walk)])
+		print("  %s: bots finished in %d s of game time (longest walk between objectives %d s)" % [
+			data.display_name, seconds, roundi(longest_walk)])
 		_teardown(world)

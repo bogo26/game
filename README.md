@@ -87,6 +87,8 @@ The macOS build runs on your own Mac; other people have to right-click → Open 
 
    The horde is wary of your AoEs. After a moment to notice one, enemies get out from under a Meteor's mark or a mortar shell, go round Arrow Rain, caltrops, fire trails and toxic clouds, and wait outside a Whirlwind or Blade Vortex, so drop them where the pack is thickest or where it's headed.
 
+   **Keep moving.** Out of fights you have a minute to reach your next objective (the clock by the team hearts starts over at each one). Linger past it and the horde grows restless, more so every 15 s: enemies drop less and less XP and hearts (none at all from 1:45), and come faster, tougher, in greater numbers and more often as elites, until you get there. Arena and boss fights stop the clock.
+
 Things to use in the levels:
 - **Barrels** explode and chain; they hurt enemies, never heroes.
 - **Urns** drop XP.
@@ -127,7 +129,7 @@ Upgrades include four **elemental chains** for your attack: fire, ice, poison an
 - **Every 5th wave is a boss:** a random mini boss on waves 5, 15, 25…, a random final boss on waves 10, 20, 30…. Beating one opens a legendary round (each player transforms another of their hero's abilities, until all three are taken), refills the team's lives and gives everyone a bonus upgrade.
 - The end screen shows the wave you reached, and your best wave is kept per difficulty.
 
-Debug flags (after `--`): `--level=3` (the run's 1-based position: `--level=4` is the mini boss, `--level=8` the final boss), `--boss=grove` (which boss: `lair`, `grove` or `cistern` for the mini boss, `boss`, `mycelium` or `glacier` for the final one), `--waves` (Endless Waves) and `--wave=5` (from that wave), `--bots=4`, `--heroes=rogue,mage`, `--layout=b`, `--mirror=hv`, `--elite-chance=0.3`, `--debug-levelups=2`, `--show-map`. For example, `./tools/dev.sh run res://src/main/game.tscn -- --waves --wave=5 --bots=4` shows bots fighting a boss wave.
+Debug flags (after `--`): `--level=3` (the run's 1-based position: `--level=4` is the mini boss, `--level=8` the final boss), `--boss=grove` (which boss: `lair`, `grove` or `cistern` for the mini boss, `boss`, `mycelium` or `glacier` for the final one), `--waves` (Endless Waves) and `--wave=5` (from that wave), `--bots=4`, `--heroes=rogue,mage`, `--layout=b`, `--mirror=hv`, `--elite-chance=0.3`, `--restless-after=5` (the horde grows restless after that many seconds), `--debug-levelups=2`, `--show-map`. For example, `./tools/dev.sh run res://src/main/game.tscn -- --waves --wave=5 --bots=4` shows bots fighting a boss wave.
 
 ## Status
 

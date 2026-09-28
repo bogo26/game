@@ -199,7 +199,7 @@ Beating the mini boss opens a **LEGENDARY** round ("LEGENDARY!  TRANSFORM AN ABI
   - With 3–4 players each panel sits in its player's HUD corner; with 2 the lower slot is on the left.
   - Rounds wait until the level banner has gone. Rounds earned after the exit is reached, or once the run is won or lost, carry over to the next level instead of opening then.
 - Upgrades last for the whole run and reset on game over.
-- XP needed per level: `24·L^1.35 + 16·L`, scaled by `1 + 0.35 × (players − 1)` (see `src/core/xp_curve.gd`). Every level-up stops the game for everyone, so the curve paces them at about two per regular level: a dozen in a run, a pick screen every minute or so.
+- XP needed per level: `24·L^1.35 + 16·L`, scaled by `1 + 0.35 × (players − 1)` (see `src/core/xp_curve.gd`). Every level-up stops the game for everyone, so the curve paces them at about two per regular level: a dozen in a run, a pick screen every minute or so. Staying behind to farm the corridors doesn't pay for long: see Keep moving (the restless horde).
 
 ## Levels and run flow
 
@@ -241,8 +241,25 @@ Beating the mini boss opens a **LEGENDARY** round ("LEGENDARY!  TRANSFORM AN ABI
     - **Mini boss** (the Ossuary, Toadstool Hollow or the Sunken Cistern): when the boss dies its room clears like an arena (doors open, a heart, the XP vacuum), the music goes back to the dungeon track, the HUD calls out its name ("BONE COLOSSUS SLAIN!"), every player picks a legendary (see Legendary upgrades), and the exit portal behind its room opens (a chest waits beside it). The team walks on to level 4.
     - **Final boss** (the Demon's Throne, the Mycelium Deep or the Frozen Court, no exit): the boss's death ends the run in victory.
     - During the fight the objective arrow (and the bots) follow the boss, or what it calls for: the Spore Mother points at her pods ("Burst the spore pods!  3 left"). The HUD adds the boss's state to its name ("SHIELDED", "SUBMERGED", "BLIZZARD").
+  - **Keep moving (the restless horde).** The corridors never stop spawning, so a team could stay and farm them for as long as it liked. Instead, out of fights the team has **60 s** (`LevelDirector.RESTLESS_AFTER`) to reach its next objective: an arena cleared, the mini boss's room cleared, then the exit. Each objective reached starts the clock over, and arena and boss fights stop it (so do pick screens, which pause the level).
+    - When it runs out, the HUD calls "THE HORDE GROWS RESTLESS" with a growl (and a one-time tip), and the horde gains a stage at once and another every 15 s (`RESTLESS_EVERY`) until the next objective:
+
+      | Stage (time without progress) | 1 (1:00) | 2 (1:15) | 3 (1:30) | 4 (1:45) | each 15 s after |
+      |---|---|---|---|---|---|
+      | XP and heart drops | 75% | 50% | 25% | none | none |
+      | Corridor spawn rate | ×1.25 | ×1.5 | ×1.75 | ×2 | +25% |
+      | Corridor alive cap (share of the player-count cap) | +10% | +20% | +30% | +40% | +10%, up to the whole cap |
+      | HP of new enemies | ×1.2 | ×1.4 | ×1.6 | ×1.8 | +20% |
+      | Enemy damage | ×1.1 | ×1.2 | ×1.3 | ×1.4 | +10% |
+      | Enemy speed (`HordeSim.speed_mult`; charges keep theirs) | ×1.05 | ×1.1 | ×1.15 | ×1.2 | +5%, at most ×1.3 |
+      | Elite chance | +1/40 | +2/40 | +3/40 | +4/40 | +1/40 (×0.5 on Casual, ×2 on Hard; level 1 too; still at most 4 alive) |
+
+    - Drops fade for every enemy killed out of a fight, elites and nests included. Fractions of a gem carry over from kill to kill (`World._faded_xp`), so at 50% every other swarmer drops its gem. Urns, barrels, chests, the arena-clear heart and the XP vacuum don't fade.
+    - Walking into an arena or the boss room holds the horde at the level's own settings, with full drops: the fight and the boss's adds are as usual. Clearing the room calms the horde and starts the clock over.
+    - Only levels with a corridor horde have a clock (levels 1–6 and the mini bosses'); the final boss's level, Endless Waves and the test room don't. Bots walking straight from objective to objective need 6–28 s, and `test_bots_can_finish_every_level` checks they never let the clock run out. `--restless-after=5` shortens it for testing.
 - **HUD:**
   - The objective text sits under the XP bar.
+  - The keep-moving clock sits right of the team hearts: the time left to reach the next objective ("0:42"), grey, then gold and blinking for the last 10 s. It hides during fights. Once the horde is restless it reads "RESTLESS  XP 50%" (then "RESTLESS  no XP") in red.
   - A yellow arrow at the screen edge points to off-screen objectives (the next arena or the exit). The next arena is the one closest **on foot** from the team (`LevelGrid.walk_distances`, a BFS where walls, closed doors and chasms block and props don't), not in a straight line.
 - **Spawner modes:**
   - CORRIDOR: off-screen trickle at a fraction of the alive cap.
@@ -639,16 +656,16 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - white hit flash in the shader
   - frozen tint
   - pixel-snapped screen shake
-- **Audio:** `tools/gen_audio.gd` renders 77 SFX and 3 music loops (menu, dungeon, boss) with a small synth and sequencer into `assets/audio`.
+- **Audio:** `tools/gen_audio.gd` renders 78 SFX and 3 music loops (menu, dungeon, boss) with a small synth and sequencer into `assets/audio`.
 - **`Audio` autoload:**
-  - Plays SFX through a 24-voice pool on an `SFX` bus. Six voices are reserved for cues players must not miss (down, revive, ult, level-up, heartbeat, help, boss wind-up and death, stings...), so a flood of hits can't cut them off.
+  - Plays SFX through a 24-voice pool on an `SFX` bus. Six voices are reserved for cues players must not miss (down, revive, ult, level-up, heartbeat, help, boss wind-up and death, the restless horde's growl, stings...), so a flood of hits can't cut them off.
   - Each sound has a minimum repeat interval (e.g. kills every 50 ms), so a horde never drowns everything out.
   - Loops music on a `Music` bus and crossfades between tracks (0.6 s). The boss track starts when a boss room's fight does (and gives way to the dungeon track when the mini boss falls); victory and defeat have their own stings.
   - Volumes are set in the pause menu and saved to `user://settings.cfg`.
 - **Sound hooks:**
   - Every ability plays a sound by type; ultimates add a swell.
   - World events cover hits, kills, explosions, pickups, hurt/down/revive and level-ups.
-  - The level director plays door, clear and portal sounds; the bosses play roar, wind-up, slam, spikes and fireball.
+  - The level director plays door, clear and portal sounds, and the World the growl when the horde grows restless; the bosses play roar, wind-up, slam, spikes and fireball.
   - The level enemies: a bow, bones falling apart and rattling back up, a spore burst, a snort and a thud into a wall, a lob and its sizzle, an imp's blink.
   - The other bosses: the Tyrant's springy hops, the Serpent's splash, bubbles and bite, pods sprouting and roots bursting, the Queen's nova, beam and blizzard.
   - UI sounds on moves and confirms.

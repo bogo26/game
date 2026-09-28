@@ -11,6 +11,9 @@ extends CanvasLayer
 ## - the boss's name (and state: "SHIELDED", "SUBMERGED") and HP bar during a
 ##   boss fight, and the controller-disconnected notice
 ## - the minimap while a player holds MAP (plus a hint at the start of a level)
+## - by the team hearts, the keep-moving clock: the time left to reach the
+##   next objective, then how restless the horde has grown (see
+##   LevelDirector.RESTLESS_AFTER)
 
 const BAR_SIZE := Vector2(160, 4)
 const PANEL_SIZE := Vector2(112, 28)
@@ -34,6 +37,12 @@ const TIP_TIME := 6.0
 const ARROW_TIP := 9.0
 const ARROW_BACK := 5.0
 const ARROW_HALF_WIDTH := 6.0
+## The keep-moving clock: grey, then gold and blinking for its last
+## CLOCK_HURRY seconds; red once the horde is restless.
+const CLOCK_COLOR := Color(0.72, 0.72, 0.78)
+const CLOCK_HURRY := 10.0
+const CLOCK_HURRY_COLOR := Color("ffe07a")
+const RESTLESS_COLOR := Color(1.0, 0.45, 0.3)
 
 var world: World
 var minimap: Minimap
@@ -55,6 +64,7 @@ var _hurt_flash := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _callout_label: Label
 var _callout_left := 0.0
 var _held_label: Label
+var _clock_label: Label
 var _card_time := PackedFloat32Array([0.0, 0.0, 0.0, 0.0])
 var _tip_label: Label
 var _tip_left := 0.0
@@ -90,6 +100,7 @@ func _ready() -> void:
 	_callout_label = _label(Color("ffe07a"), 16)
 	_callout_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_held_label = _label(Color("ffe07a"))
+	_clock_label = _label(CLOCK_COLOR)
 	_tip_label = _label(Color(0.7, 0.95, 1.0))
 	_tip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	Events.hero_spawned.connect(_on_hero_spawned)
@@ -130,6 +141,7 @@ func _process(delta: float) -> void:
 	_update_slot_labels(view)
 	_update_callout(view, delta)
 	_update_held_label(bar_x)
+	_update_clock_label(bar_x)
 	_update_tip(view, delta)
 	_update_cards(delta)
 	_update_center_message(view)
@@ -260,6 +272,29 @@ func _update_held_label(bar_x: float) -> void:
 		_held_label.text = "+%d" % GameState.pending_level_ups
 		_held_label.position = Vector2(bar_x + BAR_SIZE.x + 6, 1)
 		_held_label.modulate.a = 0.6 + 0.4 * sin(_time * 6.0)
+
+
+## The keep-moving clock, right of the team hearts (hidden in fights, where
+## it waits): "0:42", then "RESTLESS  XP 50%" once it has run out.
+func _update_clock_label(bar_x: float) -> void:
+	var director := world.director if world else null
+	_clock_label.visible = director != null and director.clock_running()
+	if not _clock_label.visible:
+		return
+	var hearts := maxi(GameState.team_lives, 1)
+	_clock_label.position = Vector2(bar_x + BAR_SIZE.x + (30 if _held_label.visible else 8) + hearts * 8 + 3, 1)
+	var settings := _clock_label.label_settings
+	if director.restless_stage <= 0:
+		var left := ceili(director.restless_in)
+		_clock_label.text = "%d:%02d" % [left / 60, left % 60]
+		var hurry := director.restless_in <= CLOCK_HURRY
+		settings.font_color = CLOCK_HURRY_COLOR if hurry else CLOCK_COLOR
+		_clock_label.modulate.a = 0.45 if hurry and int(director.restless_in * 4.0) % 2 == 1 else 1.0
+	else:
+		var share := director.drop_share()
+		_clock_label.text = "RESTLESS  XP %d%%" % roundi(share * 100.0) if share > 0.0 else "RESTLESS  no XP"
+		settings.font_color = RESTLESS_COLOR
+		_clock_label.modulate.a = 0.75 + 0.25 * sin(_time * 6.0)
 
 
 func _update_center_message(view: Vector2) -> void:
