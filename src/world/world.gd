@@ -3,7 +3,7 @@ extends Node2D
 ## Gameplay root. Owns the level, heroes and the data-oriented sims, and ticks
 ## everything in a fixed order each frame (no per-node _process ordering):
 ##   input (InputRouter autoload) → bots → heroes (+abilities) → leash
-##   → revives → flow field → spawner → horde → blasts/contact damage
+##   → revives → flow field → spawner → heroes' AoEs (dangers) → horde → blasts/contact damage
 ##   → projectiles → zones → kills/drops → ult charge → pickups → camera → render
 ## Also exposes the combat helpers abilities use (damage_enemies_in_*, heal,
 ## revive, zones, fx, shake). Timings go to PerfMonitor (F3).
@@ -388,6 +388,7 @@ func _process(delta: float) -> void:
 	director.tick(dt)
 	spawner.tick(dt, camera.visible_rect(), hero_positions)
 	horde.view_rect = camera.visible_rect()
+	_collect_dangers()
 	horde.update(dt, target_positions)
 	_play_horde_events()
 	_update_spikes(dt)
@@ -459,6 +460,7 @@ func _process(delta: float) -> void:
 	PerfMonitor.set_counter(&"projectiles", projectiles.count)
 	PerfMonitor.set_counter(&"gems", pickups.count)
 	PerfMonitor.set_counter(&"minions", minions.size())
+	PerfMonitor.set_counter(&"dangers", horde.danger_pos.size())
 
 
 # --- combat helpers for abilities -------------------------------------------------------------
@@ -626,6 +628,26 @@ func _snapshot_heroes() -> void:
 	for m in minions:
 		if m.lure and not m.is_expired():
 			target_positions.append(m.position)
+
+
+## The heroes' AoEs the horde steers clear of this frame (HordeSim.add_danger()):
+## blasts about to land (Meteor, mortar shells), auras round a hero (Whirlwind,
+## Blade Vortex) and lasting zones that do something to enemies (Arrow Rain,
+## caltrops, fire trails, toxic clouds; not Sanctuary's healing). Zones go
+## newest first, so past the cap it's the oldest that are left out. A downed
+## hero's abilities are on hold until they're back up, blasts included.
+func _collect_dangers() -> void:
+	horde.clear_dangers()
+	for hero in heroes:
+		if not hero.is_downed():
+			for ability in hero.abilities:
+				ability.add_dangers(horde)
+	for m in minions:
+		m.add_dangers(horde)
+	for k in range(zones.size() - 1, -1, -1):
+		var zone := zones[k]
+		if zone.harms_enemies():
+			horde.add_danger(zone.position, zone.radius, zone.elapsed)
 
 
 ## Downed heroes are revived by living teammates standing next to them.

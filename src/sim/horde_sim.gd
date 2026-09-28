@@ -4,6 +4,7 @@ extends RefCounted
 ## typed loop per frame and drawn through a single InstanceLayer.
 ##
 ## Per frame (called by World):
+##   clear_dangers() / add_danger()  the heroes' AoEs, which enemies steer clear of
 ##   update(dt, targets)  move along the flow field + separation + walls,
 ##                        remove the dead, rebuild the spatial hash
 ##   queries / damage()   abilities and projectiles (hash is valid until the
@@ -82,6 +83,22 @@ const ARC_BEND := 0.8
 const ARC_FAR := 112.0
 const ARC_RAMP := 32.0
 const ARC_FADE := 24.0
+## Heroes' AoEs (dangers, see add_danger()): enemies keep their footprint
+## DANGER_MARGIN px clear of one, start turning along its edge DANGER_BAND px
+## before it rather than walk in, and get out of one they're caught in,
+## keeping FLEE_ALONG of their way along its edge (so they leave on their own
+## side). Each takes a moment to notice a new one: REACT_MIN s, plus up to
+## REACT_SPREAD s more (a golden-ratio step by its uid, so some are quicker
+## than others).
+const DANGER_MARGIN := 3.0
+const DANGER_BAND := 16.0
+const FLEE_ALONG := 0.5
+const REACT_MIN := 0.2
+const REACT_SPREAD := 0.3
+const REACT_STEP := 0.618034
+## Dangers are flagged per tile (a bit each), so only the enemies near one
+## look at it. Past MAX_DANGERS at once, the rest are left out.
+const MAX_DANGERS := 32
 ## A shove of STAGGER_FULL px/s (after its kind's knockback_taken) breaks up
 ## to STAGGER_MAX of an enemy's stride; it gets going again at its agility.
 const STAGGER_FULL := 160.0
@@ -127,6 +144,8 @@ var count := 0
 var pos := PackedVector2Array()
 var vel := PackedVector2Array()        # knockback / impulses, decays
 var sep := PackedVector2Array()        # last separation push (updated every other frame)
+var dodge := PackedVector2Array()      # the turn it took for the heroes' AoEs (worked out every other frame)...
+var dodge_at := PackedInt32Array()     # ...and on which frame
 var walk := PackedVector2Array()       # its own walking velocity: eases toward where it wants to go (momentum)
 var clear := PackedByteArray()         # 1: it can walk straight to its target (checked every 16th frame)
 var pace := PackedFloat32Array()       # its own share of its kind's speed (PACE_SPREAD)
@@ -277,6 +296,11 @@ var death_fx_ult := PackedByteArray()
 var blast_pos := PackedVector2Array()
 var blast_radius := PackedFloat32Array()
 var blast_damage := PackedFloat32Array()
+## Heroes' AoEs the horde steers clear of (the World adds this frame's
+## before update()): circles, and how long each has been there.
+var danger_pos := PackedVector2Array()
+var danger_radius := PackedFloat32Array()
+var danger_age := PackedFloat32Array()
 ## Kill-log slot for enemies that died on their own (no XP drop).
 const SELF_KILL := -2
 
@@ -293,6 +317,9 @@ var _frame := 0
 var _sort_keys := PackedInt32Array()
 var _scratch := PackedInt32Array()
 var _blend := PackedFloat32Array()  # per type, this frame: how far `walk` eases toward its goal
+var _danger_cells := PackedInt64Array()  # per tile: a bit per danger that reaches it
+var _danger_stamped := false
+var _walker_radius := 0.0  # the biggest footprint among the kinds that walk
 
 
 func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> void:
@@ -302,6 +329,8 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	pos.resize(CAPACITY)
 	vel.resize(CAPACITY)
 	sep.resize(CAPACITY)
+	dodge.resize(CAPACITY)
+	dodge_at.resize(CAPACITY)
 	walk.resize(CAPACITY)
 	clear.resize(CAPACITY)
 	pace.resize(CAPACITY)
@@ -370,6 +399,7 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	t_elite.clear()
 	t_base.clear()
 	max_radius = 0.0
+	_walker_radius = 0.0
 	for data in types:
 		t_speed.append(data.speed)
 		t_agility.append(data.agility)
@@ -404,6 +434,8 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 		t_scale.append(data.draw_scale)
 		t_elite.append(data.elite_trait)
 		max_radius = maxf(max_radius, data.radius)
+		if not data.is_static():
+			_walker_radius = maxf(_walker_radius, data.radius)
 	for t in types.size():
 		var base := type_index(types[t].base_id) if types[t].base_id != &"" else t
 		t_base.append(base if base >= 0 else t)
@@ -412,6 +444,10 @@ func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> v
 	_blend.resize(types.size())
 	_refresh_hurt_reach()
 	hash.setup(grid.size_px(), HASH_CELL, CAPACITY)
+	_danger_cells.resize(grid.width * grid.height)
+	_danger_cells.fill(0)
+	_danger_stamped = false
+	clear_dangers()
 
 
 ## Enemies of type `t` (alive or not yet removed).
@@ -439,6 +475,7 @@ func spawn(type_id: int, p: Vector2, hp_multiplier: float = 1.0) -> int:
 	pos[i] = p
 	vel[i] = Vector2.ZERO
 	sep[i] = Vector2.ZERO
+	dodge[i] = Vector2.ZERO
 	walk[i] = Vector2.ZERO
 	clear[i] = 0
 	pace[i] = randf_range(1.0 - PACE_SPREAD, 1.0 + PACE_SPREAD)
@@ -750,6 +787,7 @@ func relocate(i: int, p: Vector2) -> void:
 	pos[i] = p
 	vel[i] = Vector2.ZERO
 	walk[i] = Vector2.ZERO
+	dodge[i] = Vector2.ZERO
 	clear[i] = 0
 
 
@@ -767,13 +805,87 @@ func clear_kill_log() -> void:
 	kill_ult.clear()
 
 
+# --- heroes' AoEs ------------------------------------------------------------------------------
+
+## Forgets the dangers (the World adds this frame's before update()).
+func clear_dangers() -> void:
+	danger_pos.clear()
+	danger_radius.clear()
+	danger_age.clear()
+
+
+## A hero's AoE the horde steers clear of until the next clear_dangers(): a
+## circle that hurts enemies (a lasting zone, a blast about to land, an aura
+## round a hero), there for `age` seconds so far. Enemies that have noticed
+## it get out of it, go round it, or wait at its edge while their hero stands
+## inside (see _move()). At most MAX_DANGERS at once.
+func add_danger(center: Vector2, radius: float, age: float) -> void:
+	if danger_pos.size() >= MAX_DANGERS:
+		return
+	danger_pos.append(center)
+	danger_radius.append(radius)
+	danger_age.append(age)
+
+
+## How long enemy `i` takes to notice a new danger (by its uid: some are
+## quicker). _move() works it out the same way.
+func reaction_time(i: int) -> float:
+	return REACT_MIN + REACT_SPREAD * fposmod(float(uid[i]) * REACT_STEP, 1.0)
+
+
+## Whether a footprint of radius `r` at `p` would be in (or touch) a danger.
+func in_danger(p: Vector2, r: float = 0.0) -> bool:
+	for k in danger_pos.size():
+		var reach := danger_radius[k] + r
+		if p.distance_squared_to(danger_pos[k]) < reach * reach:
+			return true
+	return false
+
+
 func update(dt: float, targets: PackedVector2Array) -> void:
 	_frame += 1
 	var n := count
 	if n > 0:
+		_stamp_dangers()
 		_move(dt, targets, n)
 	_compact()
 	hash.rebuild(pos, count)
+
+
+## Flags the tiles each danger reaches (its band and the biggest walker's
+## footprint included), row by row across its circle, for _move() to look up.
+func _stamp_dangers() -> void:
+	var nd := danger_pos.size()
+	if nd == 0 and not _danger_stamped:
+		return
+	var cells := _danger_cells
+	_danger_cells = PackedInt64Array()  # the only reference now, so writing to it doesn't copy it
+	if _danger_stamped:
+		cells.fill(0)
+		_danger_stamped = false
+	if nd > 0:
+		var cols := grid.width
+		var rows := grid.height
+		var extra := _walker_radius + DANGER_MARGIN + DANGER_BAND
+		for k in nd:
+			var c := danger_pos[k]
+			var reach := danger_radius[k] + extra
+			var bit := 1 << k
+			var y0 := clampi(int((c.y - reach) * INV_TILE), 0, rows - 1)
+			var y1 := clampi(int((c.y + reach) * INV_TILE), 0, rows - 1)
+			for cy in range(y0, y1 + 1):
+				var top := cy * TILE
+				var dy := maxf(0.0, maxf(top - c.y, c.y - top - TILE))
+				if dy >= reach:
+					continue
+				var half := sqrt(reach * reach - dy * dy)  # the circle's span across this row
+				var x0 := clampi(int((c.x - half) * INV_TILE), 0, cols - 1)
+				var x1 := clampi(int((c.x + half) * INV_TILE), 0, cols - 1)
+				var row := cy * cols
+				for cx in range(x0, x1 + 1):
+					cells[row + cx] |= bit
+		_danger_stamped = true
+	_danger_cells = cells
 
 
 func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
@@ -851,6 +963,20 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	var clear_range2 := CLEAR_CHECK_RANGE * CLEAR_CHECK_RANGE
 	var face_near2 := FACE_NEAR * FACE_NEAR
 	var face_turn2 := FACE_TURN * FACE_TURN
+	var ndangers := danger_pos.size()
+	var dcells := _danger_cells
+	var dpos := danger_pos
+	var drad := danger_radius
+	var dage := danger_age
+	var dknown := 0  # dangers some enemies have noticed by now (a bit each)...
+	var dfresh := 0  # ...of which some haven't yet
+	for k in ndangers:
+		if dage[k] >= REACT_MIN:
+			dknown |= 1 << k
+			if dage[k] < REACT_MIN + REACT_SPREAD:
+				dfresh |= 1 << k
+	var DG := dodge
+	var DGA := dodge_at
 
 	for i in n:
 		if HP[i] <= 0.0:
@@ -963,11 +1089,14 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 			var ci := int(p.y * INV_TILE) * gw + int(p.x * INV_TILE)
 			var direct := true
 			var flow_way := Vector2.ZERO
+			var dmask := 0  # the heroes' AoEs that reach its tile (a bit each)
 			if ci >= 0 and ci < ncells:
 				var fd := fdir[ci]
 				if fd != 0 and fdist[ci] > DIRECT_CHASE_TILES:
 					flow_way = dirs[fd]
 					direct = false
+				if dknown != 0:
+					dmask = dcells[ci] & dknown
 			# Nearest hero (cheap: at most 4). Chasers only need it up close,
 			# while they can walk straight to it, and to check whether they can
 			# (not needed up close, where they go straight anyway).
@@ -1108,7 +1237,7 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 				elif left <= 0.0:
 					left = RETRY_TIME
 					if dist > BLINK_MIN and dist < range_t[t]:
-						var spot := _blink_spot(tp, p)
+						var spot := _blink_spot(tp, p, r)
 						if spot.is_finite():
 							STATE[i] = 1
 							planted = true
@@ -1135,6 +1264,73 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 				# Only its heading sways: strafing or arriving, it keeps its pace.
 				desired = (desired + desired.orthogonal() * (wv * sin(AN[i] * WEAVE_RATE))).normalized() \
 					* desired.length()
+			if dmask != 0 and not planted and not charging:
+				# The heroes' AoEs that reach its tile. Of the ones it has noticed
+				# by now (reaction_time()):
+				# - caught in one, it gets out the nearest way, at full speed,
+				#   keeping FLEE_ALONG of its way along the edge (so it leaves on
+				#   its own side);
+				# - walking into one, it stops going in as it nears the edge and
+				#   turns that part of its way along the edge instead, so it goes
+				#   round - unless its hero stands inside: then it waits at the edge.
+				# Round which side: the way it's already going along the edge, else
+				# the side its hero is on (not its way's: the flow field's steps turn
+				# from tile to tile, and it would dither), else its own (`bend`).
+				# Like the separation push, half of them look again each frame; in
+				# between, each takes the turn it worked out the frame before.
+				if (i & 1) != parity:
+					if DGA[i] == frame - 1:
+						desired += DG[i]
+				else:
+					var react := 0.0
+					if (dmask & dfresh) != 0:
+						react = REACT_MIN + REACT_SPREAD * fposmod(float(UID[i]) * REACT_STEP, 1.0)
+					var way := desired
+					var flee := Vector2.ZERO
+					var turned := false
+					var dk := 0
+					while dmask != 0:
+						if (dmask & 1) != 0 and dage[dk] >= react:
+							var zone_at := dpos[dk]
+							var zone_r := drad[dk]
+							var edge := zone_r + r + DANGER_MARGIN
+							var reach := edge + DANGER_BAND
+							var away := p - zone_at
+							var dd2 := away.length_squared()
+							if dd2 < reach * reach:
+								var dd := sqrt(dd2)
+								var outward := away / dd if dd > 0.5 else Vector2.from_angle(float(UID[i]) * 2.4)
+								if dd < edge:
+									flee += outward * (2.0 - dd / edge)  # the deeper in, the more it counts
+								else:
+									var inward := desired.dot(outward)
+									if inward < 0.0:
+										var s := (reach - dd) / DANGER_BAND  # 0 where the band starts, 1 at the edge
+										desired -= outward * (inward * s)
+										if best == INF and not turned:  # (chasers following the flow field don't know yet)
+											for k in ntargets:
+												var q2 := p.distance_squared_to(targets[k])
+												if q2 < best:
+													best = q2
+													tp = targets[k]
+										turned = true
+										if best == INF or tp.distance_squared_to(zone_at) >= zone_r * zone_r:
+											var along := outward.orthogonal()
+											var side := W.dot(along)
+											if side * side < maxf(W.length_squared() * 0.09, 4.0):
+												side = along.dot(tp - zone_at) if best < INF else desired.dot(along)
+												if absf(side) < 0.001:  # head on
+													side = BND[i] if BND[i] != 0.0 else float((UID[i] & 1) * 2 - 1)
+											desired += along * (-inward * s * signf(side))
+						dmask >>= 1
+						dk += 1
+					if flee != Vector2.ZERO:
+						var flee_dir := flee.normalized()
+						desired = (flee_dir + (desired - flee_dir * desired.dot(flee_dir)) * FLEE_ALONG).normalized()
+					elif turned:
+						desired = desired.limit_length(way.length())
+					DG[i] = desired - way
+					DGA[i] = frame
 			if not charging and desired != Vector2.ZERO:
 				# Pressed against where it's going (someone's in the way): it waits its turn.
 				var along := S[i].dot(desired)
@@ -1272,6 +1468,8 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 	pos = P
 	vel = V
 	sep = S
+	dodge = DG
+	dodge_at = DGA
 	walk = WK
 	clear = CLR
 	stride = ST
@@ -1322,16 +1520,17 @@ func _shoot(t: int, p: Vector2, tp: Vector2, dist: float, aimed: Vector2) -> voi
 				shots_fired += 1
 
 
-## Where a blinker coming from `from` lands next to the hero at `hero`: open
-## floor about BLINK_NEAR away, on its own side if it can, that the hero can
-## see (so never behind a wall). INF when there's no room.
-func _blink_spot(hero: Vector2, from: Vector2) -> Vector2:
+## Where a blinker (footprint radius `r`) coming from `from` lands next to the
+## hero at `hero`: open floor about BLINK_NEAR away, on its own side if it
+## can, that the hero can see (so never behind a wall), and out of the heroes'
+## AoEs. INF when there's no room.
+func _blink_spot(hero: Vector2, from: Vector2, r: float) -> Vector2:
 	var toward := (from - hero).angle()
 	for k in 5:
 		var angle := toward + randf_range(-0.8, 0.8) * (1.0 + k * 0.6)
 		var q := hero + Vector2.from_angle(angle) * randf_range(BLINK_NEAR * 0.8, BLINK_NEAR * 1.2)
 		var c := grid.cell_of(q)
-		if not grid.is_solid(c.x, c.y) and grid.line_of_sight(hero, q):
+		if not grid.is_solid(c.x, c.y) and grid.line_of_sight(hero, q) and not in_danger(q, r + DANGER_MARGIN):
 			return q
 	return Vector2.INF
 
@@ -1359,6 +1558,8 @@ func _remove_at(i: int) -> void:
 		pos[i] = pos[last]
 		vel[i] = vel[last]
 		sep[i] = sep[last]
+		dodge[i] = dodge[last]
+		dodge_at[i] = dodge_at[last]
 		walk[i] = walk[last]
 		clear[i] = clear[last]
 		pace[i] = pace[last]

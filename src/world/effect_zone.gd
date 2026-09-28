@@ -30,6 +30,12 @@ func is_finished() -> bool:
 	return elapsed >= duration
 
 
+## Whether it does anything to enemies (not just heal heroes): the horde
+## steers clear of those.
+func harms_enemies() -> bool:
+	return damage > 0.0 or poison_dps > 0.0 or stun_time > 0.0 or slow_time > 0.0
+
+
 ## Returns true on frames where the zone applies its effect.
 func advance(delta: float) -> bool:
 	elapsed += delta

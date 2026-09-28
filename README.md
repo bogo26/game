@@ -85,6 +85,8 @@ The macOS build runs on your own Mac; other people have to right-click → Open 
    | Final boss | The Mycelium Deep | the **Spore Mother**, a towering fungus: shielded by spore pods until you burst them; roots, spore rain, spore spirals and fairy rings | **Puffballs**: burst into spore clouds |
    | Final boss | The Frozen Court | the **Frost Queen**: ice lances, frost novas to dash through, icicle hail, a sweeping beam and blizzards; her frost slows you | **Frost wraiths**: flying ghosts that shoot ice |
 
+   The horde is wary of your AoEs. After a moment to notice one, enemies get out from under a Meteor's mark or a mortar shell, go round Arrow Rain, caltrops, fire trails and toxic clouds, and wait outside a Whirlwind or Blade Vortex, so drop them where the pack is thickest or where it's headed.
+
 Things to use in the levels:
 - **Barrels** explode and chain; they hurt enemies, never heroes.
 - **Urns** drop XP.

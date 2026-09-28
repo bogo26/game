@@ -29,6 +29,11 @@ const CARD_SIZE := Vector2(112, 42)
 const CARD_ACTIONS: Array[PlayerInput.Action] = [PlayerInput.Action.ATTACK, PlayerInput.Action.SPECIAL,
 	PlayerInput.Action.MOVEMENT, PlayerInput.Action.ULTIMATE]
 const TIP_TIME := 6.0
+## The objective arrow: its tip reaches this far ahead of its middle (pulsing
+## a quarter either way), its base sits this far behind, this wide either side.
+const ARROW_TIP := 9.0
+const ARROW_BACK := 5.0
+const ARROW_HALF_WIDTH := 6.0
 
 var world: World
 var minimap: Minimap
@@ -423,8 +428,9 @@ func _draw_objective_arrow(view: Vector2) -> void:
 	var dir := rel.normalized()
 	var side := dir.orthogonal()
 	var pulse := 1.0 + 0.25 * sin(_time * 6.0)
-	var tip := pos + dir * 6.0 * pulse
-	var pts := PackedVector2Array([tip, pos - dir * 3.0 + side * 4.0, pos - dir * 3.0 - side * 4.0])
+	var tip := pos + dir * ARROW_TIP * pulse
+	var base := pos - dir * ARROW_BACK
+	var pts := PackedVector2Array([tip, base + side * ARROW_HALF_WIDTH, base - side * ARROW_HALF_WIDTH])
 	_canvas.draw_colored_polygon(pts, Color("ffe07a"))
 	_canvas.draw_polyline(PackedVector2Array([pts[0], pts[1], pts[2], pts[0]]), Color(0, 0, 0, 0.8), 1.0)
 

@@ -62,6 +62,13 @@ func is_active() -> bool:
 	return not _knives.is_empty()
 
 
+## The knives whirling round the Rogue: enemies keep out of their reach.
+func add_dangers(horde: HordeSim) -> void:
+	if not _knives.is_empty():
+		horde.add_danger(hero.position, _knives[0].orbit_radius + _knives[0].radius,
+			whirl_time + mod(&"duration") - _left)
+
+
 func cancel() -> void:
 	for m in _knives:
 		m.free_sprite()

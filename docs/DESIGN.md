@@ -492,6 +492,18 @@ Every walking enemy moves in `HordeSim._move()`:
   - Closing in, an enemy eases off over 12 px and stops at 60% of touching distance. It still hurts, but it doesn't pile onto the hero.
   - Inside that distance, the hero counts as a body in the separation push, so the crowd behind can't squeeze anyone onto the hero's feet.
   - Pressed from the front (separation pushing against its way), an enemy slows down, to as little as 15% of its speed, and waits its turn instead of shoving.
+- **Steering clear of the heroes' AoEs:** every frame the World hands the horde the circles that are hurting enemies or about to (`World._collect_dangers()` → `HordeSim.add_danger()`):
+  - lasting zones that do something to enemies: Arrow Rain, caltrops, fire trails, toxic clouds (not Sanctuary, which only heals)
+  - blasts on their way down: a Meteor's mark, mortar shells
+  - auras round a hero: Whirlwind, Blade Vortex
+
+  Abilities report theirs through `Ability.add_dangers()` and mortars through `Minion.add_dangers()`; a downed hero's wait with them. Then:
+  - Each enemy takes a moment to notice a new one: 0.2 s, plus up to 0.3 s more by its uid. So a Meteor still catches the middle of a pack, but its rim gets out in time.
+  - Caught in one, an enemy gets out the nearest way, at full speed.
+  - Walking into one, it stops going in over the last 16 px before the edge (its footprint stays 3 px clear) and turns that part of its way along the edge, so it goes round. It keeps to the side it's already going round, else takes the side its hero is on, else its own `bend`. (The flow field's steps turn from tile to tile: going by them, it would dither.)
+  - When its hero stands inside (a spinning Knight), it waits at the edge instead.
+  - Busy enemies don't break off: a wind-up, a lit fuse, lining up or making a charge, a blink or a stun. Imps never blink into one.
+  - Cost: dangers are flagged per tile (a bit each, at most 32 at once), so only the enemies near one look at it, and ones nobody can have noticed yet are skipped. Like the separation push, half of those enemies work out their turn each frame; the others take the one they worked out the frame before (`HordeSim.dodge`). The F3 overlay and the stress test count the dangers.
 - **Facing:** an enemy faces the first of these that applies:
   - its aim, while lining up a charge or drawing an aimed shot
   - its target, when within 2 tiles, in range (ranged enemies) or standing still
@@ -504,7 +516,7 @@ Every walking enemy moves in `HordeSim._move()`:
   - Flyers flap on the clock.
 
 ### Enemy behaviours
-- **Chaser:** goes for the nearest hero, straight when the way is clear or within 2 tiles, else along the flow field (see Enemy movement).
+- **Chaser:** goes for the nearest hero, straight when the way is clear or within 2 tiles, else along the flow field, and round the heroes' AoEs (see Enemy movement).
 - **Ranged (spitter):** inside its range, it circles its target at about 80% of that range at half speed, changing sides every 2.4 s, and backs off when heroes get closer than 55% of it. When its cooldown is up and it has line of sight, it stops dead and glows hot pink for 0.4 s (its shot pose), then fires at the nearest hero. It only starts a shot while it's inside the camera view, so nothing fires from off screen.
 - **Exploder:** lights its fuse when close, then blasts heroes in its radius that it has line of sight to (walls stop it, like the boss slam). Killing it during the fuse cancels the blast, and self-destructs drop no XP.
 - **Knockback:** damage pushes enemies away from the hit source, scaled per type (brutes resist). A shove also breaks an enemy's stride: its walking speed drops by the shove over 160 px/s (after its resistance), by 85% at most, then it gets going again at its agility. Stun freezes, slow halves speed, and marks make enemies take ×1.75 damage.
@@ -514,7 +526,7 @@ Every walking enemy moves in `HordeSim._move()`:
   - **Aimed shots (bone archers):** `EnemyData.Shot.AIMED` locks the aim when the wind-up starts (`HordeSim.aim`); the World draws it as a live line (`FxLayer.set_live_bands`) that ends at the first wall (`LevelGrid.shot_reach`) and vanishes if the archer dies or is stunned out of it.
   - **Lobs (salamanders):** `Shot.LOB` logs the throw; the World flies the glob (`FxLayer.lob`), marks the landing, bursts it there (walls stop the burst) and leaves slag.
   - **Chargers (frost boars, `Behavior.CHARGER`):** roam, line up (pink glow, a live band as wide as its reach), charge (`charge_speed` × `charge_time`, contact damage ×2), then catch their breath (0.6 s), or stay dazed (1.3 s) after a wall. The charge counts as a push, so it can carry the boar over a chasm's edge.
-  - **Blinkers (imps, `Behavior.BLINKER`):** pick a spot about 30 px from a hero, on their own side if they can, that the hero can see; a portal opens there while they fade out.
+  - **Blinkers (imps, `Behavior.BLINKER`):** pick a spot about 30 px from a hero, on their own side if they can, that the hero can see and that's out of the heroes' AoEs; a portal opens there while they fade out.
   - **Bone piles (`Behavior.PILE`):** a revenant (`OnDeath.BONES`) leaves one that remembers what it was (`state`) and gets back up when its timer runs out. Piles count as enemies (arenas wait for them) but don't walk, block tiles or leave corpses.
   - **Enemy hazards** (`World.add_hazard()`: spore clouds from `OnDeath.SPORES` (`cloud_damage` a hit), slag): heroes inside take a hit whenever their hit invulnerability runs out. `World.lob()` flies any bomb (salamanders' slag, the mushroom bosses' spores) and leaves the right remains.
   - **Hoppers (sporelings):** `hop` hops a second; each spends 55% of its time in the air at 1.8x speed and sits still for the rest, drawn sitting, landing, taking off and up high (`HordeSim.hop_frame()`).
@@ -581,6 +593,10 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - On its own, the horde step (300 mixed enemies round four heroes, 120 fps) went from 0.77 to 1.01 ms. The clear-path rays and the nearest-hero search they need cost 0.08 ms of that, arc-in and arrival 0.04 ms, and facing 0.035 ms.
   - The shared DDA got about 40% faster, which speeds up every `line_of_sight()` check too.
   - Re-measure windowed with `--fullscreen --max-fps=120 --seconds=60`.
+- **AoE avoidance check** (2026-09-28): headless in a Linux container, so only simulation time counts. Four 20 s stress runs alternated with the build before, in each mode:
+  - The horde went from 1.40 to 1.49 ms (plain, 2 dangers on average) and from 1.33 to 1.40 ms (`--ult-spam`, 1.5 on average); the whole simulation stayed within run-to-run noise.
+  - Worst case, on its own: 300 enemies round four heroes with three overlapping AoEs on the crowd (205 enemies near one). The horde step goes from 1.51 to 1.88 ms. Of that, the steering is ~0.18 ms (about 110 enemies work out a turn each frame, ~1.65 µs each) and flagging the tiles ~0.025 ms; the rest is the crowd itself, kept at a distance and packed along the edges. AoEs that no enemy is near cost ~0.03 ms.
+  - Re-measure on the Air.
 
 ## Art, effects and audio
 

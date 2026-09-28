@@ -287,6 +287,13 @@ func _tick_mortar(dt: float) -> void:
 	Audio.play(&"lob", -4.0, 0.8)
 
 
+## Mortar shells on their way down: enemies try to get out from under them
+## (see HordeSim.add_danger()).
+func add_dangers(horde: HordeSim) -> void:
+	for shell in _shells:
+		horde.add_danger(shell[0], MORTAR_BLAST * area, MORTAR_FLIGHT - float(shell[1]))
+
+
 ## Where the most enemies stand together between MORTAR_MIN_RANGE and the
 ## mortar's range (a few candidates are compared), or INF.
 func densest_pack() -> Vector2:
