@@ -428,7 +428,7 @@ src/
   main/       Game (run controller: levels or Endless Waves, banners, victory/defeat)
 assets/fonts  Pixel5x8 proportional bitmap font (BMFont, generated), default theme font
 tests/        headless test runner + test_*.gd
-tools/        dev.sh helper, stress test scene
+tools/        dev.sh helper (dev.cmd on Windows), stress test scene
 docs/         this document
 ```
 

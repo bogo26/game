@@ -19,22 +19,25 @@ Design, controls, heroes and architecture: [docs/DESIGN.md](docs/DESIGN.md).
 python3 tools/gen_levels.py                                     # rebuild the run's layouts
 ```
 
-- `tools/dev.sh` looks for Godot in `/Applications`, `~/Applications` and `~/Downloads`. Set `GODOT=/path/to/Godot` to override.
-- Godot keeps the list of script classes and the imported art in `.godot/`, which isn't in git, and only the editor (or `--import`) refreshes it. After a pull that adds scripts or art, `./tools/dev.sh run` and `stress` re-import once before starting. If you launch the game another way and get `Could not find type ...` errors or a black screen, run `./tools/dev.sh import` (or open the project in the editor) once.
-- On Windows, run the same commands from Git Bash, or call Godot directly:
+On Windows, `tools\dev.cmd` takes the same commands (from PowerShell or cmd), and with none it starts the game, so double-clicking it works too:
 
-```bash
-godot --headless --path . --import
-godot --headless --path . -s res://tests/run_tests.gd
+```powershell
+.\tools\dev.cmd              # play
+.\tools\dev.cmd editor       # open in the Godot editor
+.\tools\dev.cmd test         # headless test suite
+.\tools\dev.cmd export win   # build the Windows release (see below)
 ```
 
+- `tools/dev.sh` looks for Godot in `/Applications`, `~/Applications` and `~/Downloads`. Set `GODOT=/path/to/Godot` to override.
+- `tools\dev.cmd` looks on the `PATH`, then for an unzipped `Godot_v4*_win64.exe` in Program Files, `%LOCALAPPDATA%\Programs` and Downloads, or in a folder inside them (where **Extract All** puts it). Set `GODOT` to the .exe to override: `$env:GODOT = "C:\Godot\Godot_v4.7.2-stable_win64.exe"`.
+- Godot keeps the list of script classes and the imported art in `.godot/`, which isn't in git, and only the editor (or `--import`) refreshes it. After a pull that adds scripts or art, `run` and `stress` re-import once before starting. If you launch the game another way and get `Could not find type ...` errors or a black screen, run `./tools/dev.sh import` (or `.\tools\dev.cmd import`, or open the project in the editor) once.
 - Press **F3** in game for the performance overlay (FPS, frame times, per-system costs).
 - **Options** (main menu or pause menu): volumes, fullscreen, screen shake, damage numbers, reduce flashing, rumble, colour-blind friendly player colours, gamepad aim assist and tips.
 
 ## Building releases
 
-1. Install the export templates once: open the editor (`./tools/dev.sh editor`), go to **Editor → Manage Export Templates → Download and Install**, and pick 4.7.2 stable.
-2. Run `./tools/dev.sh export`. It writes:
+1. Install the export templates once: open the editor (`./tools/dev.sh editor` or `.\tools\dev.cmd editor`), go to **Editor → Manage Export Templates → Download and Install**, and pick 4.7.2 stable.
+2. Run `./tools/dev.sh export` (on Windows `.\tools\dev.cmd export`, or `export win` for just the Windows build). It writes:
    - `build/macos/HordeCrawler.zip`: a universal .app, ad-hoc signed.
    - `build/windows/HordeCrawler.exe`: x86_64, single file with the game data embedded.
 
@@ -54,7 +57,7 @@ The macOS build runs on your own Mac; other people have to right-click → Open 
 
 ## Playing
 
-1. `./tools/dev.sh run`, then pick **Start Run**.
+1. `./tools/dev.sh run` (on Windows `.\tools\dev.cmd`), then pick **Start Run**.
 2. Every player presses **A** (gamepad) or **Enter** (keyboard) to join. Browse heroes with left/right and press A/Enter to ready up.
 3. Fight down through the dungeon: **1 → 2 → 3 → mini boss → 4 → 5 → 6 → final boss**. In each level, clear the lockdown arena rooms, then reach the exit portal. Hold **Tab** / **Back** for the map.
 
