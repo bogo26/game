@@ -13,7 +13,6 @@ config_version=5
 config/name="Horde Crawler"
 config/description="4-player local co-op top-down horde crawler."
 run/main_scene="res://src/ui/main_menu.tscn"
-run/max_fps=0
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://assets/icon.png"
 
@@ -29,7 +28,6 @@ Settings="*res://src/autoload/settings.gd"
 [debug]
 
 gdscript/warnings/untyped_declaration=1
-gdscript/warnings/inferred_declaration=0
 
 [display]
 
@@ -40,24 +38,18 @@ window/size/window_height_override=1080
 window/stretch/mode="viewport"
 window/stretch/aspect="expand"
 window/stretch/scale_mode="integer"
-window/dpi/allow_hidpi=true
-window/vsync/vsync_mode=1
 
 [gui]
 
-theme/custom="res://assets/ui/theme.tres"
 theme/default_font_antialiasing=0
-
-[input_devices]
-
-pointing/emulate_touch_from_mouse=false
+theme/custom="res://assets/ui/theme.tres"
 
 [rendering]
 
+textures/canvas_textures/default_texture_filter=0
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-textures/canvas_textures/default_texture_filter=0
 textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.05, 0.047, 0.07, 1)
 2d/snap/snap_2d_transforms_to_pixel=true
 2d/snap/snap_2d_vertices_to_pixel=true
-environment/defaults/default_clear_color=Color(0.05, 0.047, 0.07, 1)
