@@ -7,7 +7,9 @@ extends RefCounted
 ## level's boss room starts a fight with its boss instead: beating a mini boss
 ## clears the room and opens the exit behind it; beating the final boss wins
 ## the run. Wakes up nests (spawners) when heroes come near. Also keeps the
-## objective text/target the HUD shows.
+## objective text/target the HUD shows, and the clock that keeps the team
+## moving: dawdle between objectives and the horde grows restless (see
+## RESTLESS_AFTER).
 
 signal level_completed
 ## The final boss died: the run is won.
@@ -19,6 +21,9 @@ signal objective_changed(text: String)
 signal wave_started(wave: int, waves: int)
 ## An arena room was cleared (the World vacuums up the XP).
 signal arena_cleared(room_id: int)
+## The horde grew restless (stage 1 when the clock runs out, then one more
+## every RESTLESS_EVERY seconds) or calmed down again (0).
+signal restless_changed(stage: int)
 
 enum RoomState { IDLE, ACTIVE, CLEARED }
 
@@ -42,6 +47,27 @@ const WAVE_SHARES_3: Array[float] = [0.3, 0.33, 0.37]
 const WAVE_NEXT_SHARE := 0.25
 const WAVE_MAX_TIME := 12.0
 const WAVE_BREATHER := 2.0
+## Keep moving: out of fights the team has this long to reach its next
+## objective (an arena or the boss room cleared, then the exit), and each one
+## reached starts the clock over. Levels without a corridor horde (nothing to
+## farm) have no clock.
+const RESTLESS_AFTER := 60.0
+## When the clock runs out the horde grows restless: a stage straight away and
+## another every RESTLESS_EVERY seconds, until the next objective. Each stage
+## enemies drop RESTLESS_DROPS less of their XP and hearts (none from the
+## 4th), and the corridor horde spawns RESTLESS_RATE faster, fills
+## RESTLESS_CAP more of the alive cap, and comes with RESTLESS_HP more HP,
+## RESTLESS_DAMAGE more damage, RESTLESS_SPEED more speed (at most
+## RESTLESS_MAX_SPEED) and one more Elites.CHANCE of an elite. Fights hold
+## the horde at the level's own settings (and full drops).
+const RESTLESS_EVERY := 15.0
+const RESTLESS_DROPS := 0.25
+const RESTLESS_RATE := 0.25
+const RESTLESS_CAP := 0.1
+const RESTLESS_HP := 0.2
+const RESTLESS_DAMAGE := 0.1
+const RESTLESS_SPEED := 0.05
+const RESTLESS_MAX_SPEED := 1.3
 
 
 class Nest:
@@ -84,10 +110,25 @@ var nests: Array[Nest] = []
 var objective := ""
 ## Where the objective is (for the HUD's off-screen arrow); INF when none.
 var objective_target := Vector2.INF
+## The keep-moving clock (see RESTLESS_AFTER): whether this level has one,
+## what it starts at (--restless-after shortens it), the seconds left on it,
+## and how restless the horde is (0: calm).
+var has_clock := false
+var clock_length := RESTLESS_AFTER
+var restless_in := RESTLESS_AFTER
+var restless_stage := 0
 
 var _exit_timer := 0.0
 var _check_timer := 0.0
 var _in_room_alive := 0
+## Seconds since the clock ran out.
+var _restless_time := 0.0
+## The level's own horde settings: a calm horde's (see _apply_horde).
+var _calm_rate := 0.0
+var _calm_cap := 0.0
+var _calm_hp := 1.0
+var _calm_elites := 0.0
+var _calm_damage := 1.0
 
 
 func setup(p_world: World) -> void:
@@ -125,6 +166,16 @@ func setup(p_world: World) -> void:
 	spawner.spawn_rate = _rate(data.corridor_spawn_rate)
 	spawner.mode = SpawnDirector.Mode.CORRIDOR if data.corridor_spawn_rate > 0.0 else SpawnDirector.Mode.OFF
 	boss_hp_multiplier = spawner.unique_hp_multiplier() * data.boss_hp_multiplier
+	_calm_rate = spawner.spawn_rate
+	_calm_cap = spawner.corridor_cap_fraction
+	_calm_hp = spawner.level_hp_multiplier
+	_calm_elites = spawner.elite_chance
+	_calm_damage = world.horde.damage_mult
+	has_clock = world.run_mode and data.corridor_spawn_rate > 0.0
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--restless-after="):  # debug: see the horde grow restless sooner
+			clock_length = maxf(1.0, arg.get_slice("=", 1).to_float())
+	restless_in = clock_length
 	_update_objective()
 
 
@@ -162,6 +213,7 @@ func tick(dt: float) -> void:
 		_check_room_entry()
 	if exit_open:
 		_check_exit(dt)
+	_tick_clock(dt)
 
 
 ## Pick rounds wait while an arena fight is on (chests' treasure rounds
@@ -239,6 +291,8 @@ func _activate(room: Room, leader: Hero) -> void:
 	for door in room.doors:
 		world.fx.disc(LevelGrid.cell_center(door), 10.0, Color(0.9, 0.7, 0.4, 0.6), 0.3)
 	world.shake(3.0)
+	if restless_stage != 0:
+		_apply_horde(0)  # the clock waits during the fight, with the level's own horde (and the boss's adds)
 	if data.is_boss_level and not level.boss_spawns.is_empty():
 		_spawn_boss(level.boss_spawns[0])
 		world.spawner.mode = SpawnDirector.Mode.OFF
@@ -309,6 +363,7 @@ func _clear(room: Room) -> void:
 	Audio.play(&"clear")
 	world.spawner.mode = SpawnDirector.Mode.CORRIDOR if data.corridor_spawn_rate > 0.0 else SpawnDirector.Mode.OFF
 	world.spawner.spawn_rate = _rate(data.corridor_spawn_rate)
+	_reset_clock()  # an objective reached
 	world.pickups.spawn(room.center, PickupSim.Kind.HEART, 1)
 	world.fx.ring(room.center, 60.0, Color(1, 0.95, 0.6), 0.6)
 	if arenas_cleared() == rooms.size() and not data.is_final_boss:
@@ -382,6 +437,61 @@ func _hero_within(p: Vector2, distance: float) -> bool:
 		if not hero.is_downed() and hero.position.distance_squared_to(p) <= distance * distance:
 			return true
 	return false
+
+
+# --- keep moving ------------------------------------------------------------------------------
+
+## Whether the keep-moving clock is running: out of fights, until the level ends.
+func clock_running() -> bool:
+	return has_clock and not completed and active_room == null
+
+
+## How much of their XP and hearts enemies drop now: less and less while the
+## horde is restless (never in a fight).
+func drop_share() -> float:
+	if active_room != null or restless_stage <= 0:
+		return 1.0
+	return maxf(0.0, 1.0 - RESTLESS_DROPS * restless_stage)
+
+
+func _tick_clock(dt: float) -> void:
+	if not clock_running():
+		return
+	var left := restless_in - dt
+	restless_in = maxf(0.0, left)
+	if left > 0.0:
+		return
+	_restless_time += minf(dt, -left)  # the part of this frame past the clock
+	var stage := 1 + int(_restless_time / RESTLESS_EVERY)
+	if stage != restless_stage:
+		_set_restless(stage)
+
+
+## An objective was reached: the clock starts over and the horde calms down.
+func _reset_clock() -> void:
+	restless_in = clock_length
+	_restless_time = 0.0
+	if restless_stage != 0:
+		_set_restless(0)
+
+
+func _set_restless(stage: int) -> void:
+	restless_stage = stage
+	_apply_horde(stage)
+	restless_changed.emit(stage)
+
+
+## Sets the horde up as restless as `stage` (0: the level's own settings).
+## New spawns get the HP; damage and speed apply to every enemy at once.
+func _apply_horde(stage: int) -> void:
+	var s := float(stage)
+	var spawner := world.spawner
+	spawner.spawn_rate = _calm_rate * (1.0 + RESTLESS_RATE * s)
+	spawner.corridor_cap_fraction = minf(1.0, _calm_cap + RESTLESS_CAP * s)
+	spawner.level_hp_multiplier = _calm_hp * (1.0 + RESTLESS_HP * s)
+	spawner.elite_chance = _calm_elites + Elites.CHANCE * GameState.difficulty_value("elites") * s
+	world.horde.damage_mult = _calm_damage * (1.0 + RESTLESS_DAMAGE * s)
+	world.horde.speed_mult = minf(RESTLESS_MAX_SPEED, 1.0 + RESTLESS_SPEED * s)
 
 
 # --- boss ------------------------------------------------------------------------------------

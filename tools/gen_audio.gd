@@ -72,6 +72,8 @@ const SFX := {
 	"help": {"wave": "square", "f0": 880.0, "f1": 880.0, "dur": 0.34, "decay": 0.9, "vol": 0.16, "duty": 0.25, "arp": [0, -5], "arp_step": 0.17},
 	"wave": {"wave": "saw", "f0": 196.0, "f1": 196.0, "dur": 0.7, "decay": 0.8, "vol": 0.3, "attack": 0.03, "arp": [0, 5, 7], "arp_step": 0.12, "lp": 0.3},
 	"boss_death": {"wave": "saw", "f0": 150.0, "f1": 30.0, "dur": 1.6, "decay": 1.0, "vol": 0.5, "noise": 0.5, "vib": [0.12, 6.0], "lp": 0.25},
+	# The team dawdled: the horde grows restless (a low growl swelling, falling a minor third).
+	"restless": {"wave": "saw", "f0": 98.0, "f1": 82.0, "dur": 1.2, "attack": 0.3, "decay": 0.8, "vol": 0.45, "noise": 0.35, "arp": [0, -3], "arp_step": 0.5, "vib": [0.12, 5.0], "lp": 0.22},
 	# Each level's own enemy: an archer's bow, a revenant falling apart and its
 	# bones getting back up, a sporecap bursting, a boar's snort and its crash
 	# into a wall, a salamander's lobbed slag and its landing, an imp's blink.

@@ -15,6 +15,7 @@ const PRIORITY := {
 	&"down": true, &"revive": true, &"ult": true, &"level_up": true, &"roar": true, &"clear": true,
 	&"door": true, &"portal": true, &"heartbeat": true, &"ult_ready": true, &"help": true,
 	&"boss_death": true, &"victory": true, &"defeat": true, &"wave": true, &"windup": true,
+	&"restless": true,
 }
 const MUSIC_DB := -6.0
 const MUSIC_FADE := 0.6

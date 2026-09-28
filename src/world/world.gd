@@ -181,6 +181,8 @@ var _hero_ranges := PackedFloat32Array()
 var _hero_active := PackedByteArray()
 var _hero_need := PackedFloat32Array()
 var _rng := RandomNumberGenerator.new()
+## XP a restless horde's kills still owe: fractions of a gem (see _faded_xp).
+var _xp_owed := 0.0
 var _scratch := PackedInt32Array()
 var _wiped := false
 var _wipe_timer := 0.0
@@ -326,6 +328,7 @@ func _ready() -> void:
 	director.mini_boss_defeated.connect(_on_mini_boss_defeated)
 	director.arena_cleared.connect(_on_arena_cleared)
 	director.wave_started.connect(_on_wave_started)
+	director.restless_changed.connect(_on_restless_changed)
 	if not GameState.debug_picks_given:
 		GameState.debug_picks_given = true
 		GameState.pending_level_ups += _cmdline_int("--debug-levelups=", 0)
@@ -1259,6 +1262,8 @@ func _process_kills() -> void:
 	if horde.falls > 0:
 		Audio.play(&"fall")
 		horde.falls = 0
+	# A restless horde (LevelDirector.RESTLESS_AFTER) drops less and less.
+	var share := director.drop_share()
 	for k in n:
 		var p := horde.kill_pos[k]
 		var t := horde.kill_type[k]
@@ -1292,9 +1297,14 @@ func _process_kills() -> void:
 				GameState.slots[killer].kills += 1
 		if killer != HordeSim.SELF_KILL:
 			var drop := grid.nearest_open(p) if grid.is_solid_at(p) else p  # fell into a chasm
-			pickups.spawn(drop, PickupSim.Kind.XP, horde.t_xp[t])
+			if share >= 1.0:
+				pickups.spawn(drop, PickupSim.Kind.XP, horde.t_xp[t])
+			else:
+				var xp := _faded_xp(horde.t_xp[t], share)
+				if xp > 0:
+					pickups.spawn(drop, PickupSim.Kind.XP, xp)
 			var heart_chance := Elites.HEART_CHANCE if horde.t_elite[t] != 0 else HEART_DROP_CHANCE
-			if _rng.randf() < heart_chance:
+			if _rng.randf() < heart_chance * share:
 				pickups.spawn(drop + Vector2(4, 0), PickupSim.Kind.HEART, 1)
 		if not in_chasm:
 			match horde.types[t].on_death:
@@ -1306,6 +1316,15 @@ func _process_kills() -> void:
 			_elite_died(p, t)
 		Events.enemy_killed.emit(p, t, killer)
 	horde.clear_kill_log()
+
+
+## A restless horde's XP drop: `xp` times `share`, carrying the fractions
+## from kill to kill (at half share every other swarmer drops its gem).
+func _faded_xp(xp: int, share: float) -> int:
+	_xp_owed += xp * share
+	var whole := int(_xp_owed)
+	_xp_owed -= whole
+	return whole
 
 
 func _apply_ult_charge() -> void:
@@ -1414,6 +1433,19 @@ func _on_wave_started(wave: int, waves: int) -> void:
 	Audio.play(&"wave")
 	if wave == 1:
 		tip(&"arena", "The doors are sealed: beat every wave to open them")
+
+
+## The team took too long to reach its next objective (see
+## LevelDirector.RESTLESS_AFTER): the horde grows restless, and more so every
+## few seconds; the HUD's clock shows how far drops have faded.
+func _on_restless_changed(stage: int) -> void:
+	if stage <= 0:
+		return
+	Audio.play(&"restless", 0.0 if stage == 1 else -6.0)
+	if stage == 1:
+		hud.callout("THE HORDE GROWS RESTLESS", Hud.RESTLESS_COLOR)
+		tip(&"restless", "Too slow! Enemies drop less and grow stronger until you reach the next objective")
+		shake(2.5)
 
 
 ## A one-time tip (see Settings.seen_tips); nothing if tips are off.
