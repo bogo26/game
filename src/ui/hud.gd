@@ -386,9 +386,13 @@ func _draw_player_panel(hero: Hero, origin: Vector2) -> void:
 	# Special / movement cooldowns and the ultimate meter.
 	var third := floorf((w - 4) / 3.0)
 	var ult_color := Color("c070f0")
+	var ult_fill := hero.ult_charge
 	if hero.ult_charge >= 1.0:
 		ult_color = ult_color.lerp(Color.WHITE, 0.5 + 0.5 * sin(_time * 10.0))
-	var fills := [1.0 - hero.special().cooldown_ratio(), 1.0 - hero.movement().cooldown_ratio(), hero.ult_charge]
+	elif hero.ult_working():  # still at work: a dim glow, and the meter fills once it's over
+		ult_fill = 1.0
+		ult_color = Color(ult_color, 0.3 + 0.12 * sin(_time * 6.0))
+	var fills := [1.0 - hero.special().cooldown_ratio(), 1.0 - hero.movement().cooldown_ratio(), ult_fill]
 	var colors := [Color("f2c84a"), Color("5ad8f0"), ult_color]
 	for k in 3:
 		var ability_slot := k + 1  # special, movement, ultimate

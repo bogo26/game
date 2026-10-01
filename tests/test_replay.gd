@@ -1,7 +1,7 @@
 extends "res://tests/test_case.gd"
 ## Replay: per-player stats and awards, the profile's records (best times,
-## Hard unlocked, hero stars), difficulties, "Change heroes" keeping the team,
-## and elite enemies (stats, only from level 2, Splitting, Volatile).
+## difficulties unlocked, hero stars), difficulties, "Change heroes" keeping
+## the team, and elite enemies (stats, only from level 2, Splitting, Volatile).
 
 const WORLD_SCENE := "res://src/world/world.tscn"
 const SELECT_SCENE := "res://src/ui/character_select.tscn"
@@ -107,17 +107,18 @@ func test_profile_records() -> void:
 	var news := p.record_run(false, GameState.Difficulty.NORMAL, 300.0, [&"knight"])
 	assert_eq(p.runs_played, 1)
 	assert_false(news["best_time"], "a defeat sets no time")
-	assert_false(p.hard_unlocked())
+	assert_false(p.unlocked(GameState.Difficulty.HARD))
 	news = p.record_run(true, GameState.Difficulty.NORMAL, 600.0, [&"knight", &"mage"])
 	assert_true(news["best_time"], "the first win is a best time")
-	assert_true(news["hard_unlocked"], "a Normal win unlocks Hard")
+	assert_eq(news["unlocked"], GameState.Difficulty.HARD, "a Normal win unlocks Hard")
 	assert_eq(p.hero_rank(&"knight"), GameState.Difficulty.NORMAL, "the knight's star")
 	news = p.record_run(true, GameState.Difficulty.NORMAL, 700.0, [&"knight"])
 	assert_false(news["best_time"], "slower: the record stands")
+	assert_eq(news["unlocked"], -1, "nothing new to unlock")
 	assert_near(p.best_time[GameState.Difficulty.NORMAL], 600.0, 0.001)
 	var loaded := Profile.load_profile()
 	assert_eq(loaded.runs_played, 3, "saved")
-	assert_true(loaded.hard_unlocked())
+	assert_true(loaded.unlocked(GameState.Difficulty.HARD))
 	assert_eq(loaded.hero_rank(&"mage"), GameState.Difficulty.NORMAL)
 
 
@@ -132,7 +133,9 @@ func test_best_times_from_shorter_runs_are_dropped() -> void:
 	var p := Profile.load_profile()
 	assert_eq(p.runs_played, 5)
 	assert_eq(p.wins[GameState.Difficulty.NORMAL], 2, "wins still count")
-	assert_true(p.hard_unlocked(), "and so does Hard")
+	assert_true(p.unlocked(GameState.Difficulty.HARD), "and so does Hard")
+	assert_eq(p.wins.size(), Profile.DIFFICULTIES, "padded out to every difficulty")
+	assert_false(p.unlocked(GameState.Difficulty.NIGHTMARE), "Nightmare still needs a Hard win")
 	assert_eq(p.hero_rank(&"knight"), GameState.Difficulty.NORMAL, "and the stars")
 	assert_near(p.best_time[GameState.Difficulty.NORMAL], 0.0, 0.001, "a 4-level best time can't be beaten")
 	var news := p.record_run(true, GameState.Difficulty.NORMAL, 1500.0, [&"knight"])
@@ -140,19 +143,77 @@ func test_best_times_from_shorter_runs_are_dropped() -> void:
 	assert_near(Profile.load_profile().best_time[GameState.Difficulty.NORMAL], 1500.0, 0.001, "and it's kept")
 
 
-func test_hard_waits_for_a_normal_win() -> void:
+func test_harder_difficulties_unlock_one_after_another() -> void:
+	# Hard after a Normal win, Nightmare after a Hard win, Torment after a
+	# Nightmare win: each one is news for the end screen, and a star.
+	var p := Profile.new()
+	assert_eq(p.hardest_unlocked(), GameState.Difficulty.NORMAL, "Casual and Normal are open from the start")
+	for d: int in [GameState.Difficulty.NORMAL, GameState.Difficulty.HARD, GameState.Difficulty.NIGHTMARE]:
+		var next := GameState.DIFFICULTY_NAMES[d + 1]
+		assert_false(p.unlocked(d + 1), "%s is locked" % next)
+		assert_eq(p.record_run(false, d, 900.0, [&"rogue"])["unlocked"], -1, "a defeat unlocks nothing")
+		var news := p.record_run(true, d, 900.0, [&"rogue"])
+		assert_eq(news["unlocked"], d + 1, "a %s win unlocks %s" % [GameState.DIFFICULTY_NAMES[d], next])
+		assert_eq(p.hero_rank(&"rogue"), d, "the rogue's star")
+	var news := p.record_run(true, GameState.Difficulty.TORMENT, 900.0, [&"rogue"])
+	assert_eq(news["unlocked"], -1, "nothing harder to unlock")
+	assert_eq(p.hero_rank(&"rogue"), GameState.Difficulty.TORMENT, "the ruby star")
+	var loaded := Profile.load_profile()
+	assert_eq(loaded.hardest_unlocked(), GameState.Difficulty.TORMENT, "saved")
+	assert_near(loaded.best_time[GameState.Difficulty.TORMENT], 900.0, 0.001)
+
+
+func test_each_difficulty_waits_for_a_win_on_the_one_before() -> void:
 	GameState.profile = Profile.new()
+	GameState.difficulty = GameState.Difficulty.TORMENT  # left over, but locked here
 	var select: Node = (load(SELECT_SCENE) as PackedScene).instantiate()
 	select.set("game_scene", "")
 	_tree().root.add_child(select)
-	GameState.difficulty = GameState.Difficulty.NORMAL
+	assert_eq(GameState.difficulty, GameState.Difficulty.NORMAL, "a locked difficulty falls back to Normal")
 	select.call("change_difficulty", 1)
-	assert_eq(GameState.difficulty, GameState.Difficulty.CASUAL, "Hard is skipped while locked")
+	assert_eq(GameState.difficulty, GameState.Difficulty.CASUAL, "Hard and up are skipped while locked")
+	assert_eq(select.call("unlock_hint", GameState.profile, false), "Hard: win on Normal")
+	assert_eq(select.call("unlock_hint", GameState.profile, true), "Hard: reach wave 20 on Normal")
 	GameState.profile.wins[GameState.Difficulty.NORMAL] = 1
 	GameState.difficulty = GameState.Difficulty.NORMAL
 	select.call("change_difficulty", 1)
 	assert_eq(GameState.difficulty, GameState.Difficulty.HARD, "unlocked")
+	assert_eq(select.call("unlock_hint", GameState.profile, false), "Nightmare: win on Hard")
+	select.call("change_difficulty", 1)
+	assert_eq(GameState.difficulty, GameState.Difficulty.CASUAL, "Nightmare and Torment wait: round to Casual")
+	GameState.profile.wins[GameState.Difficulty.HARD] = 1
+	GameState.profile.best_wave[GameState.Difficulty.NIGHTMARE] = Profile.UNLOCK_WAVE
+	select.call("change_difficulty", -1)
+	assert_eq(GameState.difficulty, GameState.Difficulty.TORMENT, "wave 20 on Nightmare opened Torment")
+	assert_eq(select.call("unlock_hint", GameState.profile, false), "", "everything is open")
+	select._process(DT)
+	assert_eq((select.get("_difficulty_label") as Label).text.contains("TORMENT"), true, "the picker shows it")
+	var stars: Array = (load("res://src/ui/character_select.gd") as GDScript).get_script_constant_map()["STAR_COLORS"]
+	assert_eq(stars.size(), GameState.Difficulty.size(), "a star colour for every difficulty")
 	_teardown(select)
+
+
+func test_each_difficulty_is_harder_than_the_last() -> void:
+	var table := GameState.DIFFICULTY
+	assert_eq(table.size(), GameState.Difficulty.size())
+	assert_eq(GameState.DIFFICULTY_NAMES.size(), table.size())
+	assert_eq(GameState.DIFFICULTY_COLORS.size(), table.size())
+	for d in range(1, table.size()):
+		var name := GameState.DIFFICULTY_NAMES[d]
+		for key: String in ["hp", "damage", "spawn", "elites", "speed"]:
+			assert_true(float(table[d][key]) >= float(table[d - 1][key]), "%s: %s doesn't drop" % [name, key])
+		assert_true(float(table[d]["hp"]) > float(table[d - 1]["hp"]), "%s: tougher enemies" % name)
+		assert_true(float(table[d]["damage"]) > float(table[d - 1]["damage"]), "%s: that hit harder" % name)
+		assert_true(int(table[d]["lives"]) <= int(table[d - 1]["lives"]), "%s: no more lives" % name)
+	for d: int in [GameState.Difficulty.NIGHTMARE, GameState.Difficulty.TORMENT]:
+		GameState.difficulty = d as GameState.Difficulty
+		var world := _make_world()
+		assert_near(world.spawner.level_hp_multiplier, float(table[d]["hp"]), 0.001)
+		assert_near(world.horde.damage_mult, float(table[d]["damage"]), 0.001)
+		assert_near(world.horde.speed_mult, float(table[d]["speed"]), 0.001, "and walk faster")
+		assert_true(world.horde.speed_mult > 1.0, GameState.DIFFICULTY_NAMES[d])
+		assert_eq(GameState.lives_per_level(), 0, "no Second Wind")
+		_teardown(world)
 
 
 func test_difficulty_scales_the_horde_and_lives() -> void:

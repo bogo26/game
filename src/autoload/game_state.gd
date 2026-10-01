@@ -14,15 +14,21 @@ const LIVES_PER_LEVEL := 1
 ## What Start Run and Endless Waves play: the dungeon run, or waves in one
 ## arena until the team falls (WaveDirector).
 enum Mode { RUN, WAVES }
-enum Difficulty { CASUAL, NORMAL, HARD }
-const DIFFICULTY_NAMES: Array[String] = ["Casual", "Normal", "Hard"]
-## Per difficulty: enemy HP, enemy damage, spawn rate, team lives per level
-## and how often elites appear.
+enum Difficulty { CASUAL, NORMAL, HARD, NIGHTMARE, TORMENT }
+const DIFFICULTY_NAMES: Array[String] = ["Casual", "Normal", "Hard", "Nightmare", "Torment"]
+## Per difficulty: enemy HP, enemy damage, spawn rate, team lives per level,
+## how often elites appear and how fast enemies walk. Each one past Normal
+## unlocks with a win on the one before it (see Profile.unlocked).
 const DIFFICULTY: Array[Dictionary] = [
-	{"hp": 0.75, "damage": 0.7, "spawn": 0.8, "lives": 2, "elites": 0.5},
-	{"hp": 1.0, "damage": 1.0, "spawn": 1.0, "lives": LIVES_PER_LEVEL, "elites": 1.0},
-	{"hp": 1.3, "damage": 1.3, "spawn": 1.2, "lives": 0, "elites": 2.0},
+	{"hp": 0.75, "damage": 0.7, "spawn": 0.8, "lives": 2, "elites": 0.5, "speed": 1.0},
+	{"hp": 1.0, "damage": 1.0, "spawn": 1.0, "lives": LIVES_PER_LEVEL, "elites": 1.0, "speed": 1.0},
+	{"hp": 1.3, "damage": 1.3, "spawn": 1.2, "lives": 0, "elites": 2.0, "speed": 1.0},
+	{"hp": 1.7, "damage": 1.6, "spawn": 1.35, "lives": 0, "elites": 3.0, "speed": 1.1},
+	{"hp": 2.2, "damage": 2.0, "spawn": 1.5, "lives": 0, "elites": 4.0, "speed": 1.2},
 ]
+## The difficulty's colour in character select: green, white, red, violet, crimson.
+const DIFFICULTY_COLORS: Array[Color] = [Color(0.45, 0.95, 0.5), Color.WHITE, Color(1.0, 0.45, 0.4),
+	Color(0.78, 0.52, 1.0), Color(1.0, 0.22, 0.25)]
 const PLAYER_COLORS: Array[Color] = [
 	Color("e8504a"),  # P1 red
 	Color("4c93f2"),  # P2 blue
@@ -99,7 +105,7 @@ var mode: Mode = Mode.RUN
 ## Endless Waves: the last wave that started (end screen, records).
 var wave := 0
 var difficulty: Difficulty = Difficulty.NORMAL
-## Records between runs (best times, wins, Hard unlocked, hero stars).
+## Records between runs (best times, wins, difficulties unlocked, hero stars).
 var profile := Profile.new()
 ## What the last finished run set (end screen): see Profile.record_run().
 var last_run_news: Dictionary = {}

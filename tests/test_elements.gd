@@ -158,6 +158,42 @@ func test_inferno_explodes_and_ignites_neighbours() -> void:
 	_teardown(world)
 
 
+func test_inferno_blasts_dont_chain() -> void:
+	# a dies burning and explodes. b (set on fire by the hero too) dies in the
+	# blast, c only catches the blast's fire and dies of it later: neither
+	# explodes, so the enemies beyond them (only another blast would reach
+	# them) are untouched. d, set on fire by the hero, lives through the blast:
+	# it still explodes when something else kills it (burning).
+	var world := _make_world()
+	var hero := _learn(world, "fire", 3)
+	hero.crit_chance = 0.0  # (a crit blast would kill c outright)
+	var horde := world.horde
+	var blast := HIT * Elements.BURN_SHARE[3] * Elements.INFERNO_DAMAGE
+	var a := horde.uid[_enemy(world, Vector2(200, 60), 50.0)]
+	var b := horde.uid[_enemy(world, Vector2(230, 60), blast * 0.5)]
+	var past_b := horde.uid[_enemy(world, Vector2(262, 60))]
+	var c := horde.uid[_enemy(world, Vector2(200, 90), blast + 5.0)]
+	var past_c := horde.uid[_enemy(world, Vector2(200, 122))]
+	var d := horde.uid[_enemy(world, Vector2(170, 60), blast * 2.0)]
+	var past_d := horde.uid[_enemy(world, Vector2(138, 60))]
+	for id: int in [a, b, d]:
+		world.elements.on_attack_hit(hero, _at(world, id), HIT)
+	horde.damage(_at(world, a), 1000.0, Vector2.ZERO, hero.slot)  # dies burning
+	_still(world, 0.2)
+	assert_eq(_at(world, b), -1, "b died in the blast")
+	assert_true(horde.is_burning(_at(world, c)), "c caught the blast's fire")
+	assert_true(_at(world, d) != -1 and horde.is_burning(_at(world, d)), "d lived through the blast, burning")
+	assert_near(horde.hp[_at(world, past_d)], 200.0, 0.01, "nothing reached past d yet")
+	horde.damage(_at(world, d), 1000.0, Vector2.ZERO, hero.slot)
+	_still(world, 0.2)
+	assert_true(horde.hp[_at(world, past_d)] < 200.0, "d exploded when it died: its fire was the hero's")
+	_still(world, Elements.BURN_TIME[3])
+	assert_eq(_at(world, c), -1, "c burned to death")
+	for id: int in [past_b, past_c]:
+		assert_near(horde.hp[_at(world, id)], 200.0, 0.01, "no blast from what the first one killed or lit")
+	_teardown(world)
+
+
 # --- ice ----------------------------------------------------------------------------------------
 
 func test_frostbite_slows() -> void:

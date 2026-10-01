@@ -4,10 +4,11 @@ extends Control
 ## un-readies or leaves. Once every joined player is ready, any of them starts
 ## the run with A / Enter (or Start on a gamepad) - there is no timer.
 ## With nobody joined, B / Esc returns to the main menu. Any joined player
-## picks the difficulty with LB / RB (Q / E); Hard unlocks with a Normal win
-## (or wave 20 of Endless Waves on Normal). A star by a hero's name shows the
-## hardest difficulty won with them. For Endless Waves the title says so, and
-## the top left shows the best wave on the chosen difficulty.
+## picks the difficulty with LB / RB (Q / E); each one past Normal unlocks
+## with a win on the one before it (or wave 20 of Endless Waves there), and a
+## line under the picker says how to open the next. A star by a hero's name
+## shows the hardest difficulty won with them. For Endless Waves the title
+## says so, and the top left shows the best wave on the chosen difficulty.
 
 const ROSTER: Array[StringName] = [
 	&"knight", &"ranger", &"mage", &"cleric", &"berserker", &"rogue", &"engineer", &"necromancer",
@@ -28,8 +29,10 @@ const HERO_TRAITS := {
 }
 const DIFFICULTY_COLORS := {"Easy": Color(0.45, 0.95, 0.5), "Medium": Color(1.0, 0.85, 0.35), "Hard": Color(1.0, 0.45, 0.4)}
 const PIP_ON := Color(0.95, 0.9, 0.7)
-## Stars for the hardest difficulty won with a hero: Casual, Normal, Hard.
-const STAR_COLORS: Array[Color] = [Color(0.8, 0.5, 0.25), Color(0.82, 0.86, 0.95), Color(1.0, 0.85, 0.3)]
+## Stars for the hardest difficulty won with a hero: Casual (bronze), Normal
+## (silver), Hard (gold), Nightmare (amethyst), Torment (ruby).
+const STAR_COLORS: Array[Color] = [Color(0.8, 0.5, 0.25), Color(0.82, 0.86, 0.95), Color(1.0, 0.85, 0.3),
+	Color(0.74, 0.5, 1.0), Color(1.0, 0.25, 0.35)]
 const PIP_OFF := Color(0.3, 0.3, 0.38)
 
 
@@ -59,6 +62,8 @@ var went_back := false
 var _title: Label
 var _footer: Label
 var _difficulty_label: Label
+## Under the picker: how to unlock the next difficulty.
+var _unlock_label: Label
 ## Endless Waves: the best wave on the chosen difficulty.
 var _record_label: Label
 var _back_prev: Dictionary = {}
@@ -80,7 +85,7 @@ func _ready() -> void:
 	else:
 		InputRouter.unassign_all()
 		GameState.clear_players()
-	if GameState.difficulty == GameState.Difficulty.HARD and not GameState.profile.hard_unlocked():
+	if not GameState.profile.unlocked(GameState.difficulty):
 		GameState.difficulty = GameState.Difficulty.NORMAL
 	var bg := ColorRect.new()
 	bg.color = Color(0.04, 0.035, 0.07)
@@ -99,6 +104,9 @@ func _ready() -> void:
 	_difficulty_label = _label("", 8, Color.WHITE)
 	_difficulty_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(_difficulty_label)
+	_unlock_label = _label("", 8, Color(0.55, 0.55, 0.62))
+	_unlock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	add_child(_unlock_label)
 	for i in InputRouter.MAX_PLAYERS:
 		_views.append(_build_slot(i))
 	InputRouter.join_requested.connect(_on_join_requested)
@@ -125,13 +133,13 @@ func _process(delta: float) -> void:
 	_animate_portraits(delta)
 
 
-## Steps the run's difficulty (skipping Hard until it's unlocked).
+## Steps the run's difficulty (skipping the ones still locked).
 func change_difficulty(step: int) -> void:
 	var count := GameState.Difficulty.size()
 	var next := int(GameState.difficulty)
 	for attempt in count:
 		next = (next + step + count) % count
-		if next != GameState.Difficulty.HARD or GameState.profile.hard_unlocked():
+		if GameState.profile.unlocked(next):
 			break
 	GameState.difficulty = next as GameState.Difficulty
 	Audio.play(&"ui_move")
@@ -146,16 +154,24 @@ func _update_difficulty_label() -> void:
 			prev = p.glyph(PlayerInput.Action.UI_PREV_TAB)
 			next = p.glyph(PlayerInput.Action.UI_NEXT_TAB)
 			break
-	var text := "%s  %s  %s" % [prev, GameState.DIFFICULTY_NAMES[GameState.difficulty].to_upper(), next]
+	_difficulty_label.text = "%s  %s  %s" % [prev, GameState.DIFFICULTY_NAMES[GameState.difficulty].to_upper(), next]
+	_difficulty_label.label_settings.font_color = GameState.DIFFICULTY_COLORS[GameState.difficulty]
 	var waves := GameState.mode == GameState.Mode.WAVES
-	if not GameState.profile.hard_unlocked():
-		text = ("(Hard: wave %d on Normal)   " % Profile.HARD_UNLOCK_WAVE if waves
-			else "(Hard: win on Normal)   ") + text
+	_unlock_label.text = unlock_hint(GameState.profile, waves)
 	if waves:
 		var best := GameState.profile.best_wave[GameState.difficulty]
 		_record_label.text = "Best: wave %d" % best if best > 0 else "Survive as many waves as you can"
-	_difficulty_label.text = text
-	_difficulty_label.label_settings.font_color = [Color(0.45, 0.95, 0.5), Color.WHITE, Color(1.0, 0.45, 0.4)][GameState.difficulty]
+
+
+## How to open the next locked difficulty ("" once they're all open).
+static func unlock_hint(profile: Profile, waves: bool) -> String:
+	var locked := profile.hardest_unlocked() + 1
+	if locked >= GameState.Difficulty.size():
+		return ""
+	var before := GameState.DIFFICULTY_NAMES[locked - 1]
+	if waves:
+		return "%s: reach wave %d on %s" % [GameState.DIFFICULTY_NAMES[locked], Profile.UNLOCK_WAVE, before]
+	return "%s: win on %s" % [GameState.DIFFICULTY_NAMES[locked], before]
 
 
 ## Joined players' heroes run on the spot (run frames 2-5).
@@ -345,8 +361,10 @@ func _layout() -> void:
 	var view := get_viewport_rect().size
 	_title.position = Vector2(0, 3)
 	_title.size = Vector2(view.x, 18)
-	_difficulty_label.position = Vector2(view.x * 0.5, 6)
+	_difficulty_label.position = Vector2(view.x * 0.5, 3)
 	_difficulty_label.size = Vector2(view.x * 0.5 - MARGIN, 10)
+	_unlock_label.position = Vector2(view.x * 0.5, 12)
+	_unlock_label.size = Vector2(view.x * 0.5 - MARGIN, 10)
 	_record_label.position = Vector2(MARGIN, 6)
 	_record_label.size = Vector2(view.x * 0.3, 10)
 	_footer.position = Vector2(0, view.y - 12)

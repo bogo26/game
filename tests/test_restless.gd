@@ -30,12 +30,13 @@ func _data(corridor_rate: float = 16.0) -> LevelData:
 	return d
 
 
-## A run's world (level 1, Normal) with no enemies spawning on their own:
-## the director still sets the spawner up as the clock says.
-func _world(data: LevelData, run_mode: bool = true, wave_mode: bool = false) -> World:
+## A run's world (level 1, Normal unless told) with no enemies spawning on
+## their own: the director still sets the spawner up as the clock says.
+func _world(data: LevelData, run_mode: bool = true, wave_mode: bool = false,
+		difficulty: GameState.Difficulty = GameState.Difficulty.NORMAL) -> World:
 	InputRouter.unassign_all()
 	GameState.clear_players()
-	GameState.difficulty = GameState.Difficulty.NORMAL
+	GameState.difficulty = difficulty
 	GameState.reset_run()
 	InputRouter.assign(0, PlayerInput.DEVICE_BOT)
 	GameState.slots[0].hero_id = &"knight"
@@ -56,6 +57,7 @@ func _teardown(world: World) -> void:
 	(Engine.get_main_loop() as SceneTree).paused = false
 	InputRouter.unassign_all()
 	GameState.clear_players()
+	GameState.difficulty = GameState.Difficulty.NORMAL
 
 
 func _wait(world: World, seconds: float) -> void:
@@ -259,4 +261,24 @@ func test_the_hud_shows_the_clock() -> void:
 	world.director._activate(world.director.room_by_id(1), world.heroes[0])
 	hud._process(DT)
 	assert_false(label.visible, "hidden during a fight")
+	_teardown(world)
+
+
+func test_a_faster_difficulty_stays_faster_when_restless() -> void:
+	# Torment's horde walks faster to begin with; growing restless speeds it up
+	# on top of that (and tops out at the same share above it). Fights bring it
+	# back to Torment's own pace.
+	var world := _world(_data(), true, false, GameState.Difficulty.TORMENT)
+	var director := world.director
+	var horde := world.horde
+	var own := float(GameState.DIFFICULTY[GameState.Difficulty.TORMENT]["speed"])
+	assert_true(own > 1.0, "Torment walks faster")
+	assert_near(horde.speed_mult, own, 0.0001, "from the start")
+	_wait(world, 60.5)
+	assert_eq(director.restless_stage, 1)
+	assert_near(horde.speed_mult, own * (1.0 + LevelDirector.RESTLESS_SPEED), 0.0001, "quicker still")
+	_wait(world, 15.0 * 9)
+	assert_near(horde.speed_mult, own * LevelDirector.RESTLESS_MAX_SPEED, 0.0001, "tops out above its own")
+	director._activate(director.room_by_id(1), world.heroes[0])
+	assert_near(horde.speed_mult, own, 0.0001, "a fight brings it back to Torment's pace")
 	_teardown(world)

@@ -40,7 +40,7 @@ Each hero has four abilities:
 - **Attack:** spammable
 - **Special:** cooldown
 - **Movement:** dash or bash on a short cooldown, with brief i-frames
-- **Ultimate:** charged by the damage the other three deal (never by its own), plus a slow trickle
+- **Ultimate:** charged by the damage the other three deal (never by its own), plus a slow trickle; the meter fills no faster than once in 16 s (about 9 s with every Recharge), and not at all while the ultimate is still at work
 
 Two players may pick the same hero. Every player has a colour (P1 red, P2 blue, P3 green, P4 yellow), which is used for their ring, reticle and HUD panel.
 
@@ -100,17 +100,20 @@ Four kinds make up most of the horde throughout the run. Every level adds an ene
 
 ## Difficulty and records
 
-Chosen in character select with LB / RB (Q / E); Hard unlocks after a win on Normal, or after reaching wave 20 of Endless Waves on Normal. Both modes use the same difficulties.
+Chosen in character select with LB / RB (Q / E). Casual and Normal are open from the start; every harder difficulty unlocks with a win on the one before it, or by reaching wave 20 of Endless Waves on it (`Profile.unlocked()`): Hard after Normal, Nightmare after Hard, Torment after Nightmare. Locked ones are skipped, and a dim line under the picker says how to open the next. Both modes use the same difficulties.
 
-| | Enemy HP | Enemy damage | Spawn rate | Team lives per level | Elites |
-|---|---|---|---|---|---|
-| Casual | ×0.75 | ×0.7 | ×0.8 | 2 | ×0.5 |
-| Normal | ×1 | ×1 | ×1 | 1 | ×1 |
-| Hard | ×1.3 | ×1.3 | ×1.2 | 0 | ×2 |
+| | Enemy HP | Enemy damage | Spawn rate | Team lives per level | Elites | Enemy speed |
+|---|---|---|---|---|---|---|
+| Casual | ×0.75 | ×0.7 | ×0.8 | 2 | ×0.5 | ×1 |
+| Normal | ×1 | ×1 | ×1 | 1 | ×1 | ×1 |
+| Hard | ×1.3 | ×1.3 | ×1.2 | 0 | ×2 | ×1 |
+| Nightmare | ×1.7 | ×1.6 | ×1.35 | 0 | ×3 | ×1.1 |
+| Torment | ×2.2 | ×2 | ×1.5 | 0 | ×4 | ×1.2 |
 
 - Enemy damage is a real multiplier (`HordeSim.damage_mult`): contact, spit, exploder and elite blasts, spikes and every boss attack.
-- **Profile** (`Profile`, `user://profile.cfg`): runs played, wins and best time per difficulty, the hardest difficulty won with each hero, shown as a bronze / silver / gold star by the hero's name in character select, and the best wave reached in Endless Waves per difficulty (`best_wave`, in its own `[waves]` section). The end screen announces "NEW BEST TIME!", "NEW BEST WAVE!" and "HARD UNLOCKED!".
-  - Best times only compare runs of the same length: the profile stores a run version (`Profile.RUN_VERSION`, 2 = the 8-level run), and loading an older profile drops its best times but keeps wins, Hard unlocked and the stars.
+- Enemy speed (`HordeSim.speed_mult`) scales walking only (charges and hops keep their own); a restless horde speeds up on top of it, to 1.3× the difficulty's own at most. Elites stay capped at 4 alive whatever the chance.
+- **Profile** (`Profile`, `user://profile.cfg`): runs played, wins and best time per difficulty, the hardest difficulty won with each hero, shown as a bronze / silver / gold / amethyst / ruby star by the hero's name in character select, and the best wave reached in Endless Waves per difficulty (`best_wave`, in its own `[waves]` section). The end screen announces "NEW BEST TIME!", "NEW BEST WAVE!" and "HARD UNLOCKED!" (or "NIGHTMARE UNLOCKED!", "TORMENT UNLOCKED!").
+  - Best times only compare runs of the same length: the profile stores a run version (`Profile.RUN_VERSION`, 2 = the 8-level run), and loading an older profile drops its best times but keeps wins, the difficulties unlocked and the stars. Profiles saved before Nightmare and Torment existed (three numbers per difficulty list) are padded.
 
 Spawn director:
 - Spawns just outside the camera on walkable tiles, in waves plus a constant trickle. Off-screen spawns stay at least 110 px from every hero.
@@ -142,7 +145,7 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
 
 | Element | Tier I | Tier II | Tier III |
 |---|---|---|---|
-| **Fire** | *Ember Strikes*: burn for 50% of the hit per second, 3 s | *Wildfire*: 80% per second, 4 s; burning enemies set enemies touching them alight | *Inferno*: burning enemies explode when they die (3× the burn per second, 38 px) and set everything they hit ablaze, so it chains |
+| **Fire** | *Ember Strikes*: burn for 50% of the hit per second, 3 s | *Wildfire*: 80% per second, 4 s; burning enemies set enemies touching them alight | *Inferno*: burning enemies explode when they die (3× the burn per second, 38 px) and set everything they hit ablaze, but blasts don't chain: what a blast kills doesn't explode, and the fire it lights is ordinary fire |
 | **Ice** | *Frostbite*: chilled, 40% slower for 2.5 s | *Permafrost*: every 3rd chill freezes the enemy solid for 1.5 s | *Shatter*: frozen enemies take double damage from attacks, and die in a nova that chills everything near them twice (freezing most of them) |
 | **Poison** | *Venom*: stacks up to 4; each stack deals 25% of the hit per second for 4 s and slows 6% | *Virulence*: up to 8 stacks, 6 s | *Plague*: poisoned enemies leave a toxic cloud (2.5 s) that adds a stack every 0.5 s to everything inside (at most 10 clouds) |
 | **Lightning** | *Static Charge*: every hit staggers its target (small shove and stun) and zaps the nearest enemy within 56 px for 50% | *Arc Lightning*: zaps chain through 3 enemies for 60% and stun them | *Thunderstrike*: every 5th hit calls down a bolt (3× damage, 0.8 s stun) that chains through 6 enemies |
@@ -152,6 +155,7 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
 - **Statuses** live in `HordeSim` arrays (burn, poison stacks, chill, frost, frozen). Damage over time ticks in the horde's movement loop and is credited to the last hero to hit, for kills and ultimate charge (but statuses an ultimate applied don't charge it: see Ultimate charge). Enemies are tinted by status: frozen, burning, poisoned or chilled.
 - **Who is affected.** Barrels and urns take no statuses. Bosses burn and get poisoned, but never freeze or slow.
 - **Death effects** (Inferno, Shatter, Plague) are logged when an enemy dies, and at most 6 play per frame, so chains ripple outward. Fire spreading is checked for a share of the horde every frame.
+  - **Inferno blasts never set off more blasts.** While one lands, `HordeSim.inferno_blast` is on and the enemies it kills log no Inferno of their own; the fire it lights carries Wildfire but not Inferno. An enemy the hero (or Wildfire spreading from the hero's fire) set alight still explodes when something else kills it, so each blast stands for an enemy the hero's own fire reached, and one kill no longer sets off the whole horde.
 - **Cost.** In the worst case (all four elements at tier III on four heroes firing ~1000 elemental shots a second), the element code costs ~0.04 ms per frame. The stress test with `--elements` still meets the targets: 4.7 ms average, 7.9 ms p99.
 - **Runs:** each player's picks are stored in `GameState` and re-applied when the next level builds the heroes again.
 
@@ -353,7 +357,7 @@ The second mode (main menu → Endless Waves): no dungeon, just waves that keep 
   - The spawner stays off, as in the run's boss rooms: the boss brings its own servants.
   - Beating it says "<NAME> SLAIN!" and opens a **legendary round** (see Legendary upgrades). Here every boss counts, not only mini bosses, until each hero has taken all three of its legendaries. After that no legendary round is queued at all (`World.legendaries_left()`), rather than an empty one. A treasure round (a bonus pick) comes after it, and the team's lives are refilled. It never ends the game.
 - **Team lives:** the difficulty's lives per level at the start, refilled after every boss wave, so five waves play the part of a run's level. A wipe with no life left ends the game: "GAME OVER / You reached wave n", then the end screen.
-- **Records:** `Profile.record_waves()` keeps the furthest wave per difficulty, shown in character select ("Best: wave 12") and announced on the end screen ("NEW BEST WAVE!"). Reaching wave 20 on Normal also unlocks Hard (`Profile.HARD_UNLOCK_WAVE`).
+- **Records:** `Profile.record_waves()` keeps the furthest wave per difficulty, shown in character select ("Best: wave 12") and announced on the end screen ("NEW BEST WAVE!"). Reaching wave 20 on a difficulty also unlocks the next one (`Profile.UNLOCK_WAVE`): Hard from Normal, Nightmare from Hard, Torment from Nightmare.
 - **Code:**
   - `WaveDirector` extends `LevelDirector`, and the World uses it instead when `wave_mode` is on. It reuses the base's arena spawning (`SpawnDirector.start_arena`), enemy counting, boss spawning (`_spawn_boss(at, scene)`) and boss objective. It replaces `tick()`, `picks_held()` (the World asks the director) and the boss's death.
   - The Game builds one World for the whole game (`_load_waves()`).
@@ -476,7 +480,9 @@ docs/         this document
 - Upgrades tweak abilities through `Ability.mods` (e.g. `pierce`, `count`, `area_pct`, `max_active`, `minion_hp_pct`). There are 86 upgrades: 17 generic, 4–5 per hero, 12 elemental and 24 legendaries, which replace an ability with a new form (see Legendary upgrades).
 - `ProjectileSim` shots can also turn toward the next enemy after a hit (`TRAIT_RICOCHET`), log the kills they make (`TRAIT_REAP`), fork at a wall bounce (`splits`) and set enemies on fire (`Effect.BURN`).
 - Hero tuning lives in `tools/gen_hero_data.py`, which writes `src/heroes/data/*.tres`. Edit the table and re-run it, or edit the `.tres` in the Godot inspector.
-- **Ultimate charge:** damage dealt ÷ the hero's `ult_cost`, plus 1% per second passively. The player ring pulses when the ultimate is ready.
+- **Ultimate charge:** damage dealt ÷ the hero's `ult_cost`, plus 1% per second passively, both times the charge rate (Recharge: +25% each). The player ring pulses when the ultimate is ready.
+  - **A ceiling:** however much the hero deals, the meter fills no faster than `Hero.ULT_MAX_PER_SECOND` (1/16 per second) times the charge rate: 16 s from empty, 12.8 s / 10.7 s / 9.1 s with one / two / three Recharges. Charge earned faster waits in `Hero.ult_bank` (no more than the meter still needs) and flows in at that pace, so a burst isn't lost. Late in a run damage grows into the thousands per second, and without it the meter refilled in about a second.
+  - **Not while it works:** nothing charges the meter (not even the trickle) while the ultimate is still at work (`Hero.ult_working()`): its ability is active (a spin, a buff, clones, a meteor on its way down, a singularity, a lich), or a zone or minion it made is still there (`World.ultimate_at_work()`: Arrow Rain, a tesla tower, the army). Toxic clouds don't count: plague can keep spreading from cloud to cloud. So a 16 s Rampage or Tesla Tower can't be kept up for good. Meanwhile the HUD's ultimate bar glows dimly.
   - An ultimate never charges itself (it could be chained otherwise). While one works (its `_activate` / `_tick_active`, the clones' swings) `HordeSim.ult_hits` is on, and its hits also go to `ult_damage_by_slot`, which `World._apply_ult_charge()` leaves out. Minions and zones made meanwhile keep that (`World.add_minion` / `add_zone`), and so do the statuses it applies (`status_ult`: their damage over time, spreading fire and death effects) and the barrels it sets off. It all still counts as damage dealt, for stats and lifesteal.
 - **Critical hits:**
   - Every hit rolls the attacker's crit chance: base 5%, Rogue 15%, Keen Eye +6%, Deadly Precision +8%.
@@ -517,10 +523,13 @@ Every walking enemy moves in `HordeSim._move()`:
   Abilities report theirs through `Ability.add_dangers()` and mortars through `Minion.add_dangers()`; a downed hero's wait with them. Then:
   - Each enemy takes a moment to notice a new one: 0.2 s, plus up to 0.3 s more by its uid. So a Meteor still catches the middle of a pack, but its rim gets out in time.
   - Caught in one, an enemy gets out the nearest way, at full speed.
+    - Unless a wall, a chasm or another AoE is in the way straight out (`HordeSim._escape_way()`): then it tries turns of up to 135° either way, and straight back, and takes the one that gets it clear of them all soonest (each 45° turned counts as 6 px further, a way toward its goal a little nearer). So an enemy pinned against a wall or in a corner gets out along the wall, and one between two AoEs doesn't flee from one into the other.
   - Walking into one, it stops going in over the last 16 px before the edge (its footprint stays 3 px clear) and turns that part of its way along the edge, so it goes round. It keeps to the side it's already going round, else takes the side its hero is on, else its own `bend`. (The flow field's steps turn from tile to tile: going by them, it would dither.)
+    - Choosing a side, it looks 45° further round the edge (`_round_open()`): if a wall shuts that side it goes round the other, and with both shut (an AoE across a corridor) it waits at the edge.
   - When its hero stands inside (a spinning Knight), it waits at the edge instead.
   - Busy enemies don't break off: a wind-up, a lit fuse, lining up or making a charge, a blink or a stun. Imps never blink into one.
   - Cost: dangers are flagged per tile (a bit each, at most 32 at once), so only the enemies near one look at it, and ones nobody can have noticed yet are skipped. Like the separation push, half of those enemies work out their turn each frame; the others take the one they worked out the frame before (`HordeSim.dodge`). The F3 overlay and the stress test count the dangers.
+    - Walls are only looked for round dangers that have one in reach (`_walled()`: a scan of the danger's tiles, once a frame, by the first enemy that needs it), so in the open a way out costs a couple of tile lookups, and only near walls a ray.
 - **Facing:** an enemy faces the first of these that applies:
   - its aim, while lining up a charge or drawing an aimed shot
   - its target, when within 2 tiles, in range (ranged enemies) or standing still
@@ -614,6 +623,9 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - The horde went from 1.40 to 1.49 ms (plain, 2 dangers on average) and from 1.33 to 1.40 ms (`--ult-spam`, 1.5 on average); the whole simulation stayed within run-to-run noise.
   - Worst case, on its own: 300 enemies round four heroes with three overlapping AoEs on the crowd (205 enemies near one). The horde step goes from 1.51 to 1.88 ms. Of that, the steering is ~0.18 ms (about 110 enemies work out a turn each frame, ~1.65 µs each) and flagging the tiles ~0.025 ms; the rest is the crowd itself, kept at a distance and packed along the edges. AoEs that no enemy is near cost ~0.03 ms.
   - Re-measure on the Air.
+- **Smarter dodging check** (walls and other AoEs in the way out, going round the open side; 2026-10-01): headless in a Linux container, so only simulation time counts.
+  - Real level (`--level=level_3 --ult-spam`, three 20 s runs alternated with the build before): 2.32–2.44 ms sim before, 2.34–2.58 ms after, within run-to-run noise. The occasional 26–40 ms spike shows up in both builds.
+  - Worst case, on its own: 300 swarmers among 32 AoEs (every slot) in a room full of pillars, about 20 enemies working out a way out each frame. The horde step goes from about 1.2–1.5 ms to 1.5–1.9 ms (best of 3, noisy machine): the way-out search costs ~0.19 ms of that (~9 µs per enemy, mostly checking that straight out is open near walls), the going-round checks ~0.01 ms. Walking the danger bits by set bit only (not bit by bit) took back part of it.
 
 ## Art, effects and audio
 

@@ -96,6 +96,22 @@ const FLEE_ALONG := 0.5
 const REACT_MIN := 0.2
 const REACT_SPREAD := 0.3
 const REACT_STEP := 0.618034
+## Caught in an AoE with a wall or another AoE in the way straight out, an
+## enemy tries these turns from it (up to 135 degrees either way, then
+## straight back) and takes the one that gets it clear of them all soonest:
+## each 45 degrees turned counts as ESCAPE_TURN_COST px further, each px of
+## the way pointing at its goal as ESCAPE_GOAL_BIAS px nearer. It looks
+## ESCAPE_LOOK px at most.
+const ESCAPE_TURNS: Array[float] = [PI * 0.25, -PI * 0.25, PI * 0.5, -PI * 0.5, PI * 0.75, -PI * 0.75, PI]
+const ESCAPE_TURN_COST := 6.0
+const ESCAPE_GOAL_BIAS := 8.0
+const ESCAPE_LOOK := 160.0
+## Going round an AoE, an enemy checks the way ROUND_LOOK radians further
+## round its edge: a wall (or chasm) there sends it round the other side, and
+## with both sides shut it waits at the edge.
+const ROUND_LOOK := PI * 0.25
+## 1 / ln 2: a danger's bit (a power of two) to its index.
+const INV_LN2 := 1.4426950408889634
 ## Dangers are flagged per tile (a bit each), so only the enemies near one
 ## look at it. Past MAX_DANGERS at once, the rest are left out.
 const MAX_DANGERS := 32
@@ -243,6 +259,9 @@ var ult_damage_by_slot := PackedFloat32Array([0, 0, 0, 0])
 ## it set off. Those hits count as damage dealt but never charge an
 ## ultimate. Whoever turns it on turns it off again.
 var ult_hits := false
+## On while an Inferno blast lands (Elements): what it kills doesn't blow up
+## in turn, so blasts never chain.
+var inferno_blast := false
 ## Biggest single hit per player slot since the World last read it.
 var biggest_hit_by_slot := PackedFloat32Array([0, 0, 0, 0])
 ## Hits since the last drain (position, damage) for sparks and numbers.
@@ -323,6 +342,10 @@ var _blend := PackedFloat32Array()  # per type, this frame: how far `walk` eases
 var _danger_cells := PackedInt64Array()  # per tile: a bit per danger that reaches it
 var _danger_stamped := false
 var _walker_radius := 0.0  # the biggest footprint among the kinds that walk
+var _walls_looked := 0  # dangers looked at for walls this frame (a bit each)...
+var _danger_walled := 0  # ...and the ones with a wall (or the grid's edge) in reach
+var _escape_crossed := false  # _escape_length(): that way out runs into another AoE...
+var _escape_touched := 0  # ...and every one it goes through (a bit each)
 
 
 func setup(p_grid: LevelGrid, p_flow: FlowField, p_types: Array[EnemyData]) -> void:
@@ -690,7 +713,7 @@ func drop_death_fx(n: int) -> void:
 
 func _log_death_fx(p: Vector2, flags: int, burning: bool, burn_power: float, poisoned: bool,
 		poison_power: float, is_ice: bool, frost_power: float, slot: int, ult: int) -> void:
-	if burning and flags & FLAG_INFERNO:
+	if burning and flags & FLAG_INFERNO and not inferno_blast:
 		_push_death_fx(p, DeathFx.INFERNO, burn_power, slot, ult)
 	if is_ice and flags & FLAG_SHATTER:
 		_push_death_fx(p, DeathFx.SHATTER, frost_power, slot, ult)
@@ -845,6 +868,120 @@ func in_danger(p: Vector2, r: float = 0.0) -> bool:
 	return false
 
 
+## The way out for an enemy of radius `r` at `p`, caught in at least one of
+## the dangers in `mask` (a bit each): `out` (straight out: in the open, the
+## nearest way) unless a wall or another danger is in the way; then the turn
+## that gets it clear of them all soonest (see ESCAPE_TURNS), leaning toward
+## `goal`, the way it wanted to go.
+func _escape_way(p: Vector2, r: float, out: Vector2, goal: Vector2, mask: int) -> Vector2:
+	var best_way := out
+	var best_cost := _escape_length(p, r, out, mask)
+	if best_cost < INF:
+		if not _escape_open(p, r, out, best_cost):
+			best_cost = INF
+		elif not _escape_crossed:
+			return out
+	var lean := goal.normalized() if goal != Vector2.ZERO else Vector2.ZERO
+	for turn in ESCAPE_TURNS:
+		var way := out.rotated(turn)
+		var length := _escape_length(p, r, way, mask)
+		if length == INF:
+			continue
+		var cost := length + ESCAPE_TURN_COST * absf(turn) / (PI * 0.25) - ESCAPE_GOAL_BIAS * way.dot(lean)
+		if cost < best_cost and _escape_open(p, r, way, length):
+			best_cost = cost
+			best_way = way
+	return best_way
+
+
+## How far an enemy of radius `r` at `p` walks along `way` to be clear of
+## every danger in `mask` (INF past ESCAPE_LOOK or the grid's edge). Notes
+## whether the way runs into a danger it wasn't already in (_escape_crossed)
+## and which ones it goes through (_escape_touched). Walls: _escape_open().
+func _escape_length(p: Vector2, r: float, way: Vector2, mask: int) -> float:
+	_escape_crossed = false
+	_escape_touched = 0
+	var gw := grid.width
+	var t := 0.0
+	for step in 6:
+		var q := p + way * t
+		var cx := int(q.x * INV_TILE)
+		var cy := int(q.y * INV_TILE)
+		if q.x < 0.0 or q.y < 0.0 or cx >= gw or cy >= grid.height:
+			return INF
+		var bits := _danger_cells[cy * gw + cx] & mask
+		var leave := -1.0
+		while bits != 0:
+			var bit := bits & -bits  # one danger at a time, lowest bit first
+			bits ^= bit
+			var k := roundi(log(float(bit)) * INV_LN2)
+			var rel := q - danger_pos[k]
+			var edge := danger_radius[k] + r + DANGER_MARGIN
+			var c := rel.length_squared() - edge * edge
+			if c < 0.0:
+				var b := -rel.dot(way)
+				leave = maxf(leave, b + sqrt(b * b - c))  # where the ray leaves this circle
+				if step > 0 and (_escape_touched & bit) == 0:
+					_escape_crossed = true
+				_escape_touched |= bit
+		if leave < 0.0:
+			return t  # clear of them all
+		t += leave + 0.5
+		if t > ESCAPE_LOOK:
+			return INF
+	return t
+
+
+## Whether a walker can take the way out _escape_length() just measured
+## (`length` along `way`): only dangers with a wall in reach need a look.
+func _escape_open(p: Vector2, r: float, way: Vector2, length: float) -> bool:
+	var bits := _escape_touched
+	while bits != 0:
+		var bit := bits & -bits
+		bits ^= bit
+		if _walled(roundi(log(float(bit)) * INV_LN2)):
+			return grid.walk_line_clear(p, p + way * (length + r))
+	return true
+
+
+## Whether danger `k` has a wall, chasm or the grid's edge anywhere an enemy
+## getting out of it or going round it could run into (its tiles as stamped;
+## looked for once a frame, by the first enemy that needs to know).
+func _walled(k: int) -> bool:
+	var bit := 1 << k
+	if (_walls_looked & bit) == 0:
+		_walls_looked |= bit
+		if _has_walls(danger_pos[k], danger_radius[k] + _walker_radius + DANGER_MARGIN + DANGER_BAND):
+			_danger_walled |= bit
+	return (_danger_walled & bit) != 0
+
+
+func _has_walls(c: Vector2, reach: float) -> bool:
+	var cols := grid.width
+	var rows := grid.height
+	if c.x - reach < 0.0 or c.y - reach < 0.0 or c.x + reach >= cols * TILE or c.y + reach >= rows * TILE:
+		return true
+	var solid := grid.solid
+	for cy in range(int((c.y - reach) * INV_TILE), int((c.y + reach) * INV_TILE) + 1):
+		var top := cy * TILE
+		var dy := maxf(0.0, maxf(top - c.y, c.y - top - TILE))
+		if dy >= reach:
+			continue
+		var half := sqrt(reach * reach - dy * dy)  # the circle's span across this row
+		var row := cy * cols
+		for cx in range(int((c.x - half) * INV_TILE), int((c.x + half) * INV_TILE) + 1):
+			if solid[row + cx] != 0:
+				return true
+	return false
+
+
+## Going round a danger (centre `c`, `edge` the distance it keeps from it, at
+## `outward` from it): whether the way round on side `side` (along
+## outward.orthogonal() * side) is open a little further round.
+func _round_open(p: Vector2, c: Vector2, outward: Vector2, edge: float, side: float) -> bool:
+	return grid.walk_line_clear(p, c + outward.rotated(-side * ROUND_LOOK) * (edge + DANGER_MARGIN))
+
+
 func update(dt: float, targets: PackedVector2Array) -> void:
 	_frame += 1
 	var n := count
@@ -866,6 +1003,8 @@ func _stamp_dangers() -> void:
 	if _danger_stamped:
 		cells.fill(0)
 		_danger_stamped = false
+	_walls_looked = 0
+	_danger_walled = 0
 	if nd > 0:
 		var cols := grid.width
 		var rows := grid.height
@@ -1273,13 +1412,17 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 				# by now (reaction_time()):
 				# - caught in one, it gets out the nearest way, at full speed,
 				#   keeping FLEE_ALONG of its way along the edge (so it leaves on
-				#   its own side);
+				#   its own side) - unless a wall or another AoE is in the way
+				#   straight out: then it takes the turn that gets it clear of
+				#   them all soonest (_escape_way());
 				# - walking into one, it stops going in as it nears the edge and
 				#   turns that part of its way along the edge instead, so it goes
 				#   round - unless its hero stands inside: then it waits at the edge.
 				# Round which side: the way it's already going along the edge, else
 				# the side its hero is on (not its way's: the flow field's steps turn
-				# from tile to tile, and it would dither), else its own (`bend`).
+				# from tile to tile, and it would dither), else its own (`bend`) -
+				# but not a side a wall shuts (_round_open()): then the other, and
+				# with both shut it waits at the edge.
 				# Like the separation push, half of them look again each frame; in
 				# between, each takes the turn it worked out the frame before.
 				if (i & 1) != parity:
@@ -1292,9 +1435,11 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 					var way := desired
 					var flee := Vector2.ZERO
 					var turned := false
-					var dk := 0
 					while dmask != 0:
-						if (dmask & 1) != 0 and dage[dk] >= react:
+						var dbit := dmask & -dmask  # one AoE at a time, lowest bit first
+						dmask ^= dbit
+						var dk := roundi(log(float(dbit)) * INV_LN2)
+						if dage[dk] >= react:
 							var zone_at := dpos[dk]
 							var zone_r := drad[dk]
 							var edge := zone_r + r + DANGER_MARGIN
@@ -1325,12 +1470,27 @@ func _move(dt: float, targets: PackedVector2Array, n: int) -> void:
 												side = along.dot(tp - zone_at) if best < INF else desired.dot(along)
 												if absf(side) < 0.001:  # head on
 													side = BND[i] if BND[i] != 0.0 else float((UID[i] & 1) * 2 - 1)
+												# Round the side that's open: a wall there sends it
+												# round the other, and with both shut it waits.
+												side = signf(side)
+												if _walled(dk) and not _round_open(p, zone_at, outward, edge, side):
+													side = -side if _round_open(p, zone_at, outward, edge, -side) else 0.0
 											desired += along * (-inward * s * signf(side))
-						dmask >>= 1
-						dk += 1
 					if flee != Vector2.ZERO:
+						# Straight out, unless a wall or another AoE is in the way.
 						var flee_dir := flee.normalized()
-						desired = (flee_dir + (desired - flee_dir * desired.dot(flee_dir)) * FLEE_ALONG).normalized()
+						var noticed := dknown
+						var fresh := dfresh if react > 0.0 else 0  # (not the new ones it hasn't noticed yet)
+						while fresh != 0:
+							var fbit := fresh & -fresh
+							fresh ^= fbit
+							if dage[roundi(log(float(fbit)) * INV_LN2)] < react:
+								noticed &= ~fbit
+						var escape := _escape_way(p, r, flee_dir, way, noticed)
+						if escape == flee_dir:
+							desired = (flee_dir + (desired - flee_dir * desired.dot(flee_dir)) * FLEE_ALONG).normalized()
+						else:
+							desired = escape
 					elif turned:
 						desired = desired.limit_length(way.length())
 					DG[i] = desired - way

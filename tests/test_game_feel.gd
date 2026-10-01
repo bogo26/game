@@ -94,14 +94,16 @@ func test_ultimate_announces_once_per_charge() -> void:
 	hero.ult_charge = 0.99
 	var n := _count(Events.ult_ready, func() -> void:
 		hero.add_ult_charge(1000.0)
-		for f in 10:
+		for f in 20:
 			hero.tick(DT))
 	assert_eq(n, 1, "one announcement when it fills")
 	_press(hero, PlayerInput.Action.ULTIMATE)
 	assert_true(hero.ult_charge < 0.01, "ultimate used")
+	hero.ultimate().cancel()  # (the meter waits while the spin lasts)
 	n = _count(Events.ult_ready, func() -> void:
 		hero.add_ult_charge(100000.0)
-		hero.tick(DT))
+		for f in int(1.0 / Hero.ULT_MAX_PER_SECOND / DT) + 2:  # it fills at its own pace
+			hero.tick(DT))
 	assert_eq(n, 1, "and again for the next charge")
 	_teardown(world)
 

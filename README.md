@@ -85,7 +85,7 @@ The macOS build runs on your own Mac; other people have to right-click → Open 
    | Final boss | The Mycelium Deep | the **Spore Mother**, a towering fungus: shielded by spore pods until you burst them; roots, spore rain, spore spirals and fairy rings | **Puffballs**: burst into spore clouds |
    | Final boss | The Frozen Court | the **Frost Queen**: ice lances, frost novas to dash through, icicle hail, a sweeping beam and blizzards; her frost slows you | **Frost wraiths**: flying ghosts that shoot ice |
 
-   The horde is wary of your AoEs. After a moment to notice one, enemies get out from under a Meteor's mark or a mortar shell, go round Arrow Rain, caltrops, fire trails and toxic clouds, and wait outside a Whirlwind or Blade Vortex, so drop them where the pack is thickest or where it's headed.
+   The horde is wary of your AoEs. After a moment to notice one, enemies get out from under a Meteor's mark or a mortar shell, go round Arrow Rain, caltrops, fire trails and toxic clouds, and wait outside a Whirlwind or Blade Vortex, so drop them where the pack is thickest or where it's headed. They're not easily cornered: caught against a wall they slip out along it, they don't flee from one AoE into the next, and they go round an AoE on whichever side isn't walled off.
 
    **Keep moving.** Out of fights you have a minute to reach your next objective (the clock by the team hearts starts over at each one). Linger past it and the horde grows restless, more so every 15 s: enemies drop less and less XP and hearts (none at all from 1:45), and come faster, tougher, in greater numbers and more often as elites, until you get there. Arena and boss fights stop the clock.
 
@@ -99,8 +99,10 @@ Things to use in the levels:
 - **Chests** give the whole team a bonus upgrade.
 - **Shrines** bless the team: Fury, Haste, Life or Wrath.
 
+**Ultimates** charge from the damage your other three abilities deal, plus a slow trickle. However strong you get, the meter takes at least 16 s to fill (about 9 s with all three Recharge upgrades), and it waits while your ultimate is still at work (its bar glows dimly meanwhile).
+
 Upgrades include four **elemental chains** for your attack: fire, ice, poison and lightning. Each has three tiers, and the third is a big one:
-- **Inferno:** burning enemies explode.
+- **Inferno:** burning enemies explode (the blasts set enemies alight, but never set off more blasts).
 - **Shatter:** frozen enemies take double damage and burst into a freezing nova.
 - **Plague:** poisoned enemies leave toxic clouds.
 - **Thunderstrike:** every 5th hit calls down a bolt.
@@ -120,7 +122,7 @@ Upgrades include four **elemental chains** for your attack: fire, ice, poison an
 
 **Test Room** on the main menu is a drop-in sandbox with an endless horde and one of everything. Add `-- --upgrades=fire_3,ice_2` to `./tools/dev.sh run` to start with those upgrades and the tiers before them; legendaries work too (`--upgrades=knight_crescent_wave,mage_singularity`: each hero only takes its own).
 
-**Replaying:** pick Casual, Normal or Hard in character select (LB / RB or Q / E; Hard unlocks after a Normal win, or after reaching wave 20 of Endless Waves on Normal). Every run picks one of two layouts for each regular level and may mirror it, and from the second level on some enemies arrive as elites (Swift, Volatile, Splitting). The end screen shows everyone's numbers and awards, and records best times.
+**Replaying:** pick Casual, Normal, Hard, Nightmare or Torment in character select (LB / RB or Q / E). Each one past Normal unlocks with a win on the one before it, or by reaching wave 20 of Endless Waves on it: Hard after Normal, Nightmare after Hard, Torment after Nightmare. Nightmare and Torment bring much tougher, harder-hitting enemies, more of them, more elites, and a horde that walks faster. Every run picks one of two layouts for each regular level and may mirror it, and from the second level on some enemies arrive as elites (Swift, Volatile, Splitting). The end screen shows everyone's numbers and awards, and records best times.
 
 **Endless Waves** (main menu): no dungeon, just waves that keep getting harder, until the team falls. Join and pick heroes and a difficulty as for a run.
 - The team holds **The Pit**, one sealed arena (pillars, pools, spike beds, powder kegs), in a different tile theme each game.

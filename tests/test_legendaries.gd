@@ -109,13 +109,19 @@ func _enemy(world: World, p: Vector2, hp: float = 1e6) -> int:
 
 
 ## World frames with every enemy held in place (only hits and pulls move it).
-func _hold(world: World, seconds: float, signal_attacks: bool = false) -> void:
+## Returns how long of it the ultimate wasn't at work (its meter fills only then).
+func _hold(world: World, seconds: float, signal_attacks: bool = false) -> float:
+	var idle := 0.0
 	for f in int(seconds / DT):
 		for i in world.horde.count:
 			world.horde.stun[i] = maxf(world.horde.stun[i], 1.0)
 		if signal_attacks and f % 12 == 0:
 			world.heroes[0].attack_performed.emit(Vector2.RIGHT)
+		var working := world.heroes[0].ult_working()
 		world._process(DT)
+		if not working and not world.heroes[0].ult_working():
+			idle += DT
+	return idle
 
 
 # --- the cards -----------------------------------------------------------------------------
@@ -296,18 +302,17 @@ func test_no_ultimate_form_charges_itself() -> void:
 		hero.apply_upgrade(u)
 		for offset in PACK:
 			_enemy(world, hero.position + offset)
-		var t0 := world.elapsed
 		hero.ult_charge = 1.0
 		hero.input.set_action(PlayerInput.Action.ULTIMATE, true)
 		world._process(DT)
 		hero.input.set_action(PlayerInput.Action.ULTIMATE, false)
 		hero.input.consume_presses()
 		assert_eq(hero.used_abilities[Ability.Slot.ULTIMATE], 1, "%s used its ultimate" % u.id)
-		_hold(world, 11.0, true)
+		var idle := _hold(world, 11.0, true)
 		if u.id != &"necro_lich_form":  # the Lich only raises what dies (nothing here)
 			assert_true(GameState.slots[0].damage_dealt > 0.0, "%s: the ultimate hit the pack" % u.id)
-		var passive := Hero.ULT_PASSIVE_PER_SECOND * hero.ult_charge_mult * (world.elapsed - t0)
-		assert_near(hero.ult_charge, passive, 0.001,
+		var passive := Hero.ULT_PASSIVE_PER_SECOND * hero.ult_charge_mult * idle
+		assert_near(hero.ult_charge + hero.ult_bank, passive, 0.001,
 			"%s: only the passive trickle charged it (dealt %.0f)" % [u.id, GameState.slots[0].damage_dealt])
 		_teardown(world)
 
@@ -325,13 +330,12 @@ func test_the_lichs_skeletons_dont_charge_it_either() -> void:
 	hero.ult_charge = 0.0
 	for offset in PACK:  # ...and rise to fight this pack
 		_enemy(world, hero.position + offset)
-	var t0 := world.elapsed
-	_hold(world, 4.0)
+	var idle := _hold(world, 4.0)
 	var raised := world.minions.filter(func(m: Minion) -> bool: return m.kind == Minion.Kind.SKELETON)
 	assert_eq(raised.size(), 3, "every kill rose")
 	assert_true(raised.all(func(m: Minion) -> bool: return m.ultimate), "as the ultimate's")
 	assert_true(GameState.slots[0].damage_dealt > 0.0, "the risen fought")
-	assert_near(hero.ult_charge, Hero.ULT_PASSIVE_PER_SECOND * hero.ult_charge_mult * (world.elapsed - t0), 0.001,
+	assert_near(hero.ult_charge + hero.ult_bank, Hero.ULT_PASSIVE_PER_SECOND * hero.ult_charge_mult * idle, 0.001,
 		"only the passive trickle charged it")
 	_teardown(world)
 
