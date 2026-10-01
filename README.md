@@ -99,6 +99,8 @@ Things to use in the levels:
 - **Chests** give the whole team a bonus upgrade.
 - **Shrines** bless the team: Fury, Haste, Life or Wrath.
 
+**Upgrades:** every team level-up pauses the game, and each player picks one of three cards in their own corner of the screen (left/right and A, A/D and Enter, or a click). Don't want any of them? Skip the round: press B (Esc), then A, or move onto the SKIP column after the cards. Any round can be skipped, legendary ones too.
+
 **Ultimates** charge from the damage your other three abilities deal, plus a slow trickle. However strong you get, the meter takes at least 16 s to fill (about 9 s with all three Recharge upgrades), and it waits while your ultimate is still at work (its bar glows dimly meanwhile).
 
 Upgrades include four **elemental chains** for your attack: fire, ice, poison and lightning. Each has three tiers, and the third is a big one:

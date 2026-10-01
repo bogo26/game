@@ -24,6 +24,15 @@ const TWO_ARENAS := """
 #######
 """
 
+## Room for four heroes.
+const OPEN := """
+############
+#..........#
+#....P.....#
+#..........#
+############
+"""
+
 ## A wall between a hero and a blast.
 const WALLED := """
 ##########
@@ -118,6 +127,129 @@ func test_last_pick_shows_picked_before_the_screen_closes() -> void:
 		world.level_up._process(DT)
 	assert_false(world.level_up.is_open(), "then the game resumes")
 	_teardown(world)
+
+
+func test_any_round_can_be_skipped() -> void:
+	for pick_round: int in [2, GameState.TREASURE_ROUND, GameState.LEGENDARY_ROUND]:
+		var world := _keyboard_world()
+		var hero := world.heroes[0]
+		var bot := world.heroes[1]
+		var had := hero.upgrade_stacks.duplicate()
+		GameState.pending_rounds.assign([pick_round])
+		world._process(DT)
+		var screen := world.level_up
+		assert_true(screen.is_open())
+		_tap_pick(world, KEY_ESCAPE)
+		assert_eq(_picker(screen, hero).selected, 0, "Esc does nothing while the cards appear")
+		_pick_frames(world, LevelUpScreen.INPUT_GRACE + DT)
+		_tap_pick(world, KEY_ESCAPE)
+		assert_eq(_picker(screen, hero).selected, _picker(screen, hero).offers.size(), "Esc goes to SKIP")
+		assert_false(_picker(screen, hero).picked, "but takes two presses")
+		_tap_pick(world, KEY_ESCAPE)
+		assert_true(_picker(screen, hero).skipped, "round %d: skipped" % pick_round)
+		_pick_frames(world, 1.0)
+		assert_false(screen.is_open(), "round %d: the round ends once the bot has picked too" % pick_round)
+		assert_eq(hero.upgrade_stacks, had, "round %d: nothing taken" % pick_round)
+		assert_eq(bot.upgrade_stacks.size(), 1, "round %d: bots never skip" % pick_round)
+		if pick_round == GameState.LEGENDARY_ROUND:
+			assert_eq(hero.attack().display_name, hero.data.attack.display_name, "no ability transformed")
+		_teardown(world)
+
+
+func test_skip_is_the_last_choice_after_the_cards() -> void:
+	var world := _keyboard_world()
+	var hero := world.heroes[0]
+	GameState.pending_level_ups = 2
+	world._process(DT)
+	var screen := world.level_up
+	_pick_frames(world, LevelUpScreen.INPUT_GRACE + DT)
+	var pk := _picker(screen, hero)
+	_tap_pick(world, KEY_LEFT)
+	assert_eq(pk.selected, pk.offers.size(), "left from the first card is SKIP")
+	_tap_pick(world, KEY_RIGHT)
+	assert_eq(pk.selected, 0, "and right from SKIP the first card again")
+	_tap_pick(world, KEY_ESCAPE)
+	_tap_pick(world, KEY_RIGHT)
+	assert_eq(pk.selected, 0, "Esc isn't a trap: a direction goes back to the cards")
+	_tap_pick(world, KEY_ENTER)
+	assert_true(pk.picked and not pk.skipped, "and Enter takes the card")
+	_pick_frames(world, 1.0)
+	assert_true(screen.is_open(), "the next round")
+	_pick_frames(world, LevelUpScreen.INPUT_GRACE + DT)
+	pk = _picker(screen, hero)
+	_tap_pick(world, KEY_LEFT)
+	var stacks := hero.upgrade_stacks.duplicate()
+	_tap_pick(world, KEY_ENTER)
+	assert_true(pk.skipped, "Enter on SKIP skips")
+	assert_eq(hero.upgrade_stacks, stacks)
+	_teardown(world)
+
+
+func test_every_card_fits_a_four_player_panel() -> void:
+	var world := _make_world(_data(OPEN), 4)
+	GameState.pending_level_ups = 1
+	world._process(DT)
+	var screen := world.level_up
+	assert_true(screen.is_open())
+	var hero := world.heroes[0]
+	var size := _picker(screen, hero).cards[0].size
+	for u in UpgradePool.shared_library().upgrades:
+		var card := screen._build_card(u, hero, size)
+		screen.add_child(card)  # in the tree, for the theme's font
+		var name_label := card.get_child(0) as Label
+		var tag := card.get_child(1) as Label
+		var text := card.get_child(2) as Label
+		var counter := card.get_child(3) as Label
+		assert_true(name_label.position.y + name_label.get_minimum_size().y <= tag.position.y + 1.0,
+			"%s: the name fits above its tag" % u.id)
+		assert_true(text.position.y + text.get_minimum_size().y <= counter.position.y + 1.0,
+			"%s: the text fits above the counter" % u.id)
+		card.free()
+	_teardown(world)
+
+
+## A world with a keyboard player (P1, a knight) and a bot (P2, a mage).
+func _keyboard_world() -> World:
+	InputRouter.unassign_all()
+	GameState.clear_players()
+	GameState.reset_run()
+	InputRouter.assign(0, PlayerInput.DEVICE_KEYBOARD)
+	InputRouter.assign(1, PlayerInput.DEVICE_BOT)
+	GameState.slots[0].hero_id = &"knight"
+	GameState.slots[1].hero_id = &"mage"
+	var world: World = (load(WORLD_SCENE) as PackedScene).instantiate()
+	world.level_data = _data(OPEN)
+	world.spawn_enemies = false
+	_tree().root.add_child(world)
+	world.bots = null
+	InputRouter._process(DT)  # a frame with nothing held
+	return world
+
+
+## Pick screen frames (the world itself is paused meanwhile).
+func _pick_frames(world: World, seconds: float) -> void:
+	for f in ceili(seconds / DT):
+		InputRouter._process(DT)
+		world.level_up._process(DT)
+
+
+## Presses a key for a frame of the pick screen, then lets go for one.
+func _tap_pick(world: World, code: Key) -> void:
+	for pressed: bool in [true, false]:
+		var ev := InputEventKey.new()
+		ev.physical_keycode = code
+		ev.keycode = code
+		ev.pressed = pressed
+		Input.parse_input_event(ev)
+		Input.flush_buffered_events()
+		_pick_frames(world, DT)
+
+
+func _picker(screen: LevelUpScreen, hero: Hero) -> LevelUpScreen.Picker:
+	for pk in screen._pickers:
+		if pk.hero == hero:
+			return pk
+	return null
 
 
 func test_pick_rounds_wait_for_the_level_banner() -> void:
