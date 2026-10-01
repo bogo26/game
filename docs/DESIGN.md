@@ -523,10 +523,13 @@ Every walking enemy moves in `HordeSim._move()`:
   Abilities report theirs through `Ability.add_dangers()` and mortars through `Minion.add_dangers()`; a downed hero's wait with them. Then:
   - Each enemy takes a moment to notice a new one: 0.2 s, plus up to 0.3 s more by its uid. So a Meteor still catches the middle of a pack, but its rim gets out in time.
   - Caught in one, an enemy gets out the nearest way, at full speed.
+    - Unless a wall, a chasm or another AoE is in the way straight out (`HordeSim._escape_way()`): then it tries turns of up to 135° either way, and straight back, and takes the one that gets it clear of them all soonest (each 45° turned counts as 6 px further, a way toward its goal a little nearer). So an enemy pinned against a wall or in a corner gets out along the wall, and one between two AoEs doesn't flee from one into the other.
   - Walking into one, it stops going in over the last 16 px before the edge (its footprint stays 3 px clear) and turns that part of its way along the edge, so it goes round. It keeps to the side it's already going round, else takes the side its hero is on, else its own `bend`. (The flow field's steps turn from tile to tile: going by them, it would dither.)
+    - Choosing a side, it looks 45° further round the edge (`_round_open()`): if a wall shuts that side it goes round the other, and with both shut (an AoE across a corridor) it waits at the edge.
   - When its hero stands inside (a spinning Knight), it waits at the edge instead.
   - Busy enemies don't break off: a wind-up, a lit fuse, lining up or making a charge, a blink or a stun. Imps never blink into one.
   - Cost: dangers are flagged per tile (a bit each, at most 32 at once), so only the enemies near one look at it, and ones nobody can have noticed yet are skipped. Like the separation push, half of those enemies work out their turn each frame; the others take the one they worked out the frame before (`HordeSim.dodge`). The F3 overlay and the stress test count the dangers.
+    - Walls are only looked for round dangers that have one in reach (`_walled()`: a scan of the danger's tiles, once a frame, by the first enemy that needs it), so in the open a way out costs a couple of tile lookups, and only near walls a ray.
 - **Facing:** an enemy faces the first of these that applies:
   - its aim, while lining up a charge or drawing an aimed shot
   - its target, when within 2 tiles, in range (ranged enemies) or standing still
@@ -620,6 +623,9 @@ Breakdown per frame (uncapped): horde 0.63 ms, projectiles 0.37 ms, heroes 0.13 
   - The horde went from 1.40 to 1.49 ms (plain, 2 dangers on average) and from 1.33 to 1.40 ms (`--ult-spam`, 1.5 on average); the whole simulation stayed within run-to-run noise.
   - Worst case, on its own: 300 enemies round four heroes with three overlapping AoEs on the crowd (205 enemies near one). The horde step goes from 1.51 to 1.88 ms. Of that, the steering is ~0.18 ms (about 110 enemies work out a turn each frame, ~1.65 µs each) and flagging the tiles ~0.025 ms; the rest is the crowd itself, kept at a distance and packed along the edges. AoEs that no enemy is near cost ~0.03 ms.
   - Re-measure on the Air.
+- **Smarter dodging check** (walls and other AoEs in the way out, going round the open side; 2026-10-01): headless in a Linux container, so only simulation time counts.
+  - Real level (`--level=level_3 --ult-spam`, three 20 s runs alternated with the build before): 2.32–2.44 ms sim before, 2.34–2.58 ms after, within run-to-run noise. The occasional 26–40 ms spike shows up in both builds.
+  - Worst case, on its own: 300 swarmers among 32 AoEs (every slot) in a room full of pillars, about 20 enemies working out a way out each frame. The horde step goes from about 1.2–1.5 ms to 1.5–1.9 ms (best of 3, noisy machine): the way-out search costs ~0.19 ms of that (~9 µs per enemy, mostly checking that straight out is open near walls), the going-round checks ~0.01 ms. Walking the danger bits by set bit only (not bit by bit) took back part of it.
 
 ## Art, effects and audio
 

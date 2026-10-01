@@ -233,6 +233,107 @@ func test_blinkers_never_blink_into_an_aoe() -> void:
 			assert_false(h.blink_to.is_empty(), "it blinks to the hero's side when there's no AoE")
 
 
+## Frames until `inside` stops holding for enemy `i` (INF if it never does).
+func _time_to_leave(h: HordeSim, i: int, targets: PackedVector2Array, inside: Callable,
+		max_seconds: float) -> float:
+	var frames := 0
+	while inside.call(h.pos[i]):
+		if frames * DT >= max_seconds:
+			return INF
+		h.update(DT, targets)
+		frames += 1
+	return frames * DT
+
+
+func test_enemies_caught_against_a_wall_get_out_along_it() -> void:
+	# Straight out of the AoE is into the wall: it goes along the wall instead.
+	var g := _open_grid(40, 20)
+	var c := Vector2(3.5 * T, 10 * T)
+	for targets: PackedVector2Array in [PackedVector2Array(), PackedVector2Array([Vector2(36 * T, 10 * T)])]:
+		var h := _horde(g, targets)
+		h.add_danger(c, 48.0, 10.0)
+		var i := _steady(h, Vector2(T + 6, 10 * T))  # against the left wall
+		var edge := 48.0 + h.t_radius[0]
+		var t := _time_to_leave(h, i, targets, func(p: Vector2) -> bool: return p.distance_to(c) <= edge, 3.0)
+		assert_true(t < 2.0, "got out along the wall (%.2f s, %d heroes)" % [t, targets.size()])
+
+
+func test_enemies_caught_in_a_corner_get_out_along_a_wall() -> void:
+	var g := _open_grid(40, 20)
+	var none := PackedVector2Array()
+	var h := _horde(g, none)
+	var c := Vector2(4 * T, 4 * T)
+	h.add_danger(c, 56.0, 10.0)
+	var i := _steady(h, Vector2(T + 6, T + 6))  # straight out is into the corner
+	var edge := 56.0 + h.t_radius[0]
+	var t := _time_to_leave(h, i, none, func(p: Vector2) -> bool: return p.distance_to(c) <= edge, 5.0)
+	assert_true(t < 3.5, "got out of the corner (%.2f s)" % t)
+
+
+func test_enemies_dont_flee_one_aoe_into_another() -> void:
+	# Straight out of a is into b, right next to it: it leaves a the other way.
+	var g := _open_grid(40, 24)
+	var none := PackedVector2Array()
+	var h := _horde(g, none)
+	var a := Vector2(20 * T, 12 * T)
+	var b := a + Vector2(-80, 0)
+	h.add_danger(a, 40.0, 10.0)
+	h.add_danger(b, 40.0, 10.0)
+	var i := _steady(h, a + Vector2(-25, 0))
+	var edge := 40.0 + h.t_radius[0]
+	var closest_b := INF
+	var frames := 0
+	while (h.pos[i].distance_to(a) <= edge or h.pos[i].distance_to(b) <= edge) and frames < 180:
+		h.update(DT, none)
+		closest_b = minf(closest_b, h.pos[i].distance_to(b))
+		frames += 1
+	assert_true(closest_b > edge, "never set foot in b (%.1f px from its middle at the closest)" % closest_b)
+	assert_true(frames < 120, "and was clear of both soon (%.2f s)" % (frames * DT))
+
+
+func test_enemies_go_round_an_aoe_on_the_side_that_is_open() -> void:
+	# The AoE reaches the wall on the side its hero is on: it goes round the
+	# other side instead of pressing into the wall.
+	var g := _open_grid(40, 20)
+	var hero := Vector2(30 * T, 2 * T)
+	var target := PackedVector2Array([hero])
+	var h := _horde(g, target)
+	var c := Vector2(18 * T, 3 * T)
+	h.add_danger(c, 44.0, 10.0)
+	var i := _steady(h, Vector2(6 * T, 3 * T))
+	var edge := 44.0 + h.t_radius[0]
+	var closest := INF
+	var frames := 0
+	while h.pos[i].distance_to(hero) > T and frames < 1200:
+		h.update(DT, target)
+		closest = minf(closest, h.pos[i].distance_to(c))
+		frames += 1
+	assert_true(closest > edge, "never set foot in it (%.1f px from its middle at the closest)" % closest)
+	assert_true(h.pos[i].distance_to(hero) <= T, "and went round below it to its hero (%.1f s)" % (frames * DT))
+
+
+func test_enemies_wait_at_an_aoe_that_shuts_the_way() -> void:
+	# A corridor the AoE fills from wall to wall: no way round, so it waits.
+	var g := LevelGrid.new(40, 5)
+	for x in 40:
+		for y in 5:
+			g.set_solid(x, y, y == 0 or y == 4 or x == 0 or x == 39)
+	var hero := Vector2(34 * T, 2.5 * T)
+	var target := PackedVector2Array([hero])
+	var h := _horde(g, target)
+	var c := Vector2(20 * T, 2.5 * T)
+	h.add_danger(c, 40.0, 10.0)
+	var i := _steady(h, Vector2(4 * T, 2.5 * T))
+	var edge := 40.0 + h.t_radius[0]
+	var closest := INF
+	for f in 600:
+		h.update(DT, target)
+		closest = minf(closest, h.pos[i].distance_to(c))
+	assert_true(closest > edge, "kept out (%.1f px from its middle at the closest)" % closest)
+	assert_true(h.pos[i].distance_to(c) < edge + HordeSim.DANGER_MARGIN + HordeSim.DANGER_BAND,
+		"waiting at its edge (%.1f px)" % h.pos[i].distance_to(c))
+
+
 # --- the World's dangers -----------------------------------------------------------------------
 
 func _make_world(team: Array[StringName]) -> World:
