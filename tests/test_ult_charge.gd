@@ -3,7 +3,8 @@ extends "res://tests/test_case.gd"
 ## the minions and zones they make) charges the ultimate; the ultimate never
 ## charges itself: not with its own hits, the minions and zones it makes, the
 ## statuses it applies (and the burns, explosions and clouds they lead to) or
-## the barrels it sets off.
+## the barrels it sets off. The meter fills no faster than
+## Hero.ULT_MAX_PER_SECOND, and not at all while the ultimate is at work.
 
 const WORLD_SCENE := "res://src/world/world.tscn"
 const DT := 1.0 / 60.0
@@ -81,14 +82,20 @@ func _pack(world: World, hp: float = 1e6) -> void:
 
 ## World frames with the pack held in place (only hits move it). With
 ## `signal_attacks` the hero signals an attack every 0.2 s without swinging:
-## Shadow Clones copy it, nothing else happens.
-func _run(world: World, seconds: float, signal_attacks: bool = false) -> void:
+## Shadow Clones copy it, nothing else happens. Returns how long of it the
+## ultimate wasn't at work (the meter fills only then).
+func _run(world: World, seconds: float, signal_attacks: bool = false) -> float:
+	var idle := 0.0
 	for f in int(seconds / DT):
 		for i in world.horde.count:
 			world.horde.stun[i] = maxf(world.horde.stun[i], 1.0)
 		if signal_attacks and f % 12 == 0:
 			world.heroes[0].attack_performed.emit(Vector2.RIGHT)
+		var working := world.heroes[0].ult_working()
 		world._process(DT)
+		if not working and not world.heroes[0].ult_working():
+			idle += DT
+	return idle
 
 
 ## Presses the ultimate with a full meter (one world frame).
@@ -111,13 +118,12 @@ func test_no_ultimate_charges_itself() -> void:
 		var world := _make_world(id)
 		var hero := world.heroes[0]
 		_pack(world)
-		var t0 := world.elapsed
 		_use_ultimate(world)
 		assert_eq(hero.used_abilities[Ability.Slot.ULTIMATE], 1, "%s used its ultimate" % id)
-		_run(world, 11.0, true)  # the longest ultimates last 10 s
+		var idle := _run(world, 11.0, true)  # the longest ultimates last 10 s
 		if not (hero.ultimate() is BuffAbility):  # Rampage only makes the hero's own hits stronger
 			assert_true(GameState.slots[0].damage_dealt > 0.0, "%s: the ultimate hit the pack" % id)
-		assert_near(hero.ult_charge, _passive(hero, world.elapsed - t0), 0.001,
+		assert_near(hero.ult_charge + hero.ult_bank, _passive(hero, idle), 0.001,
 			"%s: only the passive trickle charged it (dealt %.0f)" % [id, GameState.slots[0].damage_dealt])
 		_teardown(world)
 
@@ -137,7 +143,8 @@ func test_everything_else_still_charges_it() -> void:
 		var dealt := GameState.slots[0].damage_dealt
 		assert_true(dealt > 0.0, "%s hit the pack" % id)
 		var expected := _passive(hero, world.elapsed - t0) + dealt * hero.ult_charge_mult / hero.data.ult_cost
-		assert_near(hero.ult_charge, minf(1.0, expected), 0.001, "%s: charged by what it dealt" % id)
+		assert_near(hero.ult_charge + hero.ult_bank, minf(1.0, expected), 0.001,
+			"%s: charged by what it dealt (meter and bank)" % id)
 		_teardown(world)
 
 
@@ -152,12 +159,12 @@ func test_shadow_clones_elements_dont_charge_it_either() -> void:
 		for tier in range(1, 4):
 			hero.apply_upgrade(library.find(StringName("%s_%d" % [element, tier])))
 	_pack(world, 60.0)
-	var t0 := world.elapsed
 	_use_ultimate(world)
-	_run(world, 6.0, true)  # the clones swing, the dagger doesn't
-	_run(world, 8.0)  # burns and poison run out, clouds fade
+	var idle := _run(world, 6.0, true)  # the clones swing, the dagger doesn't
+	idle += _run(world, 8.0)  # burns and poison run out, clouds fade
 	assert_true(GameState.slots[0].kills > 0, "enemies died burning and poisoned")
-	assert_near(hero.ult_charge, _passive(hero, world.elapsed - t0), 0.001,
+	assert_true(idle > 7.0, "the meter only waited for the clones, not their poison's clouds")
+	assert_near(hero.ult_charge + hero.ult_bank, _passive(hero, idle), 0.001,
 		"only the passive trickle charged it (dealt %.0f)" % GameState.slots[0].damage_dealt)
 	_teardown(world)
 
@@ -170,12 +177,13 @@ func test_a_burn_charges_it_unless_the_ultimate_lit_it() -> void:
 	var cost := hero.data.ult_cost / hero.ult_charge_mult
 	for by_ult: bool in [true, false]:  # the latest status decides
 		hero.ult_charge = 0.0
+		hero.ult_bank = 0.0
 		horde.ult_hits = by_ult
 		horde.ignite(j, 20.0, 2.0, hero.slot)
 		horde.ult_hits = false
 		horde.update(0.5, PackedVector2Array())  # 10 damage of burning
 		world._apply_ult_charge()
-		assert_near(hero.ult_charge, 0.0 if by_ult else 10.0 / cost, 0.0001,
+		assert_near(hero.ult_charge + hero.ult_bank, 0.0 if by_ult else 10.0 / cost, 0.0001,
 			"lit by the ultimate: %s" % by_ult)
 	assert_near(GameState.slots[0].damage_dealt, 20.0, 0.01, "both burns count as damage dealt")
 	_teardown(world)
@@ -189,6 +197,7 @@ func test_a_barrel_blows_up_for_whatever_broke_it() -> void:
 		var barrel := horde.uid[horde.spawn(horde.type_index(&"barrel"), hero.position + Vector2(60, 0))]
 		var brute := _enemy(world, hero.position + Vector2(84, 0))
 		hero.ult_charge = 0.0
+		hero.ult_bank = 0.0
 		horde.ult_hits = by_ult
 		world.hit_enemy(horde.index_of_uid(barrel), 1.0, Vector2.ZERO, hero.slot)
 		horde.ult_hits = false
@@ -198,5 +207,54 @@ func test_a_barrel_blows_up_for_whatever_broke_it() -> void:
 		assert_true(horde.hp[horde.index_of_uid(brute)] < 1e6, "the blast hit the brute")
 		var dealt := GameState.slots[0].damage_dealt
 		var expected := 0.0 if by_ult else dealt * hero.ult_charge_mult / hero.data.ult_cost
-		assert_near(hero.ult_charge, expected, 0.0001, "broken by the ultimate: %s" % by_ult)
+		assert_near(hero.ult_charge + hero.ult_bank, expected, 0.0001, "broken by the ultimate: %s" % by_ult)
+		_teardown(world)
+
+
+func test_the_meter_fills_no_faster_than_its_ceiling() -> void:
+	# However much a hero deals at once, the meter takes it in at
+	# ULT_MAX_PER_SECOND (times the charge rate): 16 s from empty, about 9 s
+	# with every Recharge. What's banked on the way isn't lost.
+	assert_near(1.0 / Hero.ULT_MAX_PER_SECOND, 16.0, 0.001, "16 s at the base rate")
+	for recharges: int in [0, 3]:
+		var world := _make_world(&"mage")
+		var hero := world.heroes[0]
+		for k in recharges:
+			hero.apply_upgrade(UpgradePool.shared_library().find(&"recharge"))
+		hero.ult_charge = 0.0
+		hero.add_ult_charge(1e6)  # one enormous hit
+		assert_near(hero.ult_bank, 1.0, 0.0001, "banked, but no more than a full meter")
+		assert_eq(hero.ult_charge, 0.0, "the meter takes it in over time")
+		var fastest := 1.0 / (Hero.ULT_MAX_PER_SECOND * hero.ult_charge_mult)
+		_run(world, fastest - 0.5)
+		assert_true(hero.ult_charge < 1.0, "%d Recharge: not full before %.1f s" % [recharges, fastest])
+		assert_near(hero.ult_charge, (fastest - 0.5) / fastest, 0.01, "%d Recharge: at its ceiling" % recharges)
+		assert_near(hero.ult_charge + hero.ult_bank, 1.0, 0.0001, "%d Recharge: nothing lost" % recharges)
+		_run(world, 0.6)
+		assert_true(hero.ult_charge >= 1.0, "%d Recharge: full at %.1f s" % [recharges, fastest])
+		_teardown(world)
+
+
+func test_the_meter_waits_while_the_ultimate_is_at_work() -> void:
+	# Nothing charges it (not even the trickle) until the ultimate is over:
+	# the spin, the meteor's fall, the Arrow Rain, the tesla tower, the army,
+	# the clones, the rampage. Then it fills as ever.
+	var lasts := {&"knight": 4.0, &"ranger": 5.0, &"mage": 1.0, &"cleric": 0.0, &"berserker": 10.0,
+		&"rogue": 6.0, &"engineer": 8.0, &"necromancer": 10.0}
+	for id: StringName in lasts:
+		var world := _make_world(id)
+		var hero := world.heroes[0]
+		_pack(world)
+		_use_ultimate(world)
+		var at_work := 0.0
+		while hero.ult_working() and at_work < 20.0:
+			hero.add_ult_charge(1000.0)
+			_run(world, DT)
+			at_work += DT
+		assert_near(at_work, lasts[id], 0.1, "%s: at work for as long as it lasts" % id)
+		assert_near(hero.ult_charge + hero.ult_bank, 0.0, _passive(hero, 2.5 * DT),
+			"%s: nothing charged it meanwhile (a frame's trickle at most)" % id)
+		hero.add_ult_charge(100.0)
+		_run(world, 0.5)
+		assert_true(hero.ult_charge > 0.0, "%s: then it fills again" % id)
 		_teardown(world)

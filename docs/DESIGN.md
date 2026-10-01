@@ -40,7 +40,7 @@ Each hero has four abilities:
 - **Attack:** spammable
 - **Special:** cooldown
 - **Movement:** dash or bash on a short cooldown, with brief i-frames
-- **Ultimate:** charged by the damage the other three deal (never by its own), plus a slow trickle
+- **Ultimate:** charged by the damage the other three deal (never by its own), plus a slow trickle; the meter fills no faster than once in 16 s (about 9 s with every Recharge), and not at all while the ultimate is still at work
 
 Two players may pick the same hero. Every player has a colour (P1 red, P2 blue, P3 green, P4 yellow), which is used for their ring, reticle and HUD panel.
 
@@ -476,7 +476,9 @@ docs/         this document
 - Upgrades tweak abilities through `Ability.mods` (e.g. `pierce`, `count`, `area_pct`, `max_active`, `minion_hp_pct`). There are 86 upgrades: 17 generic, 4–5 per hero, 12 elemental and 24 legendaries, which replace an ability with a new form (see Legendary upgrades).
 - `ProjectileSim` shots can also turn toward the next enemy after a hit (`TRAIT_RICOCHET`), log the kills they make (`TRAIT_REAP`), fork at a wall bounce (`splits`) and set enemies on fire (`Effect.BURN`).
 - Hero tuning lives in `tools/gen_hero_data.py`, which writes `src/heroes/data/*.tres`. Edit the table and re-run it, or edit the `.tres` in the Godot inspector.
-- **Ultimate charge:** damage dealt ÷ the hero's `ult_cost`, plus 1% per second passively. The player ring pulses when the ultimate is ready.
+- **Ultimate charge:** damage dealt ÷ the hero's `ult_cost`, plus 1% per second passively, both times the charge rate (Recharge: +25% each). The player ring pulses when the ultimate is ready.
+  - **A ceiling:** however much the hero deals, the meter fills no faster than `Hero.ULT_MAX_PER_SECOND` (1/16 per second) times the charge rate: 16 s from empty, 12.8 s / 10.7 s / 9.1 s with one / two / three Recharges. Charge earned faster waits in `Hero.ult_bank` (no more than the meter still needs) and flows in at that pace, so a burst isn't lost. Late in a run damage grows into the thousands per second, and without it the meter refilled in about a second.
+  - **Not while it works:** nothing charges the meter (not even the trickle) while the ultimate is still at work (`Hero.ult_working()`): its ability is active (a spin, a buff, clones, a meteor on its way down, a singularity, a lich), or a zone or minion it made is still there (`World.ultimate_at_work()`: Arrow Rain, a tesla tower, the army). Toxic clouds don't count: plague can keep spreading from cloud to cloud. So a 16 s Rampage or Tesla Tower can't be kept up for good. Meanwhile the HUD's ultimate bar glows dimly.
   - An ultimate never charges itself (it could be chained otherwise). While one works (its `_activate` / `_tick_active`, the clones' swings) `HordeSim.ult_hits` is on, and its hits also go to `ult_damage_by_slot`, which `World._apply_ult_charge()` leaves out. Minions and zones made meanwhile keep that (`World.add_minion` / `add_zone`), and so do the statuses it applies (`status_ult`: their damage over time, spreading fire and death effects) and the barrels it sets off. It all still counts as damage dealt, for stats and lifesteal.
 - **Critical hits:**
   - Every hit rolls the attacker's crit chance: base 5%, Rogue 15%, Keen Eye +6%, Deadly Precision +8%.

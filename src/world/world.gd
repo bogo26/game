@@ -591,6 +591,19 @@ func add_zone(zone: EffectZone) -> void:
 	ground_fx.zone(zone.position, zone.radius, zone.color, zone.duration)
 
 
+## Whether something `hero`'s ultimate left is still at work: its zones (Arrow
+## Rain) or minions (a tesla tower, the army of the dead). Its meter waits for
+## them (Hero.ult_working). Toxic clouds don't count: plague goes on spreading.
+func ultimate_at_work(hero: Hero) -> bool:
+	for zone in zones:
+		if zone.ultimate and zone.owner_slot == hero.slot and zone.poison_dps <= 0.0 and not zone.is_finished():
+			return true
+	for m in minions:
+		if m.ultimate and m.owner_hero == hero and not m.is_expired():
+			return true
+	return false
+
+
 func shake(strength: float) -> void:
 	camera.add_shake(strength)
 

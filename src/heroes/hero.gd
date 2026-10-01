@@ -20,6 +20,10 @@ const REVIVE_RADIUS := 20.0
 const REVIVE_HP_FRACTION := 0.3
 const REVIVE_IFRAMES := 2.0
 const ULT_PASSIVE_PER_SECOND := 0.01
+## However much damage a hero deals, the ultimate's meter fills no faster than
+## this per second (times the charge rate): an empty meter takes at least 16 s,
+## about 9 s with every Recharge. Charge earned faster waits in `ult_bank`.
+const ULT_MAX_PER_SECOND := 0.0625
 const SPRITE_FEET_OFFSET := Vector2(0, -6)
 const RETICLE_DISTANCE := 22.0
 const ACCELERATION := 14.0
@@ -65,6 +69,9 @@ var aim_dir := Vector2.RIGHT
 var invulnerable_time := 0.0
 ## 0..1; the ultimate is usable at 1.
 var ult_charge := 0.0
+## Charge earned but not in the meter yet: it flows in at ULT_MAX_PER_SECOND,
+## and holds no more than the meter still needs.
+var ult_bank := 0.0
 var revive_progress := 0.0
 ## Seconds left chilled (slowed; see chill()).
 var chill_time := 0.0
@@ -305,6 +312,7 @@ func tick(delta: float) -> void:
 		else:
 			used_abilities[Ability.Slot.ULTIMATE] = 1
 			ult_charge = 0.0
+			ult_bank = 0.0
 			_ult_announced = false
 			input.rumble(0.6, 0.9, 0.3)
 	if input.just_pressed(PlayerInput.Action.MOVEMENT) and not is_dashing():
@@ -313,12 +321,30 @@ func tick(delta: float) -> void:
 		else:
 			used_abilities[Ability.Slot.MOVEMENT] = 1
 
-	ult_charge = minf(1.0, ult_charge + ULT_PASSIVE_PER_SECOND * ult_charge_mult * delta)
+	_tick_ult_charge(delta)
 	if regen > 0.0:
 		heal(regen * delta)
 	_check_readiness()
 	_update_low_hp()
 	_update_visuals(delta)
+
+
+## The ultimate's meter: the passive trickle and the charge damage banked flow
+## in, at most ULT_MAX_PER_SECOND, but only once the ultimate is done.
+func _tick_ult_charge(delta: float) -> void:
+	if ult_working():
+		ult_bank = 0.0
+		return
+	ult_bank = minf(ult_bank + ULT_PASSIVE_PER_SECOND * ult_charge_mult * delta, 1.0 - ult_charge)
+	var step := minf(ult_bank, ULT_MAX_PER_SECOND * ult_charge_mult * delta)
+	ult_charge = minf(1.0, ult_charge + step)
+	ult_bank -= step
+
+
+## While the ultimate is still at work (a spin, a buff, clones, a meteor on its
+## way down, or the Arrow Rain, tower or army it left), its meter doesn't fill.
+func ult_working() -> bool:
+	return ultimate().is_active() or (world != null and world.ultimate_at_work(self))
 
 
 ## A press that couldn't do anything: the HUD bar flashes and a soft blip plays.
@@ -482,9 +508,11 @@ func on_damage_dealt(amount: float) -> void:
 		heal(amount * steal)
 
 
+## Damage dealt banks charge (damage / ult cost): the meter takes it in at its
+## own pace (see _tick_ult_charge), and none while the ultimate is at work.
 func add_ult_charge(damage_dealt: float) -> void:
-	if state == State.ALIVE and damage_dealt > 0.0:
-		ult_charge = minf(1.0, ult_charge + damage_dealt * ult_charge_mult / maxf(data.ult_cost, 1.0))
+	if state == State.ALIVE and damage_dealt > 0.0 and not ult_working():
+		ult_bank = minf(1.0 - ult_charge, ult_bank + damage_dealt * ult_charge_mult / maxf(data.ult_cost, 1.0))
 
 
 ## Applies a hit; returns true if damage was taken.
