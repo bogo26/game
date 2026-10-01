@@ -191,7 +191,7 @@ LEGENDARIES = [
     ("rogue_shadow_hunt", "Shadow Hunt",
      "Shadow Clones: your clones hunt on their own, blinking between enemies to stab them"),
     ("engineer_flamethrower", "Flamethrower",
-     "Rivet Gun: becomes a flamethrower. Short gouts of fire that set enemies burning"),
+     "Rivet Gun: becomes a flamethrower. Fire through the whole pack, spreading as it burns"),
     ("engineer_mortar", "Mortar",
      "Deploy Turret: build mortars instead, lobbing shells at the biggest pack in range"),
     ("engineer_tesla_grid", "Tesla Grid",

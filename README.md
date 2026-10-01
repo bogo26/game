@@ -117,7 +117,7 @@ Upgrades include four **elemental chains** for your attack: fire, ice, poison an
 | Cleric | **Prism Orbs**: orbs split in three at each wall bounce | **Bastion**: a dome that stops enemy shots and pushes enemies out | | **Judgement**: pillars of light strike the toughest enemies, bosses first |
 | Berserker | **Throwing Axe**: every 3rd swing throws the axe out and back | **Bloodbath**: kills burst in blood, chaining through the pack | **Rebound**: three slams in a row, each bigger | |
 | Rogue | | **Blade Vortex**: knives whirl around you, then fly out | **Shadowstrike**: appear behind an enemy for a sure crit | **Shadow Hunt**: clones hunt on their own |
-| Engineer | **Flamethrower**: a gout of fire that sets enemies burning | **Mortar**: mortars shell the biggest pack | | **Tesla Grid**: lightning links between the tower, you and your turrets |
+| Engineer | **Flamethrower**: a gout of fire through the whole pack, spreading from enemy to enemy | **Mortar**: mortars shell the biggest pack | | **Tesla Grid**: lightning links between the tower, you and your turrets |
 | Necromancer | **Haunt**: bolt kills rise as seeking wisps | **Bone Golem**: one big golem made of corpses draws the horde | | **Lich Form**: become a Lich; your kills rise as skeletons |
 
 **Test Room** on the main menu is a drop-in sandbox with an endless horde and one of everything. Add `-- --upgrades=fire_3,ice_2` to `./tools/dev.sh run` to start with those upgrades and the tiers before them; legendaries work too (`--upgrades=knight_crescent_wave,mage_singularity`: each hero only takes its own).

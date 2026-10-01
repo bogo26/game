@@ -25,6 +25,8 @@ const BONUS_SPREAD := 10.0
 ## faster or slower (a flamethrower's gout instead of a neat fan).
 @export var jitter_deg := 0.0
 @export var speed_jitter := 0.0
+## Area upgrades (Amplify) lengthen the shots' reach too (the Flamethrower).
+@export var area_reach := false
 ## Shots turn toward the next enemy after each hit (Ricochet).
 @export var ricochet := false
 ## Shots fork in three at a wall bounce, this many times (Prism Orbs).
@@ -51,6 +53,7 @@ func _fire(origin: Vector2, aim: Vector2, n: int, spread: float) -> void:
 	var shot_pierce := pierce + int(mod(&"pierce"))
 	var shot_bounces := bounces + int(mod(&"bounces"))
 	var splash := splash_radius * area_scale() if splash_radius > 0.0 else 0.0
+	var shot_life := lifetime * area_scale() if area_reach else lifetime
 	var sim := world().projectiles
 	var elemental := slot == Slot.ATTACK and hero.has_elements()
 	var bits := (ProjectileSim.TRAIT_RICOCHET if ricochet else 0) | (ProjectileSim.TRAIT_REAP if reap else 0)
@@ -69,7 +72,7 @@ func _fire(origin: Vector2, aim: Vector2, n: int, spread: float) -> void:
 		var crit := hero.roll_crit()
 		if crit:
 			dmg *= hero.crit_mult
-		var i := sim.spawn(origin, dir * v, dmg, radius, lifetime,
+		var i := sim.spawn(origin, dir * v, dmg, radius, shot_life,
 			ProjectileSim.Team.PLAYER, hero.slot, look, shot_pierce, knockback, shot_bounces)
 		if i < 0:
 			break
