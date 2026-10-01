@@ -591,7 +591,7 @@ Every walking enemy moves in `HordeSim._move()`:
 | 13 | Level enemies: every level's own enemy (bats, drowned, bone archers, revenants, sporecaps, frost boars, salamanders, imps) with its behaviour, art, sounds and warnings; bosses raise revenants and summon imps | done |
 | 14 | More bosses: boss pools (each run meets one of three mini bosses and one of three final bosses); the Toadstool Tyrant and the Mire Serpent (mini), the Spore Mother and the Frost Queen (final), each with a level, theme and servant of its own (sporelings, eels, puffballs, frost wraiths) | done |
 | 15 | Legendary upgrades: beating the mini boss offers each player three legendaries, each turning one of the hero's abilities into a new form (24 in all), with their shots, minions, sounds and tests | done |
-| 16 | Endless Waves: a second mode where the team holds one arena (The Pit) against waves that keep getting harder until it falls; a boss every 5th wave, each a legendary round; best wave per difficulty | done |
+| 16 | Endless Waves: a second mode where the team holds one arena (The Pit) against waves that keep getting harder until it falls; a boss every 5th wave (waves 10, 20 and 30 bring a legendary round); best wave per difficulty | done |
 
 ## Performance results
 
