@@ -354,8 +354,12 @@ func test_boss_waves() -> void:
 		assert_eq(slain.size(), 1, "wave %d: the boss is slain" % start)
 		assert_false(won[0], "and the game goes on")
 		assert_eq(director.phase, WaveDirector.Phase.BREAK)
-		assert_eq(GameState.next_round(), GameState.LEGENDARY_ROUND, "wave %d: a legendary round first" % start)
-		assert_eq(GameState.pending_rounds[1], GameState.TREASURE_ROUND, "then a bonus pick for everyone")
+		if start == 10:
+			assert_eq(GameState.next_round(), GameState.LEGENDARY_ROUND, "wave 10: a legendary round first")
+			assert_eq(GameState.pending_rounds[1], GameState.TREASURE_ROUND, "then a bonus pick for everyone")
+		else:
+			assert_false(GameState.pending_rounds.has(GameState.LEGENDARY_ROUND), "wave 5: no legendary")
+			assert_eq(GameState.next_round(), GameState.TREASURE_ROUND, "just the bonus pick for everyone")
 		assert_eq(GameState.pending_treasures, treasures + 1)
 		assert_eq(GameState.team_lives, GameState.lives_per_level(), "the team's lives are back")
 		_step(world, WaveDirector.BREAK_TIME)
@@ -364,23 +368,37 @@ func test_boss_waves() -> void:
 		_teardown(world)
 
 
-func test_legendary_rounds_stop_once_every_legendary_is_taken() -> void:
+func test_legendaries_come_on_waves_10_20_and_30() -> void:
 	var world := _wave_world(5)
+	var director := world.director as WaveDirector
+	for n in range(5, 55, 5):
+		director.wave = WaveDirector.settings(n, 1, 1234, MINIS, FINALS)
+		GameState.pending_rounds.clear()
+		world._on_mini_boss_defeated("Test Boss")
+		var legendary := n == 10 or n == 20 or n == 30
+		assert_eq(GameState.pending_rounds.has(GameState.LEGENDARY_ROUND), legendary,
+			"wave %d's boss %s a legendary round" % [n, "brings" if legendary else "doesn't bring"])
+	_teardown(world)
+
+
+func test_legendary_rounds_stop_once_every_legendary_is_taken() -> void:
+	var world := _wave_world(10)
 	var hero := world.heroes[0]
 	var offers := world.upgrade_pool.legendary_offers(hero.hero_id, hero.upgrade_stacks)
 	assert_eq(offers.size(), 3, "a hero has three legendaries")
 	hero.apply_upgrade(offers[0], false)
 	hero.apply_upgrade(offers[1], false)
 	assert_true(world.legendaries_left(), "one left")
+	var slain: Array[String] = []
+	world.director.mini_boss_defeated.connect(func(boss_name: String) -> void: slain.append(boss_name))
+	_step(world, WaveDirector.FIRST_BREAK + 0.1)
 	GameState.pending_rounds.clear()
 	world._on_mini_boss_defeated("Test Boss")
-	assert_eq(GameState.next_round(), GameState.LEGENDARY_ROUND, "so a boss still brings a round")
+	assert_eq(GameState.next_round(), GameState.LEGENDARY_ROUND, "so wave 10's boss still brings a round")
 	hero.apply_upgrade(offers[2], false)
 	assert_false(world.legendaries_left(), "all three taken")
 	GameState.pending_rounds.clear()
-	var slain: Array[String] = []
-	world.director.mini_boss_defeated.connect(func(boss_name: String) -> void: slain.append(boss_name))
-	_step(world, WaveDirector.FIRST_BREAK + WaveDirector.BOSS_PORTAL_TIME + 0.2)
+	_step(world, WaveDirector.BOSS_PORTAL_TIME + 0.1)
 	_kill_boss(world, slain)
 	assert_eq(slain.size(), 1, "the boss is slain")
 	assert_false(GameState.pending_rounds.has(GameState.LEGENDARY_ROUND), "no empty legendary round")

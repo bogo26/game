@@ -19,7 +19,9 @@ enum Look { ARROW, BOLT, ORB, SPIT, KNIFE, RIVET, SOUL, FIRE, SHARD = 24, CRESCE
 
 ## Optional on-hit effects applied to enemies.
 enum Effect { NONE, SLOW, STUN, BURN }
-## BURN sets the enemy on fire for this share of the hit per second.
+## BURN sets the enemy on fire for this share of the hit per second, and the
+## fire spreads to enemies touching it, as the Fire element's Wildfire does
+## (the Flamethrower sets a pack alight, not just the front of it).
 const BURN_SHARE := 0.5
 
 ## Trait bits (set_traits). RICOCHET: after a hit the shot turns toward the
@@ -400,7 +402,7 @@ func _hit_enemy(i: int, j: int, horde: HordeSim, v: Vector2, at: Vector2) -> voi
 		Effect.STUN:
 			horde.apply_stun(j, effect_time[i])
 		Effect.BURN:
-			horde.ignite(j, damage[i] * BURN_SHARE, effect_time[i], owner[i])
+			horde.ignite(j, damage[i] * BURN_SHARE, effect_time[i], owner[i], HordeSim.FLAG_WILDFIRE)
 	if elemental[i] != 0:
 		element_hits.append(j)
 		element_hits.append(owner[i])

@@ -487,17 +487,68 @@ func test_flamethrower_sets_what_it_reaches_ablaze() -> void:
 	var world := _make_world(&"engineer")
 	var hero := _learn(world, &"engineer_flamethrower")
 	var near := _enemy(world, hero.position + Vector2(40, 0))
-	var far := _enemy(world, hero.position + Vector2(130, 0))
+	var behind := _enemy(world, hero.position + Vector2(90, 0))
+	var far := _enemy(world, hero.position + Vector2(180, 0))
 	var attack := hero.attack()
-	for f in 30:
+	for f in 45:
 		if attack.can_activate():
 			attack.try_activate(Vector2.RIGHT)
 		_hold(world, DT)
 	assert_true(_shots(world, ProjectileSim.Look.FLAME) > 0, "a gout of fire")
 	assert_true(world.horde.is_burning(_at(world, near)), "that sets what it reaches ablaze")
 	assert_true(_hp(world, near) < HP)
-	assert_near(_hp(world, far), HP, 0.001, "but it's short")
+	assert_true(world.horde.is_burning(_at(world, behind)), "through the pack, about 100 px out")
+	assert_true(_hp(world, behind) < HP)
+	assert_near(_hp(world, far), HP, 0.001, "but no further")
 	_teardown(world)
+
+
+func test_the_flamethrowers_fire_spreads() -> void:
+	var world := _make_world(&"engineer")
+	var hero := _learn(world, &"engineer_flamethrower")
+	var lit := _enemy(world, hero.position + Vector2(40, 0))
+	var attack := hero.attack()
+	for f in 20:
+		if attack.can_activate():
+			attack.try_activate(Vector2.RIGHT)
+		_hold(world, DT)
+	_hold(world, 0.6)
+	assert_eq(_shots(world, ProjectileSim.Look.FLAME), 0, "the flames are out")
+	assert_true(world.horde.is_burning(_at(world, lit)), "what they reached still burns")
+	var next := _enemy(world, _pos(world, lit) + Vector2(0, 16))
+	_hold(world, 1.0)
+	assert_true(world.horde.is_burning(_at(world, next)), "and sets an enemy touching it alight")
+	_teardown(world)
+
+
+func test_amplify_lengthens_the_flame() -> void:
+	var world := _make_world(&"engineer")
+	var hero := world.heroes[0]
+	var amplify := UpgradePool.shared_library().find(&"amplify")
+	hero.apply_upgrade(amplify)
+	assert_true(hero.attack().try_activate(Vector2.RIGHT))
+	assert_near(_longest_life(world, ProjectileSim.Look.RIVET), 0.9, 0.001, "rivets fly as far as ever")
+	hero = _learn(world, &"engineer_flamethrower")
+	var attack := hero.attack() as ProjectileAbility
+	attack.cooldown_left = 0.0
+	assert_true(attack.try_activate(Vector2.RIGHT))
+	assert_near(_longest_life(world, ProjectileSim.Look.FLAME), attack.lifetime * 1.12, 0.001,
+		"the flame reaches 12% further")
+	hero.apply_upgrade(amplify)
+	attack.cooldown_left = 0.0
+	assert_true(attack.try_activate(Vector2.RIGHT))
+	assert_near(_longest_life(world, ProjectileSim.Look.FLAME), attack.lifetime * 1.24, 0.001,
+		"and further with each Amplify")
+	_teardown(world)
+
+
+## The longest time a shot of this look in flight has left.
+func _longest_life(world: World, look: ProjectileSim.Look) -> float:
+	var out := 0.0
+	for i in world.projectiles.count:
+		if world.projectiles.look[i] == look:
+			out = maxf(out, world.projectiles.life[i])
+	return out
 
 
 func test_mortars_shell_the_biggest_pack() -> void:

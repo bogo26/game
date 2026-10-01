@@ -282,10 +282,10 @@ FORMS = {
     # --- engineer -----------------------------------------------------------------------------
     "engineer_flamethrower": ("engineer", "attack", "projectile", {
         "display_name": "Flamethrower",
-        "description": "A short gout of fire that passes through enemies and sets them burning.",
-        "cooldown": 0.12, "count": 2, "spread_degrees": 0.0, "jitter_deg": 12.0, "speed": 150.0,
-        "speed_jitter": 0.2, "lifetime": 0.4, "radius": 5.0, "pierce": 99, "damage": 3.0, "knockback": 5.0,
-        "look": LOOK["flame"], "effect": EFFECT["burn"], "effect_time": 2.0}),
+        "description": "A roaring gout of fire through the whole pack. Burning enemies set those they touch alight.",
+        "cooldown": 0.14, "count": 2, "spread_degrees": 0.0, "jitter_deg": 15.0, "speed": 200.0,
+        "speed_jitter": 0.2, "lifetime": 0.5, "radius": 6.0, "pierce": 99, "damage": 5.0, "knockback": 5.0,
+        "look": LOOK["flame"], "effect": EFFECT["burn"], "effect_time": 3.0, "area_reach": True}),
     "engineer_mortar": ("engineer", "special", "summon", {
         "display_name": "Deploy Mortar",
         "description": "Place a mortar that lobs shells at the biggest pack in range (max 2).",

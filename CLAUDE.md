@@ -61,7 +61,8 @@ export GODOT=$GD/Godot_v4.7.2-stable_linux.x86_64   # tools/dev.sh reads $GODOT
 - `src/levels/`: `level_director.gd` (run levels, arenas, the restless clock,
   applies difficulty), `wave_director.gd` (Endless Waves), `level_data.gd`.
 - `src/ui/`: `character_select.gd` (difficulty picker, unlock hint, stars),
-  `end_screen.gd`, `hud.gd`, `level_up_screen.gd`.
+  `end_screen.gd`, `hud.gd`, `level_up_screen.gd` (pick rounds: cards and the
+  SKIP column; tests drive it with a keyboard player in `test_run_flow.gd`).
 - Data is generated, don't hand-edit it: hero tuning `tools/gen_hero_data.py`
   → `src/heroes/data/*.tres`; upgrades `tools/gen_upgrades.py` →
   `src/upgrades/data/upgrade_library.tres`; layouts `tools/gen_levels.py`.
@@ -105,6 +106,10 @@ export GODOT=$GD/Godot_v4.7.2-stable_linux.x86_64   # tools/dev.sh reads $GODOT
   spawns and crits aren't all seeded): its 12 s fight kills anywhere from about
   20 to 60 enemies and it needs more than 20, so it fails once in a while. Rerun
   it before chasing it.
+- Pick screen tests: human input is ignored for `LevelUpScreen.INPUT_GRACE`
+  (0.35 s) after the cards appear. Wait `INPUT_GRACE + DT` before pressing:
+  21 frames of 1/60 s fall a hair short of 0.35 s in floats. Bots pick a
+  random card after 0.6 s and never skip.
 - Measuring how fast something fills or happens in real fights works well as
   a throwaway test file (bots via `BotDriver`, `world.wave_mode` or a run
   level). Delete it before committing.

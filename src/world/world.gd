@@ -1424,11 +1424,13 @@ func _on_arena_cleared(_room_id: int) -> void:
 
 
 ## A mini boss fell (in Endless Waves, any boss): its room opens, and so does
-## the exit behind it, and every player picks a legendary - while any hero
-## still has one to take (with none left the round would open empty).
+## the exit behind it, and every player picks a legendary - if this boss earns
+## one (in Endless Waves only waves 10, 20 and 30 do: see
+## LevelDirector.grants_legendary) and any hero still has one to take (with
+## none left the round would open empty).
 func _on_mini_boss_defeated(boss_name: String) -> void:
 	hud.callout("%s SLAIN!" % boss_name.to_upper(), Color(1, 0.9, 0.5))
-	if legendaries_left():
+	if director.grants_legendary() and legendaries_left():
 		GameState.add_legendary_pick()
 	level_up_delay = maxf(level_up_delay, LEGENDARY_DELAY)
 
