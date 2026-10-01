@@ -100,17 +100,20 @@ Four kinds make up most of the horde throughout the run. Every level adds an ene
 
 ## Difficulty and records
 
-Chosen in character select with LB / RB (Q / E); Hard unlocks after a win on Normal, or after reaching wave 20 of Endless Waves on Normal. Both modes use the same difficulties.
+Chosen in character select with LB / RB (Q / E). Casual and Normal are open from the start; every harder difficulty unlocks with a win on the one before it, or by reaching wave 20 of Endless Waves on it (`Profile.unlocked()`): Hard after Normal, Nightmare after Hard, Torment after Nightmare. Locked ones are skipped, and a dim line under the picker says how to open the next. Both modes use the same difficulties.
 
-| | Enemy HP | Enemy damage | Spawn rate | Team lives per level | Elites |
-|---|---|---|---|---|---|
-| Casual | ×0.75 | ×0.7 | ×0.8 | 2 | ×0.5 |
-| Normal | ×1 | ×1 | ×1 | 1 | ×1 |
-| Hard | ×1.3 | ×1.3 | ×1.2 | 0 | ×2 |
+| | Enemy HP | Enemy damage | Spawn rate | Team lives per level | Elites | Enemy speed |
+|---|---|---|---|---|---|---|
+| Casual | ×0.75 | ×0.7 | ×0.8 | 2 | ×0.5 | ×1 |
+| Normal | ×1 | ×1 | ×1 | 1 | ×1 | ×1 |
+| Hard | ×1.3 | ×1.3 | ×1.2 | 0 | ×2 | ×1 |
+| Nightmare | ×1.7 | ×1.6 | ×1.35 | 0 | ×3 | ×1.1 |
+| Torment | ×2.2 | ×2 | ×1.5 | 0 | ×4 | ×1.2 |
 
 - Enemy damage is a real multiplier (`HordeSim.damage_mult`): contact, spit, exploder and elite blasts, spikes and every boss attack.
-- **Profile** (`Profile`, `user://profile.cfg`): runs played, wins and best time per difficulty, the hardest difficulty won with each hero, shown as a bronze / silver / gold star by the hero's name in character select, and the best wave reached in Endless Waves per difficulty (`best_wave`, in its own `[waves]` section). The end screen announces "NEW BEST TIME!", "NEW BEST WAVE!" and "HARD UNLOCKED!".
-  - Best times only compare runs of the same length: the profile stores a run version (`Profile.RUN_VERSION`, 2 = the 8-level run), and loading an older profile drops its best times but keeps wins, Hard unlocked and the stars.
+- Enemy speed (`HordeSim.speed_mult`) scales walking only (charges and hops keep their own); a restless horde speeds up on top of it, to 1.3× the difficulty's own at most. Elites stay capped at 4 alive whatever the chance.
+- **Profile** (`Profile`, `user://profile.cfg`): runs played, wins and best time per difficulty, the hardest difficulty won with each hero, shown as a bronze / silver / gold / amethyst / ruby star by the hero's name in character select, and the best wave reached in Endless Waves per difficulty (`best_wave`, in its own `[waves]` section). The end screen announces "NEW BEST TIME!", "NEW BEST WAVE!" and "HARD UNLOCKED!" (or "NIGHTMARE UNLOCKED!", "TORMENT UNLOCKED!").
+  - Best times only compare runs of the same length: the profile stores a run version (`Profile.RUN_VERSION`, 2 = the 8-level run), and loading an older profile drops its best times but keeps wins, the difficulties unlocked and the stars. Profiles saved before Nightmare and Torment existed (three numbers per difficulty list) are padded.
 
 Spawn director:
 - Spawns just outside the camera on walkable tiles, in waves plus a constant trickle. Off-screen spawns stay at least 110 px from every hero.
@@ -354,7 +357,7 @@ The second mode (main menu → Endless Waves): no dungeon, just waves that keep 
   - The spawner stays off, as in the run's boss rooms: the boss brings its own servants.
   - Beating it says "<NAME> SLAIN!" and opens a **legendary round** (see Legendary upgrades). Here every boss counts, not only mini bosses, until each hero has taken all three of its legendaries. After that no legendary round is queued at all (`World.legendaries_left()`), rather than an empty one. A treasure round (a bonus pick) comes after it, and the team's lives are refilled. It never ends the game.
 - **Team lives:** the difficulty's lives per level at the start, refilled after every boss wave, so five waves play the part of a run's level. A wipe with no life left ends the game: "GAME OVER / You reached wave n", then the end screen.
-- **Records:** `Profile.record_waves()` keeps the furthest wave per difficulty, shown in character select ("Best: wave 12") and announced on the end screen ("NEW BEST WAVE!"). Reaching wave 20 on Normal also unlocks Hard (`Profile.HARD_UNLOCK_WAVE`).
+- **Records:** `Profile.record_waves()` keeps the furthest wave per difficulty, shown in character select ("Best: wave 12") and announced on the end screen ("NEW BEST WAVE!"). Reaching wave 20 on a difficulty also unlocks the next one (`Profile.UNLOCK_WAVE`): Hard from Normal, Nightmare from Hard, Torment from Nightmare.
 - **Code:**
   - `WaveDirector` extends `LevelDirector`, and the World uses it instead when `wave_mode` is on. It reuses the base's arena spawning (`SpawnDirector.start_arena`), enemy counting, boss spawning (`_spawn_boss(at, scene)`) and boss objective. It replaces `tick()`, `picks_held()` (the World asks the director) and the boss's death.
   - The Game builds one World for the whole game (`_load_waves()`).

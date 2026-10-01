@@ -122,7 +122,7 @@ Upgrades include four **elemental chains** for your attack: fire, ice, poison an
 
 **Test Room** on the main menu is a drop-in sandbox with an endless horde and one of everything. Add `-- --upgrades=fire_3,ice_2` to `./tools/dev.sh run` to start with those upgrades and the tiers before them; legendaries work too (`--upgrades=knight_crescent_wave,mage_singularity`: each hero only takes its own).
 
-**Replaying:** pick Casual, Normal or Hard in character select (LB / RB or Q / E; Hard unlocks after a Normal win, or after reaching wave 20 of Endless Waves on Normal). Every run picks one of two layouts for each regular level and may mirror it, and from the second level on some enemies arrive as elites (Swift, Volatile, Splitting). The end screen shows everyone's numbers and awards, and records best times.
+**Replaying:** pick Casual, Normal, Hard, Nightmare or Torment in character select (LB / RB or Q / E). Each one past Normal unlocks with a win on the one before it, or by reaching wave 20 of Endless Waves on it: Hard after Normal, Nightmare after Hard, Torment after Nightmare. Nightmare and Torment bring much tougher, harder-hitting enemies, more of them, more elites, and a horde that walks faster. Every run picks one of two layouts for each regular level and may mirror it, and from the second level on some enemies arrive as elites (Swift, Volatile, Splitting). The end screen shows everyone's numbers and awards, and records best times.
 
 **Endless Waves** (main menu): no dungeon, just waves that keep getting harder, until the team falls. Join and pick heroes and a difficulty as for a run.
 - The team holds **The Pit**, one sealed arena (pillars, pools, spike beds, powder kegs), in a different tile theme each game.

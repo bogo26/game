@@ -410,14 +410,17 @@ func test_best_waves_are_kept_per_difficulty() -> void:
 	assert_false(news["best_wave"], "not as far: the record stands")
 	assert_eq(p.best_wave[GameState.Difficulty.NORMAL], 7)
 	assert_true(p.record_waves(GameState.Difficulty.CASUAL, 3)["best_wave"], "each difficulty has its own")
-	assert_false(p.hard_unlocked())
-	news = p.record_waves(GameState.Difficulty.NORMAL, Profile.HARD_UNLOCK_WAVE)
-	assert_true(news["hard_unlocked"], "wave %d on Normal unlocks Hard" % Profile.HARD_UNLOCK_WAVE)
-	assert_true(p.hard_unlocked())
+	assert_false(p.unlocked(GameState.Difficulty.HARD))
+	news = p.record_waves(GameState.Difficulty.NORMAL, Profile.UNLOCK_WAVE)
+	assert_eq(news["unlocked"], GameState.Difficulty.HARD, "wave %d on Normal unlocks Hard" % Profile.UNLOCK_WAVE)
+	assert_true(p.unlocked(GameState.Difficulty.HARD))
+	assert_false(p.unlocked(GameState.Difficulty.NIGHTMARE))
+	news = p.record_waves(GameState.Difficulty.HARD, Profile.UNLOCK_WAVE)
+	assert_eq(news["unlocked"], GameState.Difficulty.NIGHTMARE, "and on Hard, Nightmare")
 	assert_eq(p.runs_played, 0, "waves don't count as runs")
 	var loaded := Profile.load_profile()
 	assert_eq(loaded.best_wave, p.best_wave, "saved")
-	assert_true(loaded.hard_unlocked())
+	assert_true(loaded.unlocked(GameState.Difficulty.NIGHTMARE))
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(Profile.path))
 
 
@@ -452,7 +455,7 @@ func test_the_screens_follow_the_mode() -> void:
 	GameState.wave = 12
 	GameState.run_kills = 345
 	GameState.run_active = false
-	GameState.last_run_news = {"best_wave": true, "hard_unlocked": false}
+	GameState.last_run_news = {"best_wave": true, "unlocked": -1}
 	assert_true(EndScreen.stats_line().begins_with("Endless Waves   Normal   Wave 12   Enemies 345"),
 		EndScreen.stats_line())
 	var screen: Control = (load(END_SCENE) as PackedScene).instantiate()

@@ -39,8 +39,9 @@ func _ready() -> void:
 		records.append("NEW BEST TIME!")
 	if news.get("best_wave", false):
 		records.append("NEW BEST WAVE!")
-	if news.get("hard_unlocked", false):
-		records.append("HARD UNLOCKED!")
+	var unlocked: int = news.get("unlocked", -1)
+	if unlocked >= 0:
+		records.append("%s UNLOCKED!" % GameState.DIFFICULTY_NAMES[unlocked].to_upper())
 	%Records.text = "   ".join(records)
 	%Records.visible = not records.is_empty()
 	for s in GameState.slots:

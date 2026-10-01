@@ -58,8 +58,9 @@ const RESTLESS_AFTER := 60.0
 ## 4th), and the corridor horde spawns RESTLESS_RATE faster, fills
 ## RESTLESS_CAP more of the alive cap, and comes with RESTLESS_HP more HP,
 ## RESTLESS_DAMAGE more damage, RESTLESS_SPEED more speed (at most
-## RESTLESS_MAX_SPEED) and one more Elites.CHANCE of an elite. Fights hold
-## the horde at the level's own settings (and full drops).
+## RESTLESS_MAX_SPEED times the difficulty's own) and one more Elites.CHANCE
+## of an elite. Fights hold the horde at the level's own settings (and full
+## drops).
 const RESTLESS_EVERY := 15.0
 const RESTLESS_DROPS := 0.25
 const RESTLESS_RATE := 0.25
@@ -129,6 +130,7 @@ var _calm_cap := 0.0
 var _calm_hp := 1.0
 var _calm_elites := 0.0
 var _calm_damage := 1.0
+var _calm_speed := 1.0
 
 
 func setup(p_world: World) -> void:
@@ -162,6 +164,7 @@ func setup(p_world: World) -> void:
 		if arg.begins_with("--elite-chance="):  # debug: see (lots of) elites anywhere
 			spawner.elite_chance = arg.get_slice("=", 1).to_float()
 	world.horde.damage_mult = GameState.difficulty_value("damage")
+	world.horde.speed_mult = GameState.difficulty_value("speed")
 	spawner.corridor_cap_fraction = data.corridor_cap_fraction
 	spawner.spawn_rate = _rate(data.corridor_spawn_rate)
 	spawner.mode = SpawnDirector.Mode.CORRIDOR if data.corridor_spawn_rate > 0.0 else SpawnDirector.Mode.OFF
@@ -171,6 +174,7 @@ func setup(p_world: World) -> void:
 	_calm_hp = spawner.level_hp_multiplier
 	_calm_elites = spawner.elite_chance
 	_calm_damage = world.horde.damage_mult
+	_calm_speed = world.horde.speed_mult
 	has_clock = world.run_mode and data.corridor_spawn_rate > 0.0
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--restless-after="):  # debug: see the horde grow restless sooner
@@ -491,7 +495,7 @@ func _apply_horde(stage: int) -> void:
 	spawner.level_hp_multiplier = _calm_hp * (1.0 + RESTLESS_HP * s)
 	spawner.elite_chance = _calm_elites + Elites.CHANCE * GameState.difficulty_value("elites") * s
 	world.horde.damage_mult = _calm_damage * (1.0 + RESTLESS_DAMAGE * s)
-	world.horde.speed_mult = minf(RESTLESS_MAX_SPEED, 1.0 + RESTLESS_SPEED * s)
+	world.horde.speed_mult = _calm_speed * minf(RESTLESS_MAX_SPEED, 1.0 + RESTLESS_SPEED * s)
 
 
 # --- boss ------------------------------------------------------------------------------------

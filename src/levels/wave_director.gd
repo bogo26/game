@@ -250,6 +250,7 @@ func _start_wave(n: int) -> void:
 	spawner.elite_chance = _elite_override if _elite_override >= 0.0 \
 		else wave.elite_chance * GameState.difficulty_value("elites")
 	world.horde.damage_mult = wave.damage * GameState.difficulty_value("damage")
+	world.horde.speed_mult = GameState.difficulty_value("speed")
 	room.state = RoomState.ACTIVE
 	room.quota = wave.quota
 	room.killed = 0
