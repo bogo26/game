@@ -243,6 +243,9 @@ var ult_damage_by_slot := PackedFloat32Array([0, 0, 0, 0])
 ## it set off. Those hits count as damage dealt but never charge an
 ## ultimate. Whoever turns it on turns it off again.
 var ult_hits := false
+## On while an Inferno blast lands (Elements): what it kills doesn't blow up
+## in turn, so blasts never chain.
+var inferno_blast := false
 ## Biggest single hit per player slot since the World last read it.
 var biggest_hit_by_slot := PackedFloat32Array([0, 0, 0, 0])
 ## Hits since the last drain (position, damage) for sparks and numbers.
@@ -690,7 +693,7 @@ func drop_death_fx(n: int) -> void:
 
 func _log_death_fx(p: Vector2, flags: int, burning: bool, burn_power: float, poisoned: bool,
 		poison_power: float, is_ice: bool, frost_power: float, slot: int, ult: int) -> void:
-	if burning and flags & FLAG_INFERNO:
+	if burning and flags & FLAG_INFERNO and not inferno_blast:
 		_push_death_fx(p, DeathFx.INFERNO, burn_power, slot, ult)
 	if is_ice and flags & FLAG_SHATTER:
 		_push_death_fx(p, DeathFx.SHATTER, frost_power, slot, ult)

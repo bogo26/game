@@ -142,7 +142,7 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
 
 | Element | Tier I | Tier II | Tier III |
 |---|---|---|---|
-| **Fire** | *Ember Strikes*: burn for 50% of the hit per second, 3 s | *Wildfire*: 80% per second, 4 s; burning enemies set enemies touching them alight | *Inferno*: burning enemies explode when they die (3× the burn per second, 38 px) and set everything they hit ablaze, so it chains |
+| **Fire** | *Ember Strikes*: burn for 50% of the hit per second, 3 s | *Wildfire*: 80% per second, 4 s; burning enemies set enemies touching them alight | *Inferno*: burning enemies explode when they die (3× the burn per second, 38 px) and set everything they hit ablaze, but blasts don't chain: what a blast kills doesn't explode, and the fire it lights is ordinary fire |
 | **Ice** | *Frostbite*: chilled, 40% slower for 2.5 s | *Permafrost*: every 3rd chill freezes the enemy solid for 1.5 s | *Shatter*: frozen enemies take double damage from attacks, and die in a nova that chills everything near them twice (freezing most of them) |
 | **Poison** | *Venom*: stacks up to 4; each stack deals 25% of the hit per second for 4 s and slows 6% | *Virulence*: up to 8 stacks, 6 s | *Plague*: poisoned enemies leave a toxic cloud (2.5 s) that adds a stack every 0.5 s to everything inside (at most 10 clouds) |
 | **Lightning** | *Static Charge*: every hit staggers its target (small shove and stun) and zaps the nearest enemy within 56 px for 50% | *Arc Lightning*: zaps chain through 3 enemies for 60% and stun them | *Thunderstrike*: every 5th hit calls down a bolt (3× damage, 0.8 s stun) that chains through 6 enemies |
@@ -152,6 +152,7 @@ Four chains of three upgrades give a hero's **attack** an element. Each tier nee
 - **Statuses** live in `HordeSim` arrays (burn, poison stacks, chill, frost, frozen). Damage over time ticks in the horde's movement loop and is credited to the last hero to hit, for kills and ultimate charge (but statuses an ultimate applied don't charge it: see Ultimate charge). Enemies are tinted by status: frozen, burning, poisoned or chilled.
 - **Who is affected.** Barrels and urns take no statuses. Bosses burn and get poisoned, but never freeze or slow.
 - **Death effects** (Inferno, Shatter, Plague) are logged when an enemy dies, and at most 6 play per frame, so chains ripple outward. Fire spreading is checked for a share of the horde every frame.
+  - **Inferno blasts never set off more blasts.** While one lands, `HordeSim.inferno_blast` is on and the enemies it kills log no Inferno of their own; the fire it lights carries Wildfire but not Inferno. An enemy the hero (or Wildfire spreading from the hero's fire) set alight still explodes when something else kills it, so each blast stands for an enemy the hero's own fire reached, and one kill no longer sets off the whole horde.
 - **Cost.** In the worst case (all four elements at tier III on four heroes firing ~1000 elemental shots a second), the element code costs ~0.04 ms per frame. The stress test with `--elements` still meets the targets: 4.7 ms average, 7.9 ms p99.
 - **Runs:** each player's picks are stored in `GameState` and re-applied when the next level builds the heroes again.
 

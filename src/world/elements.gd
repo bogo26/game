@@ -275,15 +275,20 @@ func _play_death_fx() -> void:
 
 
 ## A burning enemy died: it explodes and sets everything around it on fire.
+## Blasts don't chain: what one kills doesn't explode, and the fire it lights
+## is ordinary fire (it spreads, but won't explode). Enemies already burning
+## with an Inferno of their own still explode when something else kills them.
 func _inferno(p: Vector2, burn_dps: float, slot: int) -> void:
 	var source := world.hero_for_slot(slot) if slot >= 0 else null
 	horde.query_circle(p, INFERNO_RADIUS, _hits)
 	var hits := _hits.duplicate()
+	horde.inferno_blast = true
 	for j in hits:
 		var away := horde.pos[j] - p
 		var push := away.normalized() * INFERNO_KNOCKBACK if away.length_squared() > 0.01 else Vector2.ZERO
 		world.hit_enemy(j, burn_dps * INFERNO_DAMAGE, push, slot, source)
-		horde.ignite(j, burn_dps, BURN_TIME[3], slot, HordeSim.FLAG_WILDFIRE | HordeSim.FLAG_INFERNO)
+		horde.ignite(j, burn_dps, BURN_TIME[3], slot, HordeSim.FLAG_WILDFIRE)
+	horde.inferno_blast = false
 	world.fx.disc(p + Vector2(0, -4), INFERNO_RADIUS * 0.8, Color(1.0, 0.5, 0.15, 0.55), 0.22)
 	world.fx.ring(p, INFERNO_RADIUS, Color(1.0, 0.8, 0.3), 0.25)
 	world.particles.burst(p + Vector2(0, -6), 12, COLORS[Element.FIRE], 120.0, 0.45, 3, Vector2.UP, PI * 1.4, -60.0)

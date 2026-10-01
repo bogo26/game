@@ -102,7 +102,7 @@ Things to use in the levels:
 **Ultimates** charge from the damage your other three abilities deal, plus a slow trickle. However strong you get, the meter takes at least 16 s to fill (about 9 s with all three Recharge upgrades), and it waits while your ultimate is still at work (its bar glows dimly meanwhile).
 
 Upgrades include four **elemental chains** for your attack: fire, ice, poison and lightning. Each has three tiers, and the third is a big one:
-- **Inferno:** burning enemies explode.
+- **Inferno:** burning enemies explode (the blasts set enemies alight, but never set off more blasts).
 - **Shatter:** frozen enemies take double damage and burst into a freezing nova.
 - **Plague:** poisoned enemies leave toxic clouds.
 - **Thunderstrike:** every 5th hit calls down a bolt.
