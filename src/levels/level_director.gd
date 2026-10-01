@@ -227,6 +227,12 @@ func picks_held() -> bool:
 	return active_room != null and not data.is_boss_level
 
 
+## Whether the boss that just fell earns a legendary round: the run's mini
+## boss always does (Endless Waves has its own rule).
+func grants_legendary() -> bool:
+	return true
+
+
 func on_enemy_killed() -> void:
 	if active_room:
 		active_room.killed += 1

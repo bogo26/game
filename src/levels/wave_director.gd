@@ -7,16 +7,19 @@ extends LevelDirector
 ## while: they stay in the fight). A short break follows, where pick rounds
 ## earned during the wave open, and then the next wave comes. Every 5th wave
 ## is a boss: a mini boss on waves 5, 15, 25..., a final boss on 10, 20, 30...
-## Beating one opens a legendary round (every boss counts here, until each
-## hero has taken all three of its legendaries), refills the team's lives
-## and gives everyone a bonus pick. settings() holds the numbers behind each
-## wave.
+## Beating one refills the team's lives and gives everyone a bonus pick; the
+## bosses of waves 10, 20 and 30 (LEGENDARY_WAVES) also open a legendary
+## round. settings() holds the numbers behind each wave.
 
 const ARENA_PATH := "res://src/levels/data/waves.tres"
 ## The tile sheets the arena may wear (one per game).
 const THEMES: Array[StringName] = [&"crypt", &"flooded", &"bones", &"ossuary", &"fungal", &"frost",
 	&"forge", &"throne", &"grove", &"cistern", &"mycelium", &"glacier"]
 const BOSS_EVERY := 5
+## Only these boss waves (the first three final bosses) end in a legendary
+## round, so a hero's three legendaries come one at a time, spread over the
+## game, rather than all by wave 15.
+const LEGENDARY_WAVES: Array[int] = [10, 20, 30]
 ## Seconds before the first wave (the game's banner is up) and between waves.
 const FIRST_BREAK := 4.0
 const BREAK_TIME := 5.0
@@ -142,6 +145,11 @@ func tick(dt: float) -> void:
 ## boss wave they open at once, like in the run's boss fights.
 func picks_held() -> bool:
 	return phase == Phase.FIGHT and wave != null and not wave.is_boss()
+
+
+## Only the bosses of LEGENDARY_WAVES bring a legendary round.
+func grants_legendary() -> bool:
+	return wave != null and LEGENDARY_WAVES.has(wave.number)
 
 
 static func is_boss_wave(n: int) -> bool:
@@ -303,8 +311,9 @@ func _on_boss_defeated() -> void:
 	world.boss = null
 	Audio.play_music(&"dungeon")
 	_clear_wave()
-	# Any boss, mini or final: the World calls out "<NAME> SLAIN!" and queues
-	# a legendary round ahead of the treasure round _clear_wave() queued.
+	# Any boss, mini or final: the World calls out "<NAME> SLAIN!" and, on
+	# one of LEGENDARY_WAVES, queues a legendary round ahead of the treasure
+	# round _clear_wave() queued.
 	mini_boss_defeated.emit(boss_name)
 
 
